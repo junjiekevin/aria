@@ -1,5 +1,6 @@
 import React from 'react'
 import { Routes, Route, Navigate } from 'react-router-dom'
+import AuthPage from './pages/AuthPage.tsx'
 
 const StudentFormPage = React.lazy(() => import('./pages/StudentFormPage.tsx'))
 const DashboardPage = React.lazy(() => import('./pages/DashboardPage.tsx'))
@@ -12,6 +13,7 @@ const App = () => {
                 <Route path="/" element={<LandingPage />} />
                 <Route path="/form" element={<StudentFormPage />} />
                 <Route path="/dashboard" element={<DashboardPage />} />
+                <Route path="/auth" element={<AuthPage />} />
                 <Route path="*" element={<Navigate to="/" />} />
             </Routes>
         </React.Suspense>
