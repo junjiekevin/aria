@@ -1,6 +1,7 @@
 import React from 'react'
 import { Routes, Route, Navigate } from 'react-router-dom'
 import AuthPage from './pages/AuthPage.tsx'
+import ProtectedRoute from './components/ProtectedRoute.tsx'
 
 const StudentFormPage = React.lazy(() => import('./pages/StudentFormPage.tsx'))
 const DashboardPage = React.lazy(() => import('./pages/DashboardPage.tsx'))
@@ -12,7 +13,7 @@ const App = () => {
             <Routes>
                 <Route path="/" element={<LandingPage />} />
                 <Route path="/form" element={<StudentFormPage />} />
-                <Route path="/dashboard" element={<DashboardPage />} />
+                <Route path="/dashboard" element={<ProtectedRoute><DashboardPage /></ProtectedRoute>} />
                 <Route path="/auth" element={<AuthPage />} />
                 <Route path="*" element={<Navigate to="/" />} />
             </Routes>
