@@ -4,6 +4,8 @@ import { getSchedules, type Schedule } from '../lib/api/schedules';
 import { Plus, Calendar, Clock, Archive, Trash2, FileText } from 'lucide-react';
 import Chat from '../components/Chat';
 import CreateScheduleModal from '../components/CreateScheduleModal';
+import ViewScheduleModal from '../components/ViewScheduleModal';
+import EditScheduleModal from '../components/EditScheduleModal';
 
 // Inline styles inspired by the LLM design
 const styles = {
@@ -130,7 +132,7 @@ function StatusBadge({ status }: StatusBadgeProps) {
 	);
 }
 
-function ScheduleCard({ schedule }: { schedule: Schedule }) {
+function ScheduleCard({ schedule, onView, onEdit }: { schedule: Schedule; onView: () => void; onEdit: () => void }) {
 	const formatDate = (dateString: string) => {
 		const date = new Date(dateString);
 		return date.toLocaleDateString("en-US", {
@@ -166,6 +168,7 @@ function ScheduleCard({ schedule }: { schedule: Schedule }) {
 
 				<div style={{ display: 'flex', gap: '0.75rem', paddingTop: '0.5rem' }}>
 					<button 
+						onClick={onView}
 						style={{ ...styles.button, flex: 1 }}
 						onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#ea580c'; }}
 						onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = '#f97316'; }}
@@ -173,6 +176,7 @@ function ScheduleCard({ schedule }: { schedule: Schedule }) {
 						View Schedule
 					</button>
 					<button 
+						onClick={onEdit}
 						style={{ 
 							...styles.button, 
 							backgroundColor: 'white', 
@@ -241,6 +245,9 @@ export default function DashboardPage() {
 	const [loading, setLoading] = useState(true);
 	const [error, setError] = useState<string | null>(null);
 	const [showCreateModal, setShowCreateModal] = useState(false);
+	const [showViewModal, setShowViewModal] = useState(false);
+	const [showEditModal, setShowEditModal] = useState(false);
+	const [selectedSchedule, setSelectedSchedule] = useState<Schedule | null>(null);
 
 	useEffect(() => {
 		loadSchedules();
@@ -263,7 +270,21 @@ export default function DashboardPage() {
 		setShowCreateModal(true);
 	};
 
+	const handleViewSchedule = (schedule: Schedule) => {
+		setSelectedSchedule(schedule);
+		setShowViewModal(true);
+	};
+
+	const handleEditSchedule = (schedule: Schedule) => {
+		setSelectedSchedule(schedule);
+		setShowEditModal(true);
+	};
+
 	const handleScheduleCreated = () => {
+		loadSchedules(); // Refresh the list
+	};
+
+	const handleScheduleUpdated = () => {
 		loadSchedules(); // Refresh the list
 	};
 
@@ -345,7 +366,12 @@ export default function DashboardPage() {
 							</div>
 							<div style={styles.grid}>
 								{visibleSchedules.map((schedule) => (
-									<ScheduleCard key={schedule.id} schedule={schedule} />
+									<ScheduleCard 
+										key={schedule.id} 
+										schedule={schedule}
+										onView={() => handleViewSchedule(schedule)}
+										onEdit={() => handleEditSchedule(schedule)}
+									/>
 								))}
 							</div>
 						</div>
@@ -364,6 +390,17 @@ export default function DashboardPage() {
 			isOpen={showCreateModal}
 			onClose={() => setShowCreateModal(false)}
 			onSuccess={handleScheduleCreated}
+		/>
+		<ViewScheduleModal
+			isOpen={showViewModal}
+			onClose={() => setShowViewModal(false)}
+			schedule={selectedSchedule}
+		/>
+		<EditScheduleModal
+			isOpen={showEditModal}
+			onClose={() => setShowEditModal(false)}
+			schedule={selectedSchedule}
+			onSuccess={handleScheduleUpdated}
 		/>
 	</div>
 	);
