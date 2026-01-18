@@ -654,14 +654,11 @@ export default function SchedulePage() {
               <ArrowLeft size={18} />
               Back to Dashboard
             </button>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-              <img src="/src/assets/images/aria-logo.png" alt="Aria" style={styles.logo} />
-              <div>
-                <h1 style={styles.title}>{schedule.label}</h1>
-                <p style={styles.subtitle}>
-                  {new Date(schedule.start_date).toLocaleDateString()} - {new Date(schedule.end_date).toLocaleDateString()}
-                </p>
-              </div>
+            <div>
+              <h1 style={styles.title}>{schedule.label}</h1>
+              <p style={styles.subtitle}>
+                {new Date(schedule.start_date).toLocaleDateString()} - {new Date(schedule.end_date).toLocaleDateString()}
+              </p>
             </div>
           </div>
         </div>

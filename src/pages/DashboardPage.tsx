@@ -47,8 +47,9 @@ const styles = {
 		fontSize: '1rem'
 	},
 	logo: {
-		height: '40px',
+		height: '48px',
 		width: 'auto',
+		marginTop: '-4px',
 	},
 	button: {
 		backgroundColor: '#f97316',
