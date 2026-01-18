@@ -3,10 +3,10 @@ import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Calendar, Users } from 'lucide-react';
 import { getSchedule, updateSchedule, type Schedule } from '../lib/api/schedules';
-import { getScheduleEntries, updateScheduleEntry, type ScheduleEntry } from '../lib/api/schedule-entries';
+import { getScheduleEntries, updateScheduleEntry, deleteScheduleEntry, type ScheduleEntry } from '../lib/api/schedule-entries';
 import { getFormResponses, type FormResponse } from '../lib/api/form-responses';
 import AddEventModal from '../components/AddEventModal';
-import { DndContext, useDraggable, useDroppable, type DragEndEvent, type DragStartEvent } from '@dnd-kit/core';
+import { DndContext, DragOverlay, useDraggable, useDroppable, PointerSensor, useSensor, useSensors, type DragEndEvent, type DragStartEvent } from '@dnd-kit/core';
 
 const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 const HOURS = Array.from({ length: 14 }, (_, i) => i + 8); // 8 AM to 9 PM
@@ -29,7 +29,7 @@ const styles = {
   headerContent: {
     maxWidth: '1600px',
     margin: '0 auto',
-    padding: '1.5rem',
+    padding: '0.6rem 1rem',
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'center',
@@ -38,73 +38,75 @@ const styles = {
   backButton: {
     display: 'flex',
     alignItems: 'center',
-    gap: '0.5rem',
-    padding: '0.5rem 1rem',
+    gap: '0.25rem',
+    padding: '0.35rem 0.6rem',
     background: 'none',
     border: '1px solid #d1d5db',
-    borderRadius: '0.5rem',
+    borderRadius: '0.3rem',
     cursor: 'pointer',
-    fontSize: '0.9375rem',
+    fontSize: '0.8rem',
     color: '#374151',
     transition: 'all 0.2s',
   },
   title: {
-    fontSize: '1.5rem',
+    fontSize: '1.1rem',
     fontWeight: '600',
     color: '#111827',
     margin: 0,
   },
   subtitle: {
-    fontSize: '0.875rem',
+    fontSize: '0.7rem',
     color: '#6b7280',
     margin: '0.25rem 0 0 0',
   },
   main: {
     maxWidth: '1600px',
     margin: '0 auto',
-    padding: '2rem 1.5rem',
+    padding: '0.6rem',
     display: 'grid',
-    gridTemplateColumns: '1fr 300px',
-    gap: '2rem',
+    gridTemplateColumns: '1fr 280px',
+    gap: '0.85rem',
   },
   timetableContainer: {
     backgroundColor: 'white',
-    borderRadius: '0.75rem',
+    borderRadius: '0.5rem',
     boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
     border: '1px solid #e5e7eb',
     overflow: 'hidden',
   },
   timetableHeader: {
     display: 'grid',
-    gridTemplateColumns: '80px repeat(7, 1fr)',
-    borderBottom: '2px solid #e5e7eb',
-    backgroundColor: '#f9fafb',
+    gridTemplateColumns: '55px repeat(7, 1fr)',
+    borderBottom: '2px solid #f97316',
+    backgroundColor: '#fff7ed',
   },
   dayHeader: {
-    padding: '1rem',
+    padding: '0.35rem 0.5rem',
     textAlign: 'center' as const,
     fontWeight: '600',
-    fontSize: '0.875rem',
-    color: '#374151',
-    borderRight: '1px solid #e5e7eb',
+    fontSize: '0.7rem',
+    color: '#c2410c',
+    borderRight: '1px solid #fed7aa',
+    backgroundColor: '#ffedd5',
   },
   timeLabel: {
-    width: '80px',
-    padding: '0.75rem',
-    fontSize: '0.75rem',
+    width: '55px',
+    padding: '0.25rem 0.25rem',
+    fontSize: '0.7rem',
     color: '#6b7280',
     textAlign: 'right' as const,
     borderRight: '1px solid #e5e7eb',
     borderBottom: '1px solid #f3f4f6',
+    fontWeight: '500',
   },
   timetableGrid: {
     display: 'grid',
-    gridTemplateColumns: '80px repeat(7, 1fr)',
+    gridTemplateColumns: '55px repeat(7, 1fr)',
   },
   timeSlot: {
-    minHeight: '60px',
-    borderRight: '1px solid #e5e7eb',
-    borderBottom: '1px solid #f3f4f6',
+    minHeight: '40px',
+    borderRight: '1px solid #fed7aa',
+    borderBottom: '1px solid #ffedd5',
     position: 'relative' as const,
     backgroundColor: 'white',
     transition: 'background-color 0.2s',
@@ -116,41 +118,47 @@ const styles = {
   },
   panel: {
     backgroundColor: 'white',
-    borderRadius: '0.75rem',
+    borderRadius: '0.5rem',
     boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
     border: '1px solid #e5e7eb',
-    padding: '1.5rem',
+    padding: '0.85rem',
   },
   panelTitle: {
-    fontSize: '1.125rem',
+    fontSize: '0.8rem',
     fontWeight: '600',
     color: '#111827',
-    margin: '0 0 1rem 0',
+    margin: '0 0 0.6rem 0',
     display: 'flex',
     alignItems: 'center',
     gap: '0.5rem',
   },
   emptyState: {
     textAlign: 'center' as const,
-    padding: '2rem 1rem',
+    padding: '0.6rem',
     color: '#6b7280',
-    fontSize: '0.875rem',
+    fontSize: '0.7rem',
   },
   lessonBlock: {
     position: 'absolute' as const,
     top: 0,
-    left: '4px',
-    right: '4px',
-    backgroundColor: '#fb923c',
+    left: '2px',
+    right: '2px',
+    backgroundColor: '#f97316',
     color: 'white',
-    borderRadius: '0.375rem',
-    padding: '0.5rem',
-    fontSize: '0.75rem',
-    fontWeight: '500',
+    borderRadius: '0.25rem',
+    padding: '0.25rem 0.5rem',
+    fontSize: '0.625rem',
+    fontWeight: '600',
     overflow: 'hidden',
     cursor: 'pointer',
     boxShadow: '0 1px 3px rgba(0, 0, 0, 0.2)',
     transition: 'all 0.2s',
+    display: 'flex',
+    flexDirection: 'column' as const,
+    justifyContent: 'center',
+    alignItems: 'center',
+    textAlign: 'center' as const,
+    maxHeight: '40px',
   },
   statusSelect: {
     padding: '0.5rem 0.75rem',
@@ -166,6 +174,15 @@ const styles = {
 };
 
 export default function SchedulePage() {
+  // Sensor configuration - must be inside component
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 8,
+      },
+    })
+  );
+
   const { scheduleId } = useParams<{ scheduleId: string }>();
   const navigate = useNavigate();
   const [schedule, setSchedule] = useState<Schedule | null>(null);
@@ -176,8 +193,8 @@ export default function SchedulePage() {
   const [showAddModal, setShowAddModal] = useState(false);
   const [selectedSlot, setSelectedSlot] = useState<{ day: string; hour: number } | null>(null);
   const [selectedEntry, setSelectedEntry] = useState<ScheduleEntry | null>(null);
-  const [isDragging, setIsDragging] = useState(false); // Track dragging state
-  const [isDragOperation, setIsDragOperation] = useState(false); // Track if a drag just completed
+  const [isDragging, setIsDragging] = useState(false);
+  const [activeDragId, setActiveDragId] = useState<string | null>(null);
 
   useEffect(() => {
     if (scheduleId) {
@@ -260,14 +277,14 @@ export default function SchedulePage() {
 
   // Drag and drop handlers
   const handleDragStart = (event: DragStartEvent) => {
+    setActiveDragId(event.active.id as string);
     setIsDragging(true);
-    setIsDragOperation(false);
   };
 
   const handleDragEnd = async (event: DragEndEvent) => {
     const { active, over } = event;
+    setActiveDragId(null);
     setIsDragging(false);
-    setIsDragOperation(!!over); // Track if a drag operation actually completed
 
     if (!over || !schedule) return;
 
@@ -312,7 +329,57 @@ export default function SchedulePage() {
       });
 
       if (overlappingEntry) {
-        alert(`Cannot drop here - conflicts with "${overlappingEntry.student_name}"`);
+        // Instead of blocking, offer to swap
+        const confirmSwap = window.confirm(
+          `"${draggedEntry.student_name}" conflicts with "${overlappingEntry.student_name}" (${new Date(overlappingEntry.start_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} - ${new Date(overlappingEntry.end_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}). Swap them?`
+        );
+        
+        if (!confirmSwap) return;
+        
+        // Swap the two events
+        const dayAbbrev = ['SU', 'MO', 'TU', 'WE', 'TH', 'FR', 'SA'][dayIndex];
+        const draggedRule = draggedEntry.recurrence_rule;
+        const draggedStart = draggedEntry.start_time;
+        const draggedEnd = draggedEntry.end_time;
+        
+        try {
+          // Update dragged entry to new slot
+          setEntries(entries.map(e => {
+            if (e.id === draggedEntry.id) {
+              return {
+                ...e,
+                start_time: firstOccurrence.toISOString(),
+                end_time: newEnd.toISOString(),
+                recurrence_rule: `FREQ=WEEKLY;BYDAY=${dayAbbrev}`,
+              };
+            }
+            if (e.id === overlappingEntry.id) {
+              return {
+                ...e,
+                start_time: draggedStart,
+                end_time: draggedEnd,
+                recurrence_rule: draggedRule,
+              };
+            }
+            return e;
+          }));
+          
+          await updateScheduleEntry(draggedEntry.id, {
+            start_time: firstOccurrence.toISOString(),
+            end_time: newEnd.toISOString(),
+            recurrence_rule: `FREQ=WEEKLY;BYDAY=${dayAbbrev}`,
+          });
+          
+          await updateScheduleEntry(overlappingEntry.id, {
+            start_time: draggedStart,
+            end_time: draggedEnd,
+            recurrence_rule: draggedRule,
+          });
+        } catch (err) {
+          console.error('Failed to swap events:', err);
+          alert('Failed to swap events');
+          loadScheduleData();
+        }
         return;
       }
 
@@ -339,6 +406,22 @@ export default function SchedulePage() {
         console.error('Failed to move event:', err);
         alert('Failed to move event');
         loadScheduleData(); // Reload on error to restore state
+      }
+    } else if (dropId === 'trash') {
+      // Dragged to trash - delete event
+      const confirmDelete = window.confirm(
+        `Delete "${draggedEntry.student_name}"? This action cannot be undone.`
+      );
+      
+      if (!confirmDelete) return;
+      
+      try {
+        setEntries(entries.filter(e => e.id !== draggedEntry.id));
+        await deleteScheduleEntry(draggedEntry.id);
+      } catch (err) {
+        console.error('Failed to delete event:', err);
+        alert('Failed to delete event');
+        loadScheduleData();
       }
     } else if (dropId.startsWith('entry-')) {
       // Dropped on another entry - offer to swap
@@ -416,8 +499,8 @@ export default function SchedulePage() {
     const startMinutes = startTime.getMinutes();
     const durationMinutes = (endTime.getTime() - startTime.getTime()) / (1000 * 60);
     
-    const topOffset = (startMinutes / 60) * 60; // 60px per hour
-    const height = (durationMinutes / 60) * 60;
+    const topOffset = (startMinutes / 60) * 40; // 40px per hour
+    const height = (durationMinutes / 60) * 40;
     
     return {
       ...styles.lessonBlock,
@@ -428,34 +511,39 @@ export default function SchedulePage() {
 
   // Draggable lesson block component
   function DraggableLessonBlock({ entry, children }: { entry: ScheduleEntry; children: React.ReactNode }) {
-    const { attributes, listeners, setNodeRef, transform } = useDraggable({
+    const { attributes, listeners, setNodeRef } = useDraggable({
       id: entry.id,
       data: entry,
     });
 
-    const style = transform
-      ? {
+    // Hide the original element while dragging, show ghost in DragOverlay instead
+    const isBeingDragged = activeDragId === entry.id;
+
+    return (
+      <div
+        ref={setNodeRef}
+        style={{
           ...getLessonBlockStyle(entry),
-          transform: `translate3d(${transform.x}px, ${transform.y}px, 0)`,
-        }
-      : getLessonBlockStyle(entry);
+          opacity: isBeingDragged ? 0 : 1,
+          visibility: isBeingDragged ? 'hidden' : 'visible',
+          pointerEvents: isBeingDragged ? 'none' : 'auto',
+        }}
+        onClick={(e) => {
+          if (!isDragging) {
+            handleEntryClick(entry, e);
+          }
+        }}
+        {...attributes}
+        {...listeners}
+        onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#ea580c'; }}
+        onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = '#fb923c'; }}
+      >
+        {children}
+      </div>
+    );
+  }
 
-     return (
-       <div
-         ref={setNodeRef}
-         style={style}
-         onClick={(e) => !isDragOperation && handleEntryClick(entry, e)}
-         {...attributes}
-         {...listeners}
-         onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#ea580c'; }}
-         onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = '#fb923c'; }}
-       >
-         {children}
-       </div>
-     );
-   }
-
-  function DroppableSlot({ children, day, hour, isDragging }: { children: React.ReactNode; day: string; hour: number; isDragging: boolean }) {
+  function DroppableSlot({ children, day, hour }: { children: React.ReactNode; day: string; hour: number }) {
     const { setNodeRef: setSlotRef, isOver } = useDroppable({
       id: `slot-${day}-${hour}`,
     });
@@ -465,13 +553,43 @@ export default function SchedulePage() {
         ref={setSlotRef}
         style={{
           ...styles.timeSlot,
-          backgroundColor: isOver ? '#fef3c7' : 'white',
+          backgroundColor: isOver ? '#ffedd5' : 'white',
         }}
-        onClick={() => !isDragging && handleSlotClick(day, hour)}
-        onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#fef3c7'; e.currentTarget.style.cursor = 'pointer'; }}
+        onClick={() => handleSlotClick(day, hour)}
+        onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#ffedd5'; e.currentTarget.style.cursor = 'pointer'; }}
         onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'white'; }}
       >
         {children}
+      </div>
+    );
+  }
+
+  function TrashDroppable() {
+    const { setNodeRef, isOver } = useDroppable({
+      id: 'trash',
+    });
+    
+    return (
+      <div
+        ref={setNodeRef}
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: '0.6rem',
+          border: '2px dashed',
+          borderColor: isOver ? '#dc2626' : '#d1d5db',
+          borderRadius: '0.3rem',
+          backgroundColor: isOver ? '#fef2f2' : 'white',
+          color: isOver ? '#dc2626' : '#6b7280',
+          fontSize: '0.7rem',
+          fontWeight: '500',
+          transition: 'all 0.2s',
+          cursor: 'pointer',
+          marginTop: '0.6rem',
+        }}
+      >
+        {isOver ? 'Drop here to delete' : 'Drag here to delete'}
       </div>
     );
   }
@@ -511,7 +629,7 @@ export default function SchedulePage() {
   return (
     <div style={styles.container}>
       <DndContext
-        sensors={undefined}
+        sensors={sensors}
         onDragStart={handleDragStart}
         onDragEnd={handleDragEnd}
         autoScroll={false}
@@ -563,7 +681,7 @@ export default function SchedulePage() {
                 const slotEntries = getEntriesForSlot(day, hour);
                 
                 return (
-                  <DroppableSlot key={`${day}-${hour}`} day={day} hour={hour} isDragging={isDragging}>
+                  <DroppableSlot key={`${day}-${hour}`} day={day} hour={hour}>
                     {slotEntries.map((entry) => (
                       <DraggableLessonBlock key={entry.id} entry={entry}>
                         <div style={{ fontWeight: '600' }}>{entry.student_name}</div>
@@ -661,8 +779,15 @@ export default function SchedulePage() {
               </div>
             )}
           </div>
+          
+          {/* Trash Zone */}
+          <div style={styles.panel}>
+            <TrashDroppable />
+          </div>
         </div>
       </main>
+
+      {/* Add/Edit Event Modal */}
 
       {/* Add/Edit Event Modal */}
       <AddEventModal
@@ -679,6 +804,31 @@ export default function SchedulePage() {
         scheduleStartDate={schedule.start_date}
          existingEntry={selectedEntry}
       />
+
+      {/* Drag Overlay for smooth ghost */}
+      <DragOverlay>
+        {activeDragId && (() => {
+          const entry = entries.find(e => e.id === activeDragId);
+          if (!entry) return null;
+          return (
+            <div style={{
+              ...getLessonBlockStyle(entry),
+              opacity: 0.7,
+              cursor: 'grabbing',
+              zIndex: 9999,
+              position: 'fixed',
+              pointerEvents: 'none',
+            }}>
+              <div style={{ fontWeight: '600' }}>{entry.student_name}</div>
+              <div style={{ fontSize: '0.625rem', opacity: 0.9 }}>
+                {new Date(entry.start_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                {' - '}
+                {new Date(entry.end_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+              </div>
+            </div>
+          );
+        })()}
+      </DragOverlay>
       </DndContext>
     </div>
   );
