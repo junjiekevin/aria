@@ -95,14 +95,20 @@ export async function sendChatMessage(
 
     // Check if the response contains a function call (JSON format)
     // Pattern: The AI will respond with FUNCTION_CALL: {...json...}
-    const functionCallMatch = assistantMessage.match(/FUNCTION_CALL:\s*(\{[\s\S]*?\})/);
+    const functionCallMatch = assistantMessage.match(/FUNCTION_CALL:\s*(\{[\s\S]*?\})\s*$/);
     
     if (functionCallMatch) {
       try {
-        const functionCall = JSON.parse(functionCallMatch[1]);
+        // Clean up the JSON string - remove any extra whitespace/newlines
+        const jsonString = functionCallMatch[1].trim();
+        console.log('Attempting to parse:', jsonString); // Debug
+        
+        const functionCall = JSON.parse(jsonString);
         
         // Extract the text response (everything before FUNCTION_CALL)
         const textResponse = assistantMessage.split('FUNCTION_CALL:')[0].trim();
+        
+        console.log('Successfully parsed function call:', functionCall); // Debug
         
         return {
           message: textResponse || 'Executing action...',
@@ -113,6 +119,7 @@ export async function sendChatMessage(
         };
       } catch (parseError) {
         console.error('Failed to parse function call:', parseError);
+        console.error('Raw match:', functionCallMatch[1]); // Debug
         // If parsing fails, just return the message
         return { message: assistantMessage };
       }
