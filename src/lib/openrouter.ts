@@ -2,7 +2,8 @@
 // OpenRouter API client for Gemini 2.0 Flash integration
 
 const OPENROUTER_API_URL = 'https://openrouter.ai/api/v1/chat/completions';
-const GEMINI_MODEL = 'google/gemini-2.0-flash-exp:free';
+// Using Xiaomi Mimo V2 Flash - free model with good availability
+const GEMINI_MODEL = 'xiaomi/mimo-v2-flash:free';
 
 export interface Message {
   role: 'user' | 'assistant' | 'system';
