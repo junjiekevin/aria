@@ -167,7 +167,8 @@ I'll delete that for you.
 FUNCTION_CALL: {"name": "deleteSchedule", "arguments": {"schedule_id": "abc123"}}
 
 ## Available Functions:
-- createSchedule: {"label": "string", "start_date": "YYYY-MM-DD", "end_date": "YYYY-MM-DD"}
+- createSchedule: {"label": "string", "start_date": "YYYY-MM-DD", "end_date": "YYYY-MM-DD"} (for ONE schedule)
+- createMultipleSchedules: {"schedules": [{"label": "...", "start_date": "...", "end_date": "..."}]} (for 2+ schedules at once)
 - listSchedules: {}
 - deleteAllSchedules: {} (use when user wants to delete ALL schedules at once)
 - deleteSchedule: {"schedule_id": "string"} (for deleting ONE specific schedule)
@@ -178,6 +179,7 @@ FUNCTION_CALL: {"name": "deleteSchedule", "arguments": {"schedule_id": "abc123"}
 ## Important Rules:
 - ALWAYS use YYYY-MM-DD format for dates (e.g., "2026-03-01" not "March 1, 2026")
 - When creating schedules, extract dates from natural language (e.g., "March 1, 2026" → "2026-03-01")
+- When user asks to create MULTIPLE schedules (2 or more), use createMultipleSchedules with all schedules in one call
 - When user asks to "delete all":
   * First call listSchedules to see what exists
   * After you see the results, ask the user: "I can see you have X schedules: [list them]. Are you sure you want to delete all of them?"

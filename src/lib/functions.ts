@@ -40,6 +40,28 @@ export const FUNCTION_DEFINITIONS = [
     },
   },
   {
+    name: 'createMultipleSchedules',
+    description: 'Create multiple schedules at once. Use this when the user asks to create 2 or more schedules.',
+    parameters: {
+      type: 'object',
+      properties: {
+        schedules: {
+          type: 'array',
+          description: 'Array of schedule objects to create',
+          items: {
+            type: 'object',
+            properties: {
+              label: { type: 'string' },
+              start_date: { type: 'string' },
+              end_date: { type: 'string' },
+            },
+          },
+        },
+      },
+      required: ['schedules'],
+    },
+  },
+  {
     name: 'listSchedules',
     description: 'Get all schedules for the current user (excludes trashed items)',
     parameters: {
@@ -144,6 +166,25 @@ export async function executeFunction(
         return { 
           success: true, 
           data: schedule,
+        };
+      }
+
+      case 'createMultipleSchedules': {
+        const schedules = args.schedules as Array<CreateScheduleInput>;
+        
+        // Create each schedule sequentially (to show progress)
+        const createdSchedules = [];
+        for (const scheduleInput of schedules) {
+          const schedule = await createSchedule(scheduleInput);
+          createdSchedules.push(schedule);
+        }
+        
+        return { 
+          success: true, 
+          data: {
+            schedules: createdSchedules,
+            count: createdSchedules.length,
+          },
         };
       }
 

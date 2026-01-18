@@ -229,6 +229,9 @@ export default function Chat() {
         if (result.success) {
           if (name === 'createSchedule' && result.data?.label) {
             resultContent = `✓ Created "${result.data.label}"`;
+          } else if (name === 'createMultipleSchedules' && result.data?.schedules) {
+            const scheduleNames = result.data.schedules.map((s: any) => `"${s.label}"`).join(', ');
+            resultContent = `✓ Created ${result.data.count} schedules: ${scheduleNames}`;
           } else if (name === 'listSchedules' && Array.isArray(result.data)) {
             // Format the schedule list nicely (hide IDs from user)
             if (result.data.length === 0) {
