@@ -115,6 +115,14 @@ export const FUNCTION_DEFINITIONS = [
       required: ['schedule_id'],
     },
   },
+  {
+    name: 'deleteAllSchedules',
+    description: 'Delete ALL schedules at once for the current user (moves them all to trash)',
+    parameters: {
+      type: 'object',
+      properties: {},
+    },
+  },
 ];
 
 /**
@@ -177,6 +185,23 @@ export async function executeFunction(
         return { 
           success: true, 
           data: { message: 'Schedule moved to trash' },
+        };
+      }
+
+      case 'deleteAllSchedules': {
+        // Get all schedules first
+        const schedules = await getSchedules();
+        
+        // Delete each one
+        const deletePromises = schedules.map(schedule => deleteSchedule(schedule.id));
+        await Promise.all(deletePromises);
+        
+        return { 
+          success: true, 
+          data: { 
+            message: `Deleted ${schedules.length} schedule${schedules.length > 1 ? 's' : ''}`,
+            count: schedules.length 
+          },
         };
       }
 

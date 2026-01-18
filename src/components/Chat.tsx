@@ -230,16 +230,25 @@ export default function Chat() {
           if (name === 'createSchedule' && result.data?.label) {
             resultContent = `✓ Created "${result.data.label}"`;
           } else if (name === 'listSchedules' && Array.isArray(result.data)) {
-            // Format the schedule list nicely
+            // Format the schedule list nicely (hide IDs from user)
             if (result.data.length === 0) {
               resultContent = 'You have no schedules yet.';
             } else {
-              resultContent = `You have ${result.data.length} schedule(s):\n${result.data.map((s: any) => 
-                `- "${s.label}" (${s.status}) - ${s.start_date} to ${s.end_date} [ID: ${s.id}]`
+              const statusMap: Record<string, string> = {
+                draft: 'Draft',
+                collecting: 'Active',
+                archived: 'Archived',
+                trashed: 'Trashed'
+              };
+              
+              resultContent = `You currently have ${result.data.length} schedule${result.data.length > 1 ? 's' : ''}:\n${result.data.map((s: any, idx: number) => 
+                `${idx + 1}. "${s.label}" (${statusMap[s.status] || s.status})`
               ).join('\n')}`;
             }
           } else if (name === 'deleteSchedule') {
             resultContent = '✓ Schedule moved to trash';
+          } else if (name === 'deleteAllSchedules') {
+            resultContent = `✓ Deleted all schedules (${result.data?.count || 0} schedule${result.data?.count > 1 ? 's' : ''})`;
           } else if (name === 'updateSchedule') {
             resultContent = '✓ Schedule updated';
           } else if (name === 'activateSchedule') {
