@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react';
 import { getSchedules, type Schedule } from '../lib/api/schedules';
 import { Plus, Calendar, Clock, Archive, Trash2, FileText } from 'lucide-react';
 import Chat from '../components/Chat';
+import CreateScheduleModal from '../components/CreateScheduleModal';
 
 // Inline styles inspired by the LLM design
 const styles = {
@@ -239,6 +240,7 @@ export default function DashboardPage() {
 	const [schedules, setSchedules] = useState<Schedule[]>([]);
 	const [loading, setLoading] = useState(true);
 	const [error, setError] = useState<string | null>(null);
+	const [showCreateModal, setShowCreateModal] = useState(false);
 
 	useEffect(() => {
 		loadSchedules();
@@ -258,7 +260,11 @@ export default function DashboardPage() {
 	};
 
 	const handleCreateSchedule = () => {
-		console.log('Create schedule clicked');
+		setShowCreateModal(true);
+	};
+
+	const handleScheduleCreated = () => {
+		loadSchedules(); // Refresh the list
 	};
 
 	const visibleSchedules = schedules.filter((s) => s.status !== "trashed");
@@ -352,6 +358,13 @@ export default function DashboardPage() {
 				</div>
 			</div>
 		</main>
-		</div>
+
+		{/* Modals */}
+		<CreateScheduleModal 
+			isOpen={showCreateModal}
+			onClose={() => setShowCreateModal(false)}
+			onSuccess={handleScheduleCreated}
+		/>
+	</div>
 	);
 }
