@@ -426,6 +426,27 @@ export default function SchedulePage() {
     );
   }
 
+  function DroppableSlot({ children, day, hour }: { children: React.ReactNode; day: string; hour: number }) {
+    const { setNodeRef: setSlotRef, isOver } = useDroppable({
+      id: `slot-${day}-${hour}`,
+    });
+    
+    return (
+      <div
+        ref={setSlotRef}
+        style={{
+          ...styles.timeSlot,
+          backgroundColor: isOver ? '#fef3c7' : 'white',
+        }}
+        onClick={() => handleSlotClick(day, hour)}
+        onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#fef3c7'; e.currentTarget.style.cursor = 'pointer'; }}
+        onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'white'; }}
+      >
+        {children}
+      </div>
+    );
+  }
+
   if (loading) {
     return (
       <div style={{ ...styles.container, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -510,22 +531,9 @@ export default function SchedulePage() {
               </div>
                {DAYS.map((day) => {
                 const slotEntries = getEntriesForSlot(day, hour);
-                const { setNodeRef: setSlotRef, isOver } = useDroppable({
-                  id: `slot-${day}-${hour}`,
-                });
                 
                 return (
-                  <div
-                    key={`${day}-${hour}`}
-                    ref={setSlotRef}
-                    style={{
-                      ...styles.timeSlot,
-                      backgroundColor: isOver ? '#fef3c7' : 'white',
-                    }}
-                    onClick={() => handleSlotClick(day, hour)}
-                    onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#fef3c7'; e.currentTarget.style.cursor = 'pointer'; }}
-                    onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'white'; }}
-                  >
+                  <DroppableSlot key={`${day}-${hour}`} day={day} hour={hour}>
                     {slotEntries.map((entry) => (
                       <DraggableLessonBlock key={entry.id} entry={entry}>
                         <div style={{ fontWeight: '600' }}>{entry.student_name}</div>
@@ -536,7 +544,7 @@ export default function SchedulePage() {
                         </div>
                       </DraggableLessonBlock>
                     ))}
-                  </div>
+                  </DroppableSlot>
                 );
               })}
             </div>
