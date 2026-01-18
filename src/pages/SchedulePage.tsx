@@ -177,6 +177,7 @@ export default function SchedulePage() {
   const [selectedSlot, setSelectedSlot] = useState<{ day: string; hour: number } | null>(null);
   const [selectedEntry, setSelectedEntry] = useState<ScheduleEntry | null>(null);
   const [activeEntry, setActiveEntry] = useState<ScheduleEntry | null>(null); // For drag preview
+  const [isDragging, setIsDragging] = useState(false); // Track dragging state
 
   useEffect(() => {
     if (scheduleId) {
@@ -262,12 +263,14 @@ export default function SchedulePage() {
     const entry = entries.find(e => e.id === event.active.id);
     if (entry) {
       setActiveEntry(entry);
+      setIsDragging(true);
     }
   };
 
   const handleDragEnd = async (event: DragEndEvent) => {
     const { active, over } = event;
     setActiveEntry(null);
+    setIsDragging(false);
 
     if (!over || !schedule) return;
 
@@ -426,7 +429,7 @@ export default function SchedulePage() {
     );
   }
 
-  function DroppableSlot({ children, day, hour }: { children: React.ReactNode; day: string; hour: number }) {
+  function DroppableSlot({ children, day, hour, isDragging }: { children: React.ReactNode; day: string; hour: number; isDragging: boolean }) {
     const { setNodeRef: setSlotRef, isOver } = useDroppable({
       id: `slot-${day}-${hour}`,
     });
@@ -438,7 +441,7 @@ export default function SchedulePage() {
           ...styles.timeSlot,
           backgroundColor: isOver ? '#fef3c7' : 'white',
         }}
-        onClick={() => handleSlotClick(day, hour)}
+        onClick={() => !isDragging && handleSlotClick(day, hour)}
         onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#fef3c7'; e.currentTarget.style.cursor = 'pointer'; }}
         onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'white'; }}
       >
@@ -485,6 +488,7 @@ export default function SchedulePage() {
         sensors={undefined}
         onDragStart={handleDragStart}
         onDragEnd={handleDragEnd}
+        autoScroll={false}
       >
       {/* Header */}
       <header style={styles.header}>
@@ -533,7 +537,7 @@ export default function SchedulePage() {
                 const slotEntries = getEntriesForSlot(day, hour);
                 
                 return (
-                  <DroppableSlot key={`${day}-${hour}`} day={day} hour={hour}>
+                  <DroppableSlot key={`${day}-${hour}`} day={day} hour={hour} isDragging={isDragging}>
                     {slotEntries.map((entry) => (
                       <DraggableLessonBlock key={entry.id} entry={entry}>
                         <div style={{ fontWeight: '600' }}>{entry.student_name}</div>
