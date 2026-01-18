@@ -1,10 +1,10 @@
 // src/pages/DashboardPage.tsx
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { getSchedules, type Schedule } from '../lib/api/schedules';
 import { Plus, Calendar, Clock, Archive, Trash2, FileText } from 'lucide-react';
 import Chat from '../components/Chat';
 import CreateScheduleModal from '../components/CreateScheduleModal';
-import ViewScheduleModal from '../components/ViewScheduleModal';
 import EditScheduleModal from '../components/EditScheduleModal';
 
 // Inline styles inspired by the LLM design
@@ -241,11 +241,11 @@ function EmptyState({ onCreateSchedule }: { onCreateSchedule: () => void }) {
 }
 
 export default function DashboardPage() {
+	const navigate = useNavigate();
 	const [schedules, setSchedules] = useState<Schedule[]>([]);
 	const [loading, setLoading] = useState(true);
 	const [error, setError] = useState<string | null>(null);
 	const [showCreateModal, setShowCreateModal] = useState(false);
-	const [showViewModal, setShowViewModal] = useState(false);
 	const [showEditModal, setShowEditModal] = useState(false);
 	const [selectedSchedule, setSelectedSchedule] = useState<Schedule | null>(null);
 
@@ -271,8 +271,7 @@ export default function DashboardPage() {
 	};
 
 	const handleViewSchedule = (schedule: Schedule) => {
-		setSelectedSchedule(schedule);
-		setShowViewModal(true);
+		navigate(`/schedule/${schedule.id}`);
 	};
 
 	const handleEditSchedule = (schedule: Schedule) => {
@@ -385,23 +384,18 @@ export default function DashboardPage() {
 			</div>
 		</main>
 
-		{/* Modals */}
-		<CreateScheduleModal 
-			isOpen={showCreateModal}
-			onClose={() => setShowCreateModal(false)}
-			onSuccess={handleScheduleCreated}
-		/>
-		<ViewScheduleModal
-			isOpen={showViewModal}
-			onClose={() => setShowViewModal(false)}
-			schedule={selectedSchedule}
-		/>
-		<EditScheduleModal
-			isOpen={showEditModal}
-			onClose={() => setShowEditModal(false)}
-			schedule={selectedSchedule}
-			onSuccess={handleScheduleUpdated}
-		/>
-	</div>
+	{/* Modals */}
+	<CreateScheduleModal 
+		isOpen={showCreateModal}
+		onClose={() => setShowCreateModal(false)}
+		onSuccess={handleScheduleCreated}
+	/>
+	<EditScheduleModal
+		isOpen={showEditModal}
+		onClose={() => setShowEditModal(false)}
+		schedule={selectedSchedule}
+		onSuccess={handleScheduleUpdated}
+	/>
+</div>
 	);
 }
