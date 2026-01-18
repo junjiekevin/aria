@@ -496,7 +496,7 @@ export default function DashboardPage() {
 
 				{/* Right column: Chat */}
 				<div>
-					<Chat />
+					<Chat onScheduleChange={loadSchedules} />
 				</div>
 			</div>
 		</main>

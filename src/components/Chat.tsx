@@ -154,7 +154,11 @@ interface ChatMessage extends Message {
   timestamp: Date;
 }
 
-export default function Chat() {
+interface ChatProps {
+  onScheduleChange?: () => void;
+}
+
+export default function Chat({ onScheduleChange }: ChatProps) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
@@ -226,12 +230,15 @@ export default function Chat() {
 
         // Format the result message based on the function type
         let resultContent = '';
+        let scheduleModified = false;
         if (result.success) {
           if (name === 'createSchedule' && result.data?.label) {
             resultContent = `✓ Created "${result.data.label}"`;
+            scheduleModified = true;
           } else if (name === 'createMultipleSchedules' && result.data?.schedules) {
             const scheduleNames = result.data.schedules.map((s: any) => `"${s.label}"`).join(', ');
             resultContent = `✓ Created ${result.data.count} schedules: ${scheduleNames}`;
+            scheduleModified = true;
           } else if (name === 'listSchedules' && Array.isArray(result.data)) {
             // Format the schedule list nicely (hide IDs from user)
             if (result.data.length === 0) {
@@ -250,14 +257,22 @@ export default function Chat() {
             }
           } else if (name === 'deleteSchedule') {
             resultContent = '✓ Schedule moved to trash';
+            scheduleModified = true;
           } else if (name === 'deleteAllSchedules') {
             resultContent = `✓ Deleted all schedules (${result.data?.count || 0} schedule${result.data?.count > 1 ? 's' : ''})`;
+            scheduleModified = true;
           } else if (name === 'updateSchedule') {
             resultContent = '✓ Schedule updated';
+            scheduleModified = true;
           } else if (name === 'activateSchedule') {
             resultContent = '✓ Schedule activated';
+            scheduleModified = true;
           } else if (name === 'archiveSchedule') {
             resultContent = '✓ Schedule archived';
+            scheduleModified = true;
+          } else if (name === 'trashSchedule') {
+            resultContent = '✓ Schedule moved to trash';
+            scheduleModified = true;
           } else {
             resultContent = '✓ Action completed successfully';
           }
@@ -272,6 +287,11 @@ export default function Chat() {
           timestamp: new Date(),
         };
         setMessages((prev) => [...prev, resultMessage]);
+
+        // Trigger schedule refresh callback if schedules were modified
+        if (scheduleModified && onScheduleChange) {
+          setTimeout(() => onScheduleChange(), 100);
+        }
 
         // AUTO-CONTINUE: Feed the result back to AI so it can continue the workflow
         // This allows multi-step operations like "delete all" to work seamlessly
@@ -322,6 +342,11 @@ export default function Chat() {
                 };
 
                 setMessages((prev) => [...prev, followUpMessage]);
+
+                // Trigger refresh for follow-up actions
+                if (followUpResult.success && onScheduleChange) {
+                  setTimeout(() => onScheduleChange(), 100);
+                }
               }
             } catch (error) {
               console.error('Error in auto-continue:', error);
