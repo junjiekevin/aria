@@ -2,6 +2,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { Send, Loader2, Bot, User } from 'lucide-react';
 import { sendChatMessage, ARIA_SYSTEM_PROMPT, type Message } from '../lib/openrouter';
+import { executeFunction } from '../lib/functions';
 
 const styles = {
   container: {
@@ -200,6 +201,36 @@ export default function Chat() {
       };
 
       setMessages((prev) => [...prev, assistantMessage]);
+
+      // If there's a function call, execute it
+      if (response.functionCall) {
+        const { name, arguments: args } = response.functionCall;
+        
+        // Show a system message that we're executing the function
+        const executingMessage: ChatMessage = {
+          id: (Date.now() + 2).toString(),
+          role: 'assistant',
+          content: `Executing ${name}...`,
+          timestamp: new Date(),
+        };
+        setMessages((prev) => [...prev, executingMessage]);
+
+        // Execute the function
+        const result = await executeFunction(name, args);
+
+        // Remove the "executing" message and show result
+        setMessages((prev) => prev.filter((msg) => msg.id !== executingMessage.id));
+
+        const resultMessage: ChatMessage = {
+          id: (Date.now() + 3).toString(),
+          role: 'assistant',
+          content: result.success
+            ? `✓ Done! ${result.data?.label ? `Created "${result.data.label}"` : 'Action completed successfully.'}`
+            : `✗ Error: ${result.error}`,
+          timestamp: new Date(),
+        };
+        setMessages((prev) => [...prev, resultMessage]);
+      }
     } catch (error) {
       console.error('Error sending message:', error);
 

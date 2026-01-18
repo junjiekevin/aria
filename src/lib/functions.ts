@@ -1,0 +1,196 @@
+// src/lib/functions.ts
+// Function definitions for AI function calling
+
+import { 
+  createSchedule, 
+  getSchedules, 
+  updateSchedule, 
+  deleteSchedule, 
+  activateSchedule,
+  archiveSchedule,
+  type CreateScheduleInput,
+  type UpdateScheduleInput 
+} from './api/schedules';
+
+/**
+ * Function schema definitions for OpenRouter/AI
+ * These tell the AI what functions it can call and what parameters they need
+ */
+export const FUNCTION_DEFINITIONS = [
+  {
+    name: 'createSchedule',
+    description: 'Create a new schedule for lessons or appointments. The schedule starts as a draft.',
+    parameters: {
+      type: 'object',
+      properties: {
+        label: {
+          type: 'string',
+          description: 'A descriptive name for the schedule (e.g., "Fall 2026 Piano Lessons")',
+        },
+        start_date: {
+          type: 'string',
+          description: 'Start date in YYYY-MM-DD format (e.g., "2026-09-01")',
+        },
+        end_date: {
+          type: 'string',
+          description: 'End date in YYYY-MM-DD format (e.g., "2026-12-15")',
+        },
+      },
+      required: ['label', 'start_date', 'end_date'],
+    },
+  },
+  {
+    name: 'listSchedules',
+    description: 'Get all schedules for the current user (excludes trashed items)',
+    parameters: {
+      type: 'object',
+      properties: {},
+    },
+  },
+  {
+    name: 'updateSchedule',
+    description: 'Update an existing schedule (change label, dates, or status)',
+    parameters: {
+      type: 'object',
+      properties: {
+        schedule_id: {
+          type: 'string',
+          description: 'The ID of the schedule to update',
+        },
+        label: {
+          type: 'string',
+          description: 'New label/name for the schedule (optional)',
+        },
+        start_date: {
+          type: 'string',
+          description: 'New start date in YYYY-MM-DD format (optional)',
+        },
+        end_date: {
+          type: 'string',
+          description: 'New end date in YYYY-MM-DD format (optional)',
+        },
+      },
+      required: ['schedule_id'],
+    },
+  },
+  {
+    name: 'activateSchedule',
+    description: 'Activate a draft schedule to start collecting student responses',
+    parameters: {
+      type: 'object',
+      properties: {
+        schedule_id: {
+          type: 'string',
+          description: 'The ID of the schedule to activate',
+        },
+      },
+      required: ['schedule_id'],
+    },
+  },
+  {
+    name: 'archiveSchedule',
+    description: 'Archive a completed schedule (no longer collecting responses)',
+    parameters: {
+      type: 'object',
+      properties: {
+        schedule_id: {
+          type: 'string',
+          description: 'The ID of the schedule to archive',
+        },
+      },
+      required: ['schedule_id'],
+    },
+  },
+  {
+    name: 'deleteSchedule',
+    description: 'Move a schedule to trash (soft delete, can be restored within 14 days)',
+    parameters: {
+      type: 'object',
+      properties: {
+        schedule_id: {
+          type: 'string',
+          description: 'The ID of the schedule to delete',
+        },
+      },
+      required: ['schedule_id'],
+    },
+  },
+];
+
+/**
+ * Execute a function called by the AI
+ */
+export async function executeFunction(
+  functionName: string,
+  args: Record<string, any>
+): Promise<{ success: boolean; data?: any; error?: string }> {
+  try {
+    switch (functionName) {
+      case 'createSchedule': {
+        const input: CreateScheduleInput = {
+          label: args.label,
+          start_date: args.start_date,
+          end_date: args.end_date,
+        };
+        const schedule = await createSchedule(input);
+        return { 
+          success: true, 
+          data: schedule,
+        };
+      }
+
+      case 'listSchedules': {
+        const schedules = await getSchedules();
+        return { 
+          success: true, 
+          data: schedules,
+        };
+      }
+
+      case 'updateSchedule': {
+        const { schedule_id, ...updates } = args;
+        const updatedSchedule = await updateSchedule(schedule_id, updates as UpdateScheduleInput);
+        return { 
+          success: true, 
+          data: updatedSchedule,
+        };
+      }
+
+      case 'activateSchedule': {
+        await activateSchedule(args.schedule_id);
+        return { 
+          success: true, 
+          data: { message: 'Schedule activated successfully' },
+        };
+      }
+
+      case 'archiveSchedule': {
+        await archiveSchedule(args.schedule_id);
+        return { 
+          success: true, 
+          data: { message: 'Schedule archived successfully' },
+        };
+      }
+
+      case 'deleteSchedule': {
+        await deleteSchedule(args.schedule_id);
+        return { 
+          success: true, 
+          data: { message: 'Schedule moved to trash' },
+        };
+      }
+
+      default:
+        return { 
+          success: false, 
+          error: `Unknown function: ${functionName}` 
+        };
+    }
+  } catch (error) {
+    console.error(`Error executing ${functionName}:`, error);
+    return { 
+      success: false, 
+      error: error instanceof Error ? error.message : 'Unknown error occurred' 
+    };
+  }
+}

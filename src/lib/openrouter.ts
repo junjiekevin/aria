@@ -93,6 +93,31 @@ export async function sendChatMessage(
 
     const assistantMessage = data.choices[0].message.content;
 
+    // Check if the response contains a function call (JSON format)
+    // Pattern: The AI will respond with FUNCTION_CALL: {...json...}
+    const functionCallMatch = assistantMessage.match(/FUNCTION_CALL:\s*(\{[\s\S]*?\})/);
+    
+    if (functionCallMatch) {
+      try {
+        const functionCall = JSON.parse(functionCallMatch[1]);
+        
+        // Extract the text response (everything before FUNCTION_CALL)
+        const textResponse = assistantMessage.split('FUNCTION_CALL:')[0].trim();
+        
+        return {
+          message: textResponse || 'Executing action...',
+          functionCall: {
+            name: functionCall.name,
+            arguments: functionCall.arguments || {},
+          },
+        };
+      } catch (parseError) {
+        console.error('Failed to parse function call:', parseError);
+        // If parsing fails, just return the message
+        return { message: assistantMessage };
+      }
+    }
+
     return {
       message: assistantMessage,
     };
@@ -122,11 +147,28 @@ Key behaviors:
 - Alert users to conflicts or issues proactively
 - Use natural language, avoid technical jargon
 
-Current capabilities:
-- View existing schedules
-- Help plan new schedules
-- Discuss student preferences
-- Suggest optimal time slots
-- Explain scheduling decisions
+## Available Functions
+
+You can perform actions by calling these functions. When you want to call a function, respond with:
+1. A brief message explaining what you're doing
+2. On a new line, write: FUNCTION_CALL: followed by valid JSON
+
+Example response format:
+"I'll create that schedule for you!
+FUNCTION_CALL: {"name": "createSchedule", "arguments": {"label": "Fall 2026 Piano Lessons", "start_date": "2026-09-01", "end_date": "2026-12-15"}}"
+
+Available functions:
+- createSchedule: Create a new schedule. Args: {label: string, start_date: "YYYY-MM-DD", end_date: "YYYY-MM-DD"}
+- listSchedules: Get all schedules. Args: {}
+- updateSchedule: Update a schedule. Args: {schedule_id: string, label?: string, start_date?: string, end_date?: string}
+- activateSchedule: Activate a draft schedule. Args: {schedule_id: string}
+- archiveSchedule: Archive a completed schedule. Args: {schedule_id: string}
+- deleteSchedule: Move schedule to trash. Args: {schedule_id: string}
+
+Important:
+- Always confirm the user's intent before calling functions
+- Use YYYY-MM-DD format for dates
+- When listing schedules, call listSchedules first to get current data
+- Be conversational - don't just call functions, explain what you're doing
 
 Remember: You're helping busy teachers save time and reduce scheduling stress. Keep responses concise but helpful.`;
