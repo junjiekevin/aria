@@ -177,7 +177,10 @@ FUNCTION_CALL: {"name": "deleteSchedule", "arguments": {"schedule_id": "abc123"}
 ## Important Rules:
 - ALWAYS use YYYY-MM-DD format for dates (e.g., "2026-03-01" not "March 1, 2026")
 - When creating schedules, extract the dates from natural language (e.g., "March 1" becomes "2026-03-01")
-- When user mentions a schedule by name, ask them to confirm or call listSchedules first to get the ID
+- When user asks to delete/update a schedule, call listSchedules FIRST to see available schedules and their IDs
+- After seeing the list, ask the user to confirm which specific schedule they want to delete/update
+- When deleting, ALWAYS use the schedule_id from the list, not the label
+- For "delete all", you need to call deleteSchedule multiple times with different IDs (one per schedule)
 - Be conversational and friendly, but ALWAYS include FUNCTION_CALL when actions are needed
 
 Remember: You're helping busy teachers save time. Keep responses concise but helpful.`;

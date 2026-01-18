@@ -224,12 +224,39 @@ export default function Chat() {
         // Remove the "executing" message and show result
         setMessages((prev) => prev.filter((msg) => msg.id !== executingMessage.id));
 
+        // Format the result message based on the function type
+        let resultContent = '';
+        if (result.success) {
+          if (name === 'createSchedule' && result.data?.label) {
+            resultContent = `✓ Created "${result.data.label}"`;
+          } else if (name === 'listSchedules' && Array.isArray(result.data)) {
+            // Format the schedule list nicely
+            if (result.data.length === 0) {
+              resultContent = 'You have no schedules yet.';
+            } else {
+              resultContent = `You have ${result.data.length} schedule(s):\n${result.data.map((s: any) => 
+                `- "${s.label}" (${s.status}) - ${s.start_date} to ${s.end_date} [ID: ${s.id}]`
+              ).join('\n')}`;
+            }
+          } else if (name === 'deleteSchedule') {
+            resultContent = '✓ Schedule moved to trash';
+          } else if (name === 'updateSchedule') {
+            resultContent = '✓ Schedule updated';
+          } else if (name === 'activateSchedule') {
+            resultContent = '✓ Schedule activated';
+          } else if (name === 'archiveSchedule') {
+            resultContent = '✓ Schedule archived';
+          } else {
+            resultContent = '✓ Action completed successfully';
+          }
+        } else {
+          resultContent = `✗ Error: ${result.error}`;
+        }
+
         const resultMessage: ChatMessage = {
           id: (Date.now() + 3).toString(),
           role: 'assistant',
-          content: result.success
-            ? `✓ Done! ${result.data?.label ? `Created "${result.data.label}"` : 'Action completed successfully.'}`
-            : `✗ Error: ${result.error}`,
+          content: resultContent,
           timestamp: new Date(),
         };
         setMessages((prev) => [...prev, resultMessage]);
