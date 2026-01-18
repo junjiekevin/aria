@@ -8,6 +8,7 @@ export interface Schedule {
     end_date: string; // YYYY-MM-DD Format
     status: 'draft' | 'collecting' | 'archived' | 'trashed';
     deleted_at: string | null;
+    previous_status: 'draft' | 'collecting' | 'archived' | null; // Store status before trashing
     created_at: string;
 }
 
@@ -228,11 +229,15 @@ export async function deleteSchedule(scheduleId: string) {
         throw error;
     }
 
+    // Get current schedule to preserve previous_status
+    const currentSchedule = await getSchedule(scheduleId);
+
     const { data, error } = await supabase
         .from('schedules')
         .update({
             status: 'trashed',
-            deleted_at: new Date().toISOString()
+            deleted_at: new Date().toISOString(),
+            previous_status: currentSchedule.status
         })
         .eq('id', scheduleId)
         .eq('user_id', user.id)
@@ -251,7 +256,7 @@ export async function deleteSchedule(scheduleId: string) {
     return data;
 }
 
-// Restore from trash (can only restore to draft, not archived)
+// Restore from trash (restore to previous_status, or draft if not available)
 export async function restoreSchedule(scheduleId: string) {
     const { data: { user } } = await supabase.auth.getUser();
 
@@ -260,6 +265,9 @@ export async function restoreSchedule(scheduleId: string) {
         error.code = 'UNAUTHORIZED';
         throw error;
     }
+
+    // Get current schedule to get previous_status
+    const currentSchedule = await getSchedule(scheduleId);
 
     // Check schedule limit before restoring
     const { data: existingSchedules, error: countError } = await supabase
@@ -278,11 +286,15 @@ export async function restoreSchedule(scheduleId: string) {
         throw error;
     }
 
+    // Restore to previous_status, or 'draft' if not available
+    const restoreStatus = currentSchedule.previous_status || 'draft';
+
     const { data, error } = await supabase
         .from('schedules')
         .update({
-            status: 'draft',
-            deleted_at: null
+            status: restoreStatus,
+            deleted_at: null,
+            previous_status: null
         })
         .eq('id', scheduleId)
         .eq('user_id', user.id)
@@ -325,13 +337,83 @@ export async function getTrashedSchedules() {
     return data || [];
 }
 
+// Get all schedules including trashed (for "All" filter)
+export async function getAllSchedules() {
+    const { data: { user } } = await supabase.auth.getUser();
+
+    if (!user) {
+        const error = new Error('User not authenticated') as ScheduleValidationError;
+        error.code = 'UNAUTHORIZED';
+        throw error;
+    }
+
+    const { data, error } = await supabase
+        .from('schedules')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false });
+
+    if (error) {
+        throw new Error(`Failed to fetch schedules: ${error.message}`);
+    }
+
+    return data || [];
+}
+
+// Permanent delete a single schedule (hard delete from database)
+export async function permanentDeleteSchedule(scheduleId: string) {
+    const { data: { user } } = await supabase.auth.getUser();
+
+    if (!user) {
+        const error = new Error('User not authenticated') as ScheduleValidationError;
+        error.code = 'UNAUTHORIZED';
+        throw error;
+    }
+
+    const { error } = await supabase
+        .from('schedules')
+        .delete()
+        .eq('id', scheduleId)
+        .eq('user_id', user.id);
+
+    if (error) {
+        throw new Error(`Failed to permanently delete schedule: ${error.message}`);
+    }
+
+    return { success: true };
+}
+
+// Permanently delete all trashed schedules
+export async function permanentDeleteAllTrashed() {
+    const { data: { user } } = await supabase.auth.getUser();
+
+    if (!user) {
+        const error = new Error('User not authenticated') as ScheduleValidationError;
+        error.code = 'UNAUTHORIZED';
+        throw error;
+    }
+
+    const { data, error } = await supabase
+        .from('schedules')
+        .delete()
+        .eq('user_id', user.id)
+        .eq('status', 'trashed')
+        .select('id');
+
+    if (error) {
+        throw new Error(`Failed to permanently delete trashed schedules: ${error.message}`);
+    }
+
+    return { success: true, count: data?.length || 0 };
+}
+
 // Helper function to validate status transitions
 function validateStatusTransition(currentStatus: string, newStatus: string): boolean {
     const validTransitions: Record<string, string[]> = {
         draft: ['collecting', 'trashed'],
         collecting: ['archived', 'trashed'],
-        archived: ['trashed'], // Archived schedules cannot go back
-        trashed: ['draft'] // Can only restore to draft, not archived
+        archived: ['trashed'], // Archived schedules can only go to trash
+        trashed: ['draft', 'collecting', 'archived'] // Can restore to any status
     };
 
     return validTransitions[currentStatus]?.includes(newStatus) || false;

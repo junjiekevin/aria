@@ -8,6 +8,10 @@ import {
   deleteSchedule, 
   activateSchedule,
   archiveSchedule,
+  restoreSchedule,
+  permanentDeleteSchedule,
+  permanentDeleteAllTrashed,
+  getAllSchedules,
   type CreateScheduleInput,
   type UpdateScheduleInput 
 } from './api/schedules';
@@ -139,7 +143,51 @@ export const FUNCTION_DEFINITIONS = [
   },
   {
     name: 'deleteAllSchedules',
-    description: 'Delete ALL schedules at once for the current user (moves them all to trash)',
+    description: 'Move ALL schedules to trash (soft delete, can be restored within 30 days)',
+    parameters: {
+      type: 'object',
+      properties: {},
+    },
+  },
+  {
+    name: 'recoverSchedule',
+    description: 'Restore a trashed schedule to its previous status. Can only be used on schedules that are in trash.',
+    parameters: {
+      type: 'object',
+      properties: {
+        schedule_id: {
+          type: 'string',
+          description: 'The ID of the trashed schedule to recover',
+        },
+      },
+      required: ['schedule_id'],
+    },
+  },
+  {
+    name: 'permanentDeleteSchedule',
+    description: 'Permanently delete a schedule from the database (cannot be recovered). Only use when user explicitly requests hard delete.',
+    parameters: {
+      type: 'object',
+      properties: {
+        schedule_id: {
+          type: 'string',
+          description: 'The ID of the schedule to permanently delete',
+        },
+      },
+      required: ['schedule_id'],
+    },
+  },
+  {
+    name: 'permanentDeleteAllTrashed',
+    description: 'Permanently delete ALL trashed schedules from the database (cannot be recovered). Only use when user explicitly requests to empty trash.',
+    parameters: {
+      type: 'object',
+      properties: {},
+    },
+  },
+  {
+    name: 'listAllSchedules',
+    description: 'Get ALL schedules including trashed items (for comprehensive listing)',
     parameters: {
       type: 'object',
       properties: {},
@@ -240,9 +288,44 @@ export async function executeFunction(
         return { 
           success: true, 
           data: { 
-            message: `Deleted ${schedules.length} schedule${schedules.length > 1 ? 's' : ''}`,
+            message: `Moved ${schedules.length} schedule${schedules.length > 1 ? 's' : ''} to trash`,
             count: schedules.length 
           },
+        };
+      }
+
+      case 'recoverSchedule': {
+        await restoreSchedule(args.schedule_id);
+        return { 
+          success: true, 
+          data: { message: 'Schedule restored from trash' },
+        };
+      }
+
+      case 'permanentDeleteSchedule': {
+        await permanentDeleteSchedule(args.schedule_id);
+        return { 
+          success: true, 
+          data: { message: 'Schedule permanently deleted' },
+        };
+      }
+
+      case 'permanentDeleteAllTrashed': {
+        const result = await permanentDeleteAllTrashed();
+        return { 
+          success: true, 
+          data: { 
+            message: `Permanently deleted ${result.count} trashed schedule${result.count > 1 ? 's' : ''}`,
+            count: result.count 
+          },
+        };
+      }
+
+      case 'listAllSchedules': {
+        const schedules = await getAllSchedules();
+        return { 
+          success: true, 
+          data: schedules,
         };
       }
 

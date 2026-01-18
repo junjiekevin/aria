@@ -169,12 +169,22 @@ FUNCTION_CALL: {"name": "deleteSchedule", "arguments": {"schedule_id": "abc123"}
 ## Available Functions:
 - createSchedule: {"label": "string", "start_date": "YYYY-MM-DD", "end_date": "YYYY-MM-DD"} (for ONE schedule)
 - createMultipleSchedules: {"schedules": [{"label": "...", "start_date": "...", "end_date": "..."}]} (for 2+ schedules at once)
-- listSchedules: {}
-- deleteAllSchedules: {} (use when user wants to delete ALL schedules at once)
-- deleteSchedule: {"schedule_id": "string"} (for deleting ONE specific schedule)
+- listSchedules: {} (shows only non-trashed schedules)
+- listAllSchedules: {} (shows ALL schedules including trashed)
+- deleteSchedule: {"schedule_id": "string"} (moves ONE schedule to trash, recoverable within 30 days)
+- deleteAllSchedules: {} (moves ALL schedules to trash, recoverable within 30 days)
+- recoverSchedule: {"schedule_id": "string"} (restores a trashed schedule to its previous status)
+- permanentDeleteSchedule: {"schedule_id": "string"} (permanently deletes, CANNOT be recovered)
+- permanentDeleteAllTrashed: {} (empties trash, permanently deletes all trashed schedules)
 - updateSchedule: {"schedule_id": "string", "label": "string"} (label optional)
 - activateSchedule: {"schedule_id": "string"}
 - archiveSchedule: {"schedule_id": "string"}
+
+## Trash and Recovery:
+- Schedules moved to trash are recoverable within 30 days
+- After 30 days, trashed schedules are automatically permanently deleted
+- Users can restore trashed schedules to their previous status at any time
+- Always mention that deleted schedules can be recovered when confirming deletions
 
 ## Important Rules:
 - ALWAYS use YYYY-MM-DD format for dates (e.g., "2026-03-01" not "March 1, 2026")
