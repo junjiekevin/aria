@@ -3,6 +3,47 @@ import { useNavigate, Navigate } from "react-router-dom";
 import { Auth as SupabaseAuth, ThemeSupa } from "@supabase/auth-ui-react";
 import { supabase } from "../lib/supabase";
 
+const styles = {
+    container: {
+        minHeight: '100vh',
+        display: 'grid',
+        placeItems: 'center',
+        padding: '1rem',
+        background: 'linear-gradient(135deg, #fff7ed 0%, #ffffff 50%, #fff7ed 100%)',
+    },
+    card: {
+        width: '100%',
+        maxWidth: '28rem',
+        backgroundColor: 'white',
+        borderRadius: '0.75rem',
+        padding: '2rem',
+        boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
+        border: '1px solid #e5e7eb',
+    },
+    header: {
+        marginBottom: '1.5rem',
+        textAlign: 'center' as const,
+    },
+    title: {
+        fontSize: '1.5rem',
+        fontWeight: '600',
+        margin: '0 0 0.5rem 0',
+        color: '#111827',
+    },
+    subtitle: {
+        fontSize: '0.875rem',
+        color: '#6b7280',
+        margin: 0,
+    },
+    loading: {
+        minHeight: '100vh',
+        display: 'grid',
+        placeItems: 'center',
+        fontSize: '0.875rem',
+        color: '#6b7280',
+    },
+};
+
 export default function AuthPage() {
     const navigate = useNavigate();
     const [checking, setChecking] = useState(true);
@@ -47,8 +88,8 @@ export default function AuthPage() {
 
     if (checking) {
         return (
-            <div className="min-h-screen grid place-items-center">
-                <span className="text-sm text-gray-500">Loading...</span>
+            <div style={styles.loading}>
+                <span>Loading...</span>
             </div>
         );
     }
@@ -58,11 +99,11 @@ export default function AuthPage() {
     }
 
     return (
-        <div className="min-h-screen grid place-items-center p-4">
-            <div className="w-full max-w-md">
-                <div className="mb-6 text-center">
-                    <h1 className="text-2xl font-semibold">Sign in to Aria</h1>
-                    <p className="text-sm text-gray-500">Teacher login via Google</p>
+        <div style={styles.container}>
+            <div style={styles.card}>
+                <div style={styles.header}>
+                    <h1 style={styles.title}>Sign in to Aria</h1>
+                    <p style={styles.subtitle}>Teacher login via Google</p>
                 </div>
 
                 <SupabaseAuth
@@ -77,8 +118,8 @@ export default function AuthPage() {
                         variables: {
                             default: {
                                 colors: {
-                                    brand: "#111827",
-                                    brandAccent: "#4B5563",
+                                    brand: "#f97316",
+                                    brandAccent: "#ea580c",
                                 },
                             },
                         },

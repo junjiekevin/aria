@@ -7,6 +7,16 @@ interface ProtectedRouteProps {
     children: ReactNode;
 }
 
+const styles = {
+    loading: {
+        minHeight: '100vh',
+        display: 'grid',
+        placeItems: 'center',
+        fontSize: '0.875rem',
+        color: '#6b7280',
+    },
+};
+
 export default function ProtectedRoute({ children }: ProtectedRouteProps) {
     const [session, setSession] = useState<any>(null);
     const [loading, setLoading] = useState(true);
@@ -37,8 +47,8 @@ export default function ProtectedRoute({ children }: ProtectedRouteProps) {
     // While checking
     if (loading) {
         return (
-            <div className="min-h-screen grid place-items-center">
-                <span className="text-sm text-gray-500">Checking authentication…</span>
+            <div style={styles.loading}>
+                <span>Checking authentication…</span>
             </div>
         );
     }
