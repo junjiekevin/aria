@@ -6,7 +6,7 @@ import { getSchedule, updateSchedule, type Schedule } from '../lib/api/schedules
 import { getScheduleEntries, updateScheduleEntry, type ScheduleEntry } from '../lib/api/schedule-entries';
 import { getFormResponses, type FormResponse } from '../lib/api/form-responses';
 import AddEventModal from '../components/AddEventModal';
-import { DndContext, DragOverlay, useDraggable, useDroppable, type DragEndEvent, type DragStartEvent } from '@dnd-kit/core';
+import { DndContext, useDraggable, useDroppable, type DragEndEvent, type DragStartEvent } from '@dnd-kit/core';
 
 const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 const HOURS = Array.from({ length: 14 }, (_, i) => i + 8); // 8 AM to 9 PM
@@ -176,8 +176,8 @@ export default function SchedulePage() {
   const [showAddModal, setShowAddModal] = useState(false);
   const [selectedSlot, setSelectedSlot] = useState<{ day: string; hour: number } | null>(null);
   const [selectedEntry, setSelectedEntry] = useState<ScheduleEntry | null>(null);
-  const [activeEntry, setActiveEntry] = useState<ScheduleEntry | null>(null); // For drag preview
   const [isDragging, setIsDragging] = useState(false); // Track dragging state
+  const [isDragOperation, setIsDragOperation] = useState(false); // Track if a drag just completed
 
   useEffect(() => {
     if (scheduleId) {
@@ -260,17 +260,14 @@ export default function SchedulePage() {
 
   // Drag and drop handlers
   const handleDragStart = (event: DragStartEvent) => {
-    const entry = entries.find(e => e.id === event.active.id);
-    if (entry) {
-      setActiveEntry(entry);
-      setIsDragging(true);
-    }
+    setIsDragging(true);
+    setIsDragOperation(false);
   };
 
   const handleDragEnd = async (event: DragEndEvent) => {
     const { active, over } = event;
-    setActiveEntry(null);
     setIsDragging(false);
+    setIsDragOperation(!!over); // Track if a drag operation actually completed
 
     if (!over || !schedule) return;
 
@@ -322,16 +319,26 @@ export default function SchedulePage() {
       const dayAbbrev = ['SU', 'MO', 'TU', 'WE', 'TH', 'FR', 'SA'][dayIndex];
       const recurrenceRule = `FREQ=WEEKLY;BYDAY=${dayAbbrev}`;
 
+      // Optimistic update - update local state directly
+      const updatedEntry = {
+        ...draggedEntry,
+        start_time: firstOccurrence.toISOString(),
+        end_time: newEnd.toISOString(),
+        recurrence_rule: recurrenceRule,
+      };
+
+      setEntries(entries.map(e => e.id === draggedEntry.id ? updatedEntry : e));
+
       try {
         await updateScheduleEntry(draggedEntry.id, {
           start_time: firstOccurrence.toISOString(),
           end_time: newEnd.toISOString(),
           recurrence_rule: recurrenceRule,
         });
-        loadScheduleData();
       } catch (err) {
         console.error('Failed to move event:', err);
         alert('Failed to move event');
+        loadScheduleData(); // Reload on error to restore state
       }
     } else if (dropId.startsWith('entry-')) {
       // Dropped on another entry - offer to swap
@@ -347,10 +354,30 @@ export default function SchedulePage() {
       if (!confirmSwap) return;
 
       try {
-        // Swap times
+        // Swap times - optimistic update
         const draggedStart = draggedEntry.start_time;
         const draggedEnd = draggedEntry.end_time;
         const draggedRule = draggedEntry.recurrence_rule;
+
+        const updatedDraggedEntry = {
+          ...draggedEntry,
+          start_time: targetEntry.start_time,
+          end_time: targetEntry.end_time,
+          recurrence_rule: targetEntry.recurrence_rule,
+        };
+
+        const updatedTargetEntry = {
+          ...targetEntry,
+          start_time: draggedStart,
+          end_time: draggedEnd,
+          recurrence_rule: draggedRule,
+        };
+
+        setEntries(entries.map(e => {
+          if (e.id === draggedEntry.id) return updatedDraggedEntry;
+          if (e.id === targetEntry.id) return updatedTargetEntry;
+          return e;
+        }));
 
         await updateScheduleEntry(draggedEntry.id, {
           start_time: targetEntry.start_time,
@@ -363,11 +390,10 @@ export default function SchedulePage() {
           end_time: draggedEnd,
           recurrence_rule: draggedRule,
         });
-
-        loadScheduleData();
       } catch (err) {
         console.error('Failed to swap events:', err);
         alert('Failed to swap events');
+        loadScheduleData(); // Reload on error
       }
     }
   };
@@ -414,20 +440,20 @@ export default function SchedulePage() {
         }
       : getLessonBlockStyle(entry);
 
-    return (
-      <div
-        ref={setNodeRef}
-        style={style}
-        onClick={(e) => handleEntryClick(entry, e)}
-        {...attributes}
-        {...listeners}
-        onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#ea580c'; }}
-        onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = '#fb923c'; }}
-      >
-        {children}
-      </div>
-    );
-  }
+     return (
+       <div
+         ref={setNodeRef}
+         style={style}
+         onClick={(e) => !isDragOperation && handleEntryClick(entry, e)}
+         {...attributes}
+         {...listeners}
+         onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#ea580c'; }}
+         onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = '#fb923c'; }}
+       >
+         {children}
+       </div>
+     );
+   }
 
   function DroppableSlot({ children, day, hour, isDragging }: { children: React.ReactNode; day: string; hour: number; isDragging: boolean }) {
     const { setNodeRef: setSlotRef, isOver } = useDroppable({
@@ -651,26 +677,8 @@ export default function SchedulePage() {
         initialDay={selectedSlot?.day}
         initialHour={selectedSlot?.hour}
         scheduleStartDate={schedule.start_date}
-        existingEntry={selectedEntry}
+         existingEntry={selectedEntry}
       />
-      
-      <DragOverlay>
-        {activeEntry && (
-          <div style={{ 
-            ...styles.lessonBlock,
-            position: 'relative',
-            width: '200px',
-            opacity: 0.8,
-          }}>
-            <div style={{ fontWeight: '600' }}>{activeEntry.student_name}</div>
-            <div style={{ fontSize: '0.625rem', opacity: 0.9 }}>
-              {new Date(activeEntry.start_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-              {' - '}
-              {new Date(activeEntry.end_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-            </div>
-          </div>
-        )}
-      </DragOverlay>
       </DndContext>
     </div>
   );
