@@ -36,12 +36,19 @@ const styles = {
 		fontSize: '2rem',
 		fontWeight: 'bold',
 		color: '#111827',
-		margin: 0
+		margin: 0,
+		display: 'flex',
+		alignItems: 'center',
+		gap: '0.75rem',
 	},
 	subtitle: {
 		color: '#6b7280',
 		margin: '0.25rem 0 0 0',
 		fontSize: '1rem'
+	},
+	logo: {
+		height: '40px',
+		width: 'auto',
 	},
 	button: {
 		backgroundColor: '#f97316',
@@ -306,11 +313,14 @@ export default function DashboardPage() {
 		<div style={styles.dashboard}>
 			<header style={styles.header}>
 				<div style={styles.headerContent}>
-					<div>
-						<h1 style={styles.title}>Aria</h1>
-						<p style={styles.subtitle}>Your scheduling assistant</p>
+					<div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+						<img src="/src/assets/images/aria-logo.png" alt="Aria" style={styles.logo} />
+						<div>
+							<h1 style={styles.title}>Aria</h1>
+							<p style={styles.subtitle}>Your scheduling assistant</p>
+						</div>
 					</div>
-					<button 
+					<button
 						onClick={handleCreateSchedule}
 						style={styles.button}
 						onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#ea580c'; }}
