@@ -50,7 +50,7 @@ export async function createScheduleEntry(entry: CreateScheduleEntryInput): Prom
 // Update schedule entry time
 export async function updateScheduleEntry(
     entryId: string, 
-    updates: { start_time?: string; end_time?: string; recurrence_rule?: string }
+    updates: { student_name?: string; start_time?: string; end_time?: string; recurrence_rule?: string }
 ): Promise<ScheduleEntry> {
     const { data, error } = await supabase
         .from('schedule_entries')

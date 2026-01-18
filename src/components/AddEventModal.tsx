@@ -1,6 +1,6 @@
 // src/components/AddEventModal.tsx
 import { useState, useEffect } from 'react';
-import { createScheduleEntry, updateScheduleEntry, deleteScheduleEntry, type ScheduleEntry } from '../lib/api/schedule-entries';
+import { createScheduleEntry, updateScheduleEntry, deleteScheduleEntry, getScheduleEntries, type ScheduleEntry } from '../lib/api/schedule-entries';
 import Modal from './Modal';
 
 interface AddEventModalProps {
@@ -183,53 +183,69 @@ export default function AddEventModal({
     try {
       setLoading(true);
 
+      // Calculate the time range for the new/updated event
+      const scheduleStart = new Date(scheduleStartDate);
+      const dayIndex = DAYS.indexOf(day);
+      const dayOfWeek = dayIndex;
+      const currentDay = scheduleStart.getDay();
+      let daysToAdd = dayOfWeek - currentDay;
+      if (daysToAdd < 0) daysToAdd += 7;
+      
+      const firstOccurrence = new Date(scheduleStart);
+      firstOccurrence.setDate(scheduleStart.getDate() + daysToAdd);
+
+      const [hours, minutes] = startTime.split(':').map(Number);
+      firstOccurrence.setHours(hours, minutes, 0, 0);
+
+      const endTime = new Date(firstOccurrence);
+      endTime.setMinutes(endTime.getMinutes() + parseInt(duration));
+
+      // Check for overlaps
+      const allEntries = await getScheduleEntries(scheduleId);
+      const overlappingEntry = allEntries.find(entry => {
+        // Skip comparing with itself when editing
+        if (isEditMode && existingEntry && entry.id === existingEntry.id) {
+          return false;
+        }
+
+        const entryStart = new Date(entry.start_time);
+        const entryEnd = new Date(entry.end_time);
+
+        // Check if on same day of week
+        if (entryStart.getDay() !== dayOfWeek) {
+          return false;
+        }
+
+        // Check for any time overlap (partial or full)
+        const hasOverlap = 
+          (firstOccurrence < entryEnd && endTime > entryStart);
+
+        return hasOverlap;
+      });
+
+      if (overlappingEntry) {
+        const overlappingStart = new Date(overlappingEntry.start_time);
+        const overlappingEnd = new Date(overlappingEntry.end_time);
+        setError(
+          `Time slot conflicts with "${overlappingEntry.student_name}" (${overlappingStart.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} - ${overlappingEnd.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}). Please choose a different time.`
+        );
+        setLoading(false);
+        return;
+      }
+
+      const dayAbbrev = ['SU', 'MO', 'TU', 'WE', 'TH', 'FR', 'SA'][dayOfWeek];
+      const recurrenceRule = `FREQ=WEEKLY;BYDAY=${dayAbbrev}`;
+
       if (isEditMode && existingEntry) {
         // UPDATE existing entry
-        const scheduleStart = new Date(scheduleStartDate);
-        const dayIndex = DAYS.indexOf(day);
-        const dayOfWeek = dayIndex;
-        const currentDay = scheduleStart.getDay();
-        let daysToAdd = dayOfWeek - currentDay;
-        if (daysToAdd < 0) daysToAdd += 7;
-        
-        const firstOccurrence = new Date(scheduleStart);
-        firstOccurrence.setDate(scheduleStart.getDate() + daysToAdd);
-
-        const [hours, minutes] = startTime.split(':').map(Number);
-        firstOccurrence.setHours(hours, minutes, 0, 0);
-
-        const endTime = new Date(firstOccurrence);
-        endTime.setMinutes(endTime.getMinutes() + parseInt(duration));
-
-        const dayAbbrev = ['SU', 'MO', 'TU', 'WE', 'TH', 'FR', 'SA'][dayOfWeek];
-        const recurrenceRule = `FREQ=WEEKLY;BYDAY=${dayAbbrev}`;
-
         await updateScheduleEntry(existingEntry.id, {
+          student_name: studentName.trim(),
           start_time: firstOccurrence.toISOString(),
           end_time: endTime.toISOString(),
           recurrence_rule: recurrenceRule,
         });
       } else {
         // CREATE new entry
-        const scheduleStart = new Date(scheduleStartDate);
-        const dayIndex = DAYS.indexOf(day);
-        const dayOfWeek = dayIndex;
-        const currentDay = scheduleStart.getDay();
-        let daysToAdd = dayOfWeek - currentDay;
-        if (daysToAdd < 0) daysToAdd += 7;
-        
-        const firstOccurrence = new Date(scheduleStart);
-        firstOccurrence.setDate(scheduleStart.getDate() + daysToAdd);
-
-        const [hours, minutes] = startTime.split(':').map(Number);
-        firstOccurrence.setHours(hours, minutes, 0, 0);
-
-        const endTime = new Date(firstOccurrence);
-        endTime.setMinutes(endTime.getMinutes() + parseInt(duration));
-
-        const dayAbbrev = ['SU', 'MO', 'TU', 'WE', 'TH', 'FR', 'SA'][dayOfWeek];
-        const recurrenceRule = `FREQ=WEEKLY;BYDAY=${dayAbbrev}`;
-
         await createScheduleEntry({
           schedule_id: scheduleId,
           student_name: studentName.trim(),
@@ -287,13 +303,8 @@ export default function AddEventModal({
             style={styles.input}
             onFocus={(e) => { e.target.style.borderColor = '#f97316'; e.target.style.outline = 'none'; }}
             onBlur={(e) => { e.target.style.borderColor = '#d1d5db'; }}
-            disabled={loading || isEditMode} // Lock name when editing
+            disabled={loading}
           />
-          {isEditMode && (
-            <div style={styles.hint}>
-              Name cannot be changed when editing
-            </div>
-          )}
         </div>
 
         {/* Day and Start Time */}
