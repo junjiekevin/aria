@@ -2,6 +2,7 @@
 import { useState, useEffect } from 'react';
 import { getSchedules, type Schedule } from '../lib/api/schedules';
 import { Plus, Calendar, Clock, Archive, Trash2, FileText } from 'lucide-react';
+import Chat from '../components/Chat';
 
 // Inline styles inspired by the LLM design
 const styles = {
@@ -80,6 +81,12 @@ const styles = {
 		display: 'grid',
 		gap: '1.5rem',
 		gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))'
+	},
+	twoColumnLayout: {
+		display: 'grid',
+		gridTemplateColumns: '1fr 500px',
+		gap: '2rem',
+		alignItems: 'start'
 	}
 };
 
@@ -316,25 +323,35 @@ export default function DashboardPage() {
 				</div>
 			)}
 
-			<main style={styles.main}>
-				{visibleSchedules.length === 0 ? (
-					<EmptyState onCreateSchedule={handleCreateSchedule} />
-				) : (
-					<div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-						<div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-							<h2 style={{ fontSize: '1.5rem', fontWeight: '600', color: '#111827', margin: 0 }}>Your Schedules</h2>
-							<p style={{ color: '#6b7280', margin: 0 }}>
-								{visibleSchedules.length} {visibleSchedules.length === 1 ? "schedule" : "schedules"}
-							</p>
+		<main style={styles.main}>
+			<div style={styles.twoColumnLayout}>
+				{/* Left column: Schedules */}
+				<div>
+					{visibleSchedules.length === 0 ? (
+						<EmptyState onCreateSchedule={handleCreateSchedule} />
+					) : (
+						<div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+							<div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+								<h2 style={{ fontSize: '1.5rem', fontWeight: '600', color: '#111827', margin: 0 }}>Your Schedules</h2>
+								<p style={{ color: '#6b7280', margin: 0 }}>
+									{visibleSchedules.length} {visibleSchedules.length === 1 ? "schedule" : "schedules"}
+								</p>
+							</div>
+							<div style={styles.grid}>
+								{visibleSchedules.map((schedule) => (
+									<ScheduleCard key={schedule.id} schedule={schedule} />
+								))}
+							</div>
 						</div>
-						<div style={styles.grid}>
-							{visibleSchedules.map((schedule) => (
-								<ScheduleCard key={schedule.id} schedule={schedule} />
-							))}
-						</div>
-					</div>
-				)}
-			</main>
+					)}
+				</div>
+
+				{/* Right column: Chat */}
+				<div>
+					<Chat />
+				</div>
+			</div>
+		</main>
 		</div>
 	);
 }
