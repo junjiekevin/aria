@@ -209,7 +209,6 @@ export default function AccountPage() {
               <div style={styles.infoLabel}>Email</div>
               <div style={styles.infoValue}>{email}</div>
             </div>
-            <span style={styles.badge}>Google OAuth</span>
           </div>
         </div>
 

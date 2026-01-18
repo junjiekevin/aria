@@ -86,16 +86,7 @@ export default function ProfileDropdown({ user }: ProfileDropdownProps) {
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   const fullName = user?.user_metadata?.full_name || 'User';
-  const avatarUrl = user?.user_metadata?.avatar_url;
   const email = user?.email || '';
-
-  // Get initials from name
-  const initials = fullName
-    .split(' ')
-    .map((n) => n[0])
-    .join('')
-    .toUpperCase()
-    .slice(0, 2);
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -127,11 +118,9 @@ export default function ProfileDropdown({ user }: ProfileDropdownProps) {
         onMouseEnter={(e) => { e.currentTarget.style.borderColor = '#f97316'; }}
         onMouseLeave={(e) => { e.currentTarget.style.borderColor = '#e5e7eb'; }}
       >
-        {avatarUrl ? (
-          <img src={avatarUrl} alt={fullName} style={styles.avatarImage} />
-        ) : (
-          <div style={styles.avatar}>{initials}</div>
-        )}
+        <div style={styles.avatar}>
+          <User size={20} />
+        </div>
         <ChevronDown
           size={16}
           color="#6b7280"
