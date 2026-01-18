@@ -2,10 +2,13 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getSchedules, type Schedule } from '../lib/api/schedules';
+import { supabase } from '../lib/supabase';
 import { Plus, Calendar, Clock, Archive, Trash2, FileText } from 'lucide-react';
 import Chat from '../components/Chat';
 import CreateScheduleModal from '../components/CreateScheduleModal';
 import EditScheduleModal from '../components/EditScheduleModal';
+import ProfileDropdown from '../components/ProfileDropdown';
+import logo from '../assets/images/aria-logo.png';
 
 // Inline styles inspired by the LLM design
 const styles = {
@@ -250,15 +253,18 @@ function EmptyState({ onCreateSchedule }: { onCreateSchedule: () => void }) {
 
 export default function DashboardPage() {
 	const navigate = useNavigate();
+	const [user, setUser] = useState<any>(null);
 	const [schedules, setSchedules] = useState<Schedule[]>([]);
 	const [loading, setLoading] = useState(true);
 	const [error, setError] = useState<string | null>(null);
 	const [showCreateModal, setShowCreateModal] = useState(false);
 	const [showEditModal, setShowEditModal] = useState(false);
 	const [selectedSchedule, setSelectedSchedule] = useState<Schedule | null>(null);
+	const [filter, setFilter] = useState<'all' | 'draft' | 'collecting' | 'archived' | 'trashed'>('all');
 
 	useEffect(() => {
 		loadSchedules();
+		loadUser();
 	}, []);
 
 	const loadSchedules = async () => {
@@ -272,6 +278,11 @@ export default function DashboardPage() {
 		} finally {
 			setLoading(false);
 		}
+	};
+
+	const loadUser = async () => {
+		const { data: { user } } = await supabase.auth.getUser();
+		setUser(user);
 	};
 
 	const handleCreateSchedule = () => {
@@ -295,7 +306,23 @@ export default function DashboardPage() {
 		loadSchedules(); // Refresh the list
 	};
 
-	const visibleSchedules = schedules.filter((s) => s.status !== "trashed");
+	const filterTabs = [
+		{ key: 'all', label: 'All' },
+		{ key: 'draft', label: 'Draft' },
+		{ key: 'collecting', label: 'Active' },
+		{ key: 'archived', label: 'Archived' },
+		{ key: 'trashed', label: 'Trashed' },
+	] as const;
+
+	const visibleSchedules = schedules.filter((s) => {
+		if (filter === 'all') return true;
+		return s.status === filter;
+	});
+
+	const getFilteredCount = (status: typeof filter) => {
+		if (status === 'all') return schedules.length;
+		return schedules.filter(s => s.status === status).length;
+	};
 
 	if (loading) {
 		return (
@@ -315,21 +342,28 @@ export default function DashboardPage() {
 			<header style={styles.header}>
 				<div style={styles.headerContent}>
 					<div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-						<img src="/src/assets/images/aria-logo.png" alt="Aria" style={styles.logo} />
+						<img src={logo} alt="Aria" style={styles.logo} />
 						<div>
 							<h1 style={styles.title}>Aria</h1>
 							<p style={styles.subtitle}>Your scheduling assistant</p>
 						</div>
 					</div>
-					<button
-						onClick={handleCreateSchedule}
-						style={styles.button}
-						onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#ea580c'; }}
-						onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = '#f97316'; }}
-					>
-						<Plus size={20} />
-						Create New Schedule
-					</button>
+					<div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+						<button
+							onClick={handleCreateSchedule}
+							style={{
+								...styles.button,
+								padding: '0.5rem 1rem',
+								fontSize: '0.875rem',
+							}}
+							onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#ea580c'; }}
+							onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = '#f97316'; }}
+						>
+							<Plus size={18} />
+							New Schedule
+						</button>
+						{user && <ProfileDropdown user={user} />}
+					</div>
 				</div>
 			</header>
 
@@ -364,7 +398,7 @@ export default function DashboardPage() {
 			<div style={styles.twoColumnLayout}>
 				{/* Left column: Schedules */}
 				<div>
-					{visibleSchedules.length === 0 ? (
+					{visibleSchedules.length === 0 && filter === 'all' ? (
 						<EmptyState onCreateSchedule={handleCreateSchedule} />
 					) : (
 						<div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
@@ -374,16 +408,88 @@ export default function DashboardPage() {
 									{visibleSchedules.length} {visibleSchedules.length === 1 ? "schedule" : "schedules"}
 								</p>
 							</div>
-							<div style={styles.grid}>
-								{visibleSchedules.map((schedule) => (
-									<ScheduleCard 
-										key={schedule.id} 
-										schedule={schedule}
-										onView={() => handleViewSchedule(schedule)}
-										onEdit={() => handleEditSchedule(schedule)}
-									/>
+
+							{/* Filter Tabs */}
+							<div style={{ display: 'flex', gap: '0.25rem', borderBottom: '1px solid #e5e7eb', paddingBottom: '0.5rem' }}>
+								{filterTabs.map((tab) => (
+									<button
+										key={tab.key}
+										onClick={() => setFilter(tab.key)}
+										style={{
+											padding: '0.5rem 1rem',
+											background: filter === tab.key ? '#fff7ed' : 'transparent',
+											border: 'none',
+											borderRadius: '0.5rem',
+											fontSize: '0.875rem',
+											fontWeight: filter === tab.key ? '500' : '400',
+											color: filter === tab.key ? '#f97316' : '#6b7280',
+											cursor: 'pointer',
+											transition: 'all 0.2s',
+											display: 'flex',
+											alignItems: 'center',
+											gap: '0.5rem',
+										}}
+										onMouseEnter={(e) => {
+											if (filter !== tab.key) {
+												e.currentTarget.style.backgroundColor = '#f3f4f6';
+											}
+										}}
+										onMouseLeave={(e) => {
+											if (filter !== tab.key) {
+												e.currentTarget.style.backgroundColor = 'transparent';
+											}
+										}}
+									>
+										{tab.label}
+										<span style={{
+											fontSize: '0.75rem',
+											padding: '0.125rem 0.5rem',
+											borderRadius: '9999px',
+											backgroundColor: filter === tab.key ? '#ffedd5' : '#f3f4f6',
+											color: filter === tab.key ? '#c2410c' : '#6b7280',
+										}}>
+											{getFilteredCount(tab.key)}
+										</span>
+									</button>
 								))}
 							</div>
+
+							{visibleSchedules.length === 0 ? (
+								<div style={{
+									textAlign: 'center',
+									padding: '3rem 1.5rem',
+									color: '#6b7280',
+								}}>
+									<p>No {filter !== 'all' ? filter : ''} schedules found.</p>
+									{filter !== 'all' && (
+										<button
+											onClick={() => setFilter('all')}
+											style={{
+												marginTop: '1rem',
+												padding: '0.5rem 1rem',
+												background: '#f97316',
+												color: 'white',
+												border: 'none',
+												borderRadius: '0.5rem',
+												cursor: 'pointer',
+											}}
+										>
+											View All Schedules
+										</button>
+									)}
+								</div>
+							) : (
+								<div style={styles.grid}>
+									{visibleSchedules.map((schedule) => (
+										<ScheduleCard
+											key={schedule.id}
+											schedule={schedule}
+											onView={() => handleViewSchedule(schedule)}
+											onEdit={() => handleEditSchedule(schedule)}
+										/>
+									))}
+								</div>
+							)}
 						</div>
 					)}
 				</div>
