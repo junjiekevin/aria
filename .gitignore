@@ -35,3 +35,4 @@ supabase/.temp/
 *.njsproj
 *.sln
 *.sw?
+Aria logs/
