@@ -1,9 +1,9 @@
 // src/pages/DashboardPage.tsx
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { getSchedules, type Schedule, deleteSchedule, restoreSchedule, permanentDeleteAllTrashed } from '../lib/api/schedules';
+import { getAllSchedules, type Schedule, deleteSchedule, restoreSchedule, permanentDeleteAllTrashed } from '../lib/api/schedules';
 import { supabase } from '../lib/supabase';
-import { Plus, Calendar, Clock, Archive, Trash2, FileText, RotateCcw, AlertTriangle } from 'lucide-react';
+import { Plus, Calendar, Clock, Archive, Trash2, FileText, RotateCcw, AlertTriangle, XCircle } from 'lucide-react';
 import Chat from '../components/Chat';
 import CreateScheduleModal from '../components/CreateScheduleModal';
 import EditScheduleModal from '../components/EditScheduleModal';
@@ -224,7 +224,7 @@ function ScheduleCard({
 								onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#fef2f2'; }}
 								onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'white'; }}
 							>
-								<Trash2 size={18} />
+								<XCircle size={18} />
 								Delete
 							</button>
 						</>
@@ -344,7 +344,7 @@ export default function DashboardPage() {
 		try {
 			setLoading(true);
 			setError(null);
-			const data = await getSchedules();
+			const data = await getAllSchedules();
 			setSchedules(data);
 		} catch (err) {
 			setError(err instanceof Error ? err.message : 'Failed to load schedules');
@@ -437,6 +437,9 @@ export default function DashboardPage() {
 		if (filter === 'all') return true;
 		return s.status === filter;
 	});
+
+	// Determine if we should show the "All trashed" empty state
+	const showAllTrashedEmptyState = filter === 'all' && schedules.length > 0 && schedules.every(s => s.status === 'trashed');
 
 	const getFilteredCount = (status: typeof filter) => {
 		if (status === 'all') return schedules.length;
@@ -573,7 +576,55 @@ export default function DashboardPage() {
 								))}
 							</div>
 
-							{visibleSchedules.length === 0 ? (
+							{/* Special empty state when all schedules are trashed */}
+							{showAllTrashedEmptyState ? (
+								<div style={{
+									textAlign: 'center',
+									padding: '4rem 1.5rem',
+									color: '#6b7280',
+								}}>
+									<div style={{
+										width: '5rem',
+										height: '5rem',
+										borderRadius: '50%',
+										background: '#fef3c7',
+										display: 'flex',
+										alignItems: 'center',
+										justifyContent: 'center',
+										margin: '0 auto 1.5rem',
+									}}>
+										<Trash2 size={32} color="#f59e0b" />
+									</div>
+									<h3 style={{ fontSize: '1.25rem', fontWeight: '600', color: '#111827', marginBottom: '0.75rem' }}>
+										All your schedules are in trash
+									</h3>
+									<p style={{ fontSize: '1rem', marginBottom: '1.5rem', maxWidth: '24rem', margin: '0 auto 1.5rem' }}>
+										You have {schedules.length} schedule{schedules.length > 1 ? 's' : ''} in trash. 
+										They will be permanently deleted after 30 days.
+									</p>
+									<button
+										onClick={() => setFilter('trashed')}
+										style={{
+											padding: '0.75rem 1.5rem',
+											background: '#f97316',
+											color: 'white',
+											border: 'none',
+											borderRadius: '0.5rem',
+											cursor: 'pointer',
+											fontSize: '1rem',
+											fontWeight: '500',
+											display: 'inline-flex',
+											alignItems: 'center',
+											gap: '0.5rem',
+										}}
+										onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#ea580c'; }}
+										onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = '#f97316'; }}
+									>
+										<Trash2 size={20} />
+										View Trashed Schedules
+									</button>
+								</div>
+							) : visibleSchedules.length === 0 ? (
 								<div style={{
 									textAlign: 'center',
 									padding: '3rem 1.5rem',
@@ -623,7 +674,7 @@ export default function DashboardPage() {
 												onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#fef2f2'; }}
 												onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'white'; }}
 											>
-												<Trash2 size={16} />
+												<XCircle size={16} />
 												Delete All
 											</button>
 										</div>
