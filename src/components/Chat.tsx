@@ -288,7 +288,10 @@ export default function Chat() {
                 { role: 'user', content: userMessage.content },
                 { role: 'assistant', content: response.message },
                 { role: 'assistant', content: resultContent },
-                { role: 'user', content: 'Continue with the requested action.' }, // Prompt AI to continue
+                { 
+                  role: 'user', 
+                  content: `[The schedules have been listed. Now ask the user for confirmation before proceeding with any deletions. Be conversational and concise.]` 
+                },
               ];
 
               const continueResponse = await sendChatMessage(continueHistory, ARIA_SYSTEM_PROMPT);
