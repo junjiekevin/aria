@@ -269,6 +269,61 @@ export default function Chat() {
           timestamp: new Date(),
         };
         setMessages((prev) => [...prev, resultMessage]);
+
+        // AUTO-CONTINUE: Feed the result back to AI so it can continue the workflow
+        // This allows multi-step operations like "delete all" to work seamlessly
+        if (name === 'listSchedules' && result.success && Array.isArray(result.data) && result.data.length > 0) {
+          // After listing schedules, let the AI continue the conversation
+          // We'll send the result as a system message back to the AI
+          setTimeout(async () => {
+            try {
+              setLoading(true);
+              
+              // Prepare the context with the list result
+              const continueHistory: Message[] = [
+                ...messages.map((msg) => ({ role: msg.role, content: msg.content })),
+                { role: 'user', content: userMessage.content },
+                { role: 'assistant', content: response.message },
+                { role: 'assistant', content: resultContent },
+                { role: 'user', content: 'Continue with the requested action.' }, // Prompt AI to continue
+              ];
+
+              const continueResponse = await sendChatMessage(continueHistory, ARIA_SYSTEM_PROMPT);
+
+              const continueMessage: ChatMessage = {
+                id: (Date.now() + 5).toString(),
+                role: 'assistant',
+                content: continueResponse.message,
+                timestamp: new Date(),
+              };
+
+              setMessages((prev) => [...prev, continueMessage]);
+
+              // If the AI wants to call another function (like deleteAllSchedules), execute it
+              if (continueResponse.functionCall) {
+                const followUpResult = await executeFunction(
+                  continueResponse.functionCall.name,
+                  continueResponse.functionCall.arguments
+                );
+
+                const followUpMessage: ChatMessage = {
+                  id: (Date.now() + 6).toString(),
+                  role: 'assistant',
+                  content: followUpResult.success
+                    ? `✓ ${followUpResult.data?.message || 'Done!'}`
+                    : `✗ Error: ${followUpResult.error}`,
+                  timestamp: new Date(),
+                };
+
+                setMessages((prev) => [...prev, followUpMessage]);
+              }
+            } catch (error) {
+              console.error('Error in auto-continue:', error);
+            } finally {
+              setLoading(false);
+            }
+          }, 500); // Small delay to let UI update
+        }
       }
     } catch (error) {
       console.error('Error sending message:', error);
