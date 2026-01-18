@@ -193,6 +193,8 @@ export default function Chat() {
 
       const response = await sendChatMessage(conversationHistory, ARIA_SYSTEM_PROMPT);
 
+      console.log('AI Response:', response); // Debug log
+
       const assistantMessage: ChatMessage = {
         id: (Date.now() + 1).toString(),
         role: 'assistant',
@@ -204,6 +206,7 @@ export default function Chat() {
 
       // If there's a function call, execute it
       if (response.functionCall) {
+        console.log('Function call detected:', response.functionCall); // Debug log
         const { name, arguments: args } = response.functionCall;
         
         // Show a system message that we're executing the function
