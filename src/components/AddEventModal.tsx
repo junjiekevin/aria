@@ -1,6 +1,6 @@
 // src/components/AddEventModal.tsx
 import { useState, useEffect } from 'react';
-import { createScheduleEntry, updateScheduleEntry, deleteScheduleEntry, getScheduleEntries, type ScheduleEntry } from '../lib/api/schedule-entries';
+import { createScheduleEntry, updateScheduleEntry, deleteScheduleEntry, deleteThisAndSubsequentEntries, getScheduleEntries, type ScheduleEntry } from '../lib/api/schedule-entries';
 import Modal from './Modal';
 
 interface AddEventModalProps {
@@ -119,6 +119,7 @@ export default function AddEventModal({
   const [frequency, setFrequency] = useState('weekly'); // once, weekly, 2weekly, monthly
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   // Pre-fill form when editing existing entry
   useEffect(() => {
@@ -301,13 +302,13 @@ export default function AddEventModal({
 
   const handleDelete = async () => {
     if (!existingEntry) return;
-    
-    const confirmDelete = window.confirm(
-      `Are you sure you want to delete the event for "${existingEntry.student_name}"? This action cannot be undone.`
-    );
-    
-    if (!confirmDelete) return;
+    setShowDeleteConfirm(true);
+  };
 
+  const confirmDeleteThis = async () => {
+    if (!existingEntry) return;
+    setShowDeleteConfirm(false);
+    
     try {
       setLoading(true);
       await deleteScheduleEntry(existingEntry.id);
@@ -316,6 +317,23 @@ export default function AddEventModal({
     } catch (err) {
       console.error('Failed to delete event:', err);
       setError(err instanceof Error ? err.message : 'Failed to delete event');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const confirmDeleteAll = async () => {
+    if (!existingEntry) return;
+    setShowDeleteConfirm(false);
+    
+    try {
+      setLoading(true);
+      await deleteThisAndSubsequentEntries(existingEntry.id, existingEntry.start_time);
+      onSuccess();
+      onClose();
+    } catch (err) {
+      console.error('Failed to delete events:', err);
+      setError(err instanceof Error ? err.message : 'Failed to delete events');
     } finally {
       setLoading(false);
     }
@@ -488,6 +506,70 @@ export default function AddEventModal({
           </button>
         </div>
       </form>
+
+      {/* Delete Confirmation Modal */}
+      <Modal
+        isOpen={showDeleteConfirm}
+        onClose={() => setShowDeleteConfirm(false)}
+        title="Delete Event"
+        maxWidth="35rem"
+      >
+        <div style={{ padding: '0.5rem 0' }}>
+          <p style={{ color: '#374151', marginBottom: '1.25rem' }}>
+            Delete <strong>{existingEntry?.student_name}</strong>?
+          </p>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+            <button
+              onClick={confirmDeleteThis}
+              style={{
+                padding: '0.75rem 1rem',
+                backgroundColor: 'white',
+                color: '#374151',
+                border: '1px solid #d1d5db',
+                borderRadius: '0.5rem',
+                cursor: 'pointer',
+                textAlign: 'left',
+              }}
+              onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#f9fafb'; }}
+              onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'white'; }}
+            >
+              <div style={{ fontWeight: '500' }}>This event only</div>
+              <div style={{ fontSize: '0.8rem', color: '#6b7280', marginTop: '0.25rem' }}>Keep future occurrences</div>
+            </button>
+            <button
+              onClick={confirmDeleteAll}
+              style={{
+                padding: '0.75rem 1rem',
+                backgroundColor: '#fef2f2',
+                color: '#dc2626',
+                border: '1px solid #fecaca',
+                borderRadius: '0.5rem',
+                cursor: 'pointer',
+                textAlign: 'left',
+              }}
+              onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#fee2e2'; }}
+              onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = '#fef2f2'; }}
+            >
+              <div style={{ fontWeight: '500' }}>This and all future events</div>
+              <div style={{ fontSize: '0.8rem', color: '#991b1b', marginTop: '0.25rem' }}>Delete the entire series</div>
+            </button>
+            <button
+              onClick={() => setShowDeleteConfirm(false)}
+              style={{
+                padding: '0.5rem 1rem',
+                backgroundColor: 'transparent',
+                color: '#6b7280',
+                border: 'none',
+                borderRadius: '0.5rem',
+                cursor: 'pointer',
+                marginTop: '0.5rem',
+              }}
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      </Modal>
     </Modal>
   );
 }

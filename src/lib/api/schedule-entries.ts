@@ -77,3 +77,29 @@ export async function deleteScheduleEntry(entryId: string): Promise<void> {
         throw new Error(`Failed to delete schedule entry: ${error.message}`);
     }
 }
+
+// Delete this entry and all subsequent entries with the same student_name and recurrence_rule
+export async function deleteThisAndSubsequentEntries(entryId: string, startTime: string): Promise<void> {
+    // First, get the entry to find student_name and recurrence_rule
+    const { data: entry, error: fetchError } = await supabase
+        .from('schedule_entries')
+        .select('student_name, recurrence_rule')
+        .eq('id', entryId)
+        .single();
+    
+    if (fetchError) {
+        throw new Error(`Failed to fetch entry: ${fetchError.message}`);
+    }
+    
+    // Delete this entry and all subsequent entries for same student with same recurrence rule
+    const { error } = await supabase
+        .from('schedule_entries')
+        .delete()
+        .eq('student_name', entry.student_name)
+        .eq('recurrence_rule', entry.recurrence_rule)
+        .gte('start_time', startTime);
+    
+    if (error) {
+        throw new Error(`Failed to delete entries: ${error.message}`);
+    }
+}
