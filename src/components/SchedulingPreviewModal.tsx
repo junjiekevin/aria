@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import Modal from './Modal';
 import { scheduleStudents, createEntryFromAssignment, type SchedulingResult, type ScheduledAssignment } from '../lib/scheduling';
 import { createScheduleEntry, type ScheduleEntry } from '../lib/api/schedule-entries';
-import type { FormResponse } from '../lib/api/form-responses';
+import { deleteFormResponse, type FormResponse } from '../lib/api/form-responses';
 
 function formatTime(hour: number, minute: number): string {
     const period = hour >= 12 ? 'PM' : 'AM';
@@ -201,6 +201,8 @@ export default function SchedulingPreviewModal({
                     student_name: assignment.student.student_name,
                     ...entryData,
                 });
+                // Delete the form response after successfully scheduling
+                await deleteFormResponse(assignment.student.id);
                 created++;
                 setCreatedCount(created);
             } catch (err) {

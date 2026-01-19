@@ -3,7 +3,7 @@ import { useState, useEffect, useMemo, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Calendar, Users, ChevronLeft, ChevronRight, Trash2 } from 'lucide-react';
 import { getSchedule, updateSchedule, type Schedule } from '../lib/api/schedules';
-import { getScheduleEntries, updateScheduleEntry, deleteScheduleEntry, type ScheduleEntry } from '../lib/api/schedule-entries';
+import { getScheduleEntries, updateScheduleEntry, deleteScheduleEntry, deleteThisAndSubsequentEntries, type ScheduleEntry } from '../lib/api/schedule-entries';
 import { getFormResponses, deleteFormResponse, type FormResponse } from '../lib/api/form-responses';
 import AddEventModal from '../components/AddEventModal';
 import Modal from '../components/Modal';
@@ -219,6 +219,7 @@ export default function SchedulePage() {
   const [showAddParticipantModal, setShowAddParticipantModal] = useState(false);
   const [selectedParticipant, setSelectedParticipant] = useState<FormResponse | null>(null);
   const [participantToDelete, setParticipantToDelete] = useState<FormResponse | null>(null);
+  const [entryToDelete, setEntryToDelete] = useState<ScheduleEntry | null>(null);
   
   // Scheduling preview modal state
   const [showSchedulingPreview, setShowSchedulingPreview] = useState(false);
@@ -706,21 +707,8 @@ export default function SchedulePage() {
         loadScheduleData(); // Reload on error to restore state
       }
     } else if (dropId === 'trash') {
-      // Dragged to trash - delete event
-      const confirmDelete = window.confirm(
-        `Delete "${draggedEntry.student_name}"? This action cannot be undone.`
-      );
-      
-      if (!confirmDelete) return;
-      
-      try {
-        setEntries(entries.filter(e => e.id !== draggedEntry.id));
-        await deleteScheduleEntry(draggedEntry.id);
-      } catch (err) {
-        console.error('Failed to delete event:', err);
-        alert('Failed to delete event');
-        loadScheduleData();
-      }
+      // Dropped on trash - confirm and delete
+      setEntryToDelete(draggedEntry);
     } else if (dropId.startsWith('entry-')) {
       // Dropped on another entry - offer to swap
       const targetEntryId = dropId.replace('entry-', '');
@@ -1382,6 +1370,90 @@ export default function SchedulePage() {
               }}
             >
               Delete
+            </button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Schedule Entry Delete Confirmation Modal */}
+      <Modal
+        isOpen={!!entryToDelete}
+        onClose={() => setEntryToDelete(null)}
+        title="Delete Event"
+        maxWidth="35rem"
+      >
+        <div style={{ padding: '0.5rem 0' }}>
+          <p style={{ color: '#374151', marginBottom: '1.25rem' }}>
+            Delete <strong>{entryToDelete?.student_name}</strong>?
+          </p>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+            <button
+              onClick={async () => {
+                if (!entryToDelete) return;
+                try {
+                  setEntries(entries.filter(e => e.id !== entryToDelete.id));
+                  await deleteScheduleEntry(entryToDelete.id);
+                  setEntryToDelete(null);
+                } catch (err) {
+                  console.error('Failed to delete event:', err);
+                  loadScheduleData();
+                }
+              }}
+              style={{
+                padding: '0.75rem 1rem',
+                backgroundColor: 'white',
+                color: '#374151',
+                border: '1px solid #d1d5db',
+                borderRadius: '0.5rem',
+                cursor: 'pointer',
+                textAlign: 'left',
+              }}
+              onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#f9fafb'; }}
+              onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'white'; }}
+            >
+              <div style={{ fontWeight: '500' }}>This event only</div>
+              <div style={{ fontSize: '0.8rem', color: '#6b7280', marginTop: '0.25rem' }}>Keep future occurrences</div>
+            </button>
+            <button
+              onClick={async () => {
+                if (!entryToDelete) return;
+                try {
+                  await deleteThisAndSubsequentEntries(entryToDelete.id, entryToDelete.start_time);
+                  setEntries(entries.filter(e => e.id !== entryToDelete.id));
+                  setEntryToDelete(null);
+                } catch (err) {
+                  console.error('Failed to delete events:', err);
+                  loadScheduleData();
+                }
+              }}
+              style={{
+                padding: '0.75rem 1rem',
+                backgroundColor: '#fef2f2',
+                color: '#dc2626',
+                border: '1px solid #fecaca',
+                borderRadius: '0.5rem',
+                cursor: 'pointer',
+                textAlign: 'left',
+              }}
+              onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#fee2e2'; }}
+              onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = '#fef2f2'; }}
+            >
+              <div style={{ fontWeight: '500' }}>This and all future events</div>
+              <div style={{ fontSize: '0.8rem', color: '#991b1b', marginTop: '0.25rem' }}>Delete the entire series</div>
+            </button>
+            <button
+              onClick={() => setEntryToDelete(null)}
+              style={{
+                padding: '0.5rem 1rem',
+                backgroundColor: 'transparent',
+                color: '#6b7280',
+                border: 'none',
+                borderRadius: '0.5rem',
+                cursor: 'pointer',
+                marginTop: '0.5rem',
+              }}
+            >
+              Cancel
             </button>
           </div>
         </div>

@@ -84,21 +84,59 @@ export function buildAvailabilityMap(entries: ScheduleEntry[], scheduleStart: Da
     for (const entry of entries) {
         const entryStart = new Date(entry.start_time);
         const entryEnd = new Date(entry.end_time);
+        const entryDayIndex = entryStart.getDay();
+        const entryDay = DAYS[entryDayIndex];
         
         const daysFromScheduleStart = Math.floor((entryStart.getTime() - scheduleStart.getTime()) / (1000 * 60 * 60 * 24));
-        const week = Math.floor(daysFromScheduleStart / 7);
+        const startWeek = Math.floor(daysFromScheduleStart / 7);
         
-        if (week >= 0 && week < totalWeeks) {
-            const day = DAYS[entryStart.getDay()];
-            const dayKey = `${week}-${day}`;
-            
-            const startMinutes = entryStart.getHours() * 60 + entryStart.getMinutes();
-            const endMinutes = entryEnd.getHours() * 60 + entryEnd.getMinutes();
-            
-            for (let m = startMinutes; m < endMinutes; m += 15) {
-                const hour = Math.floor(m / 60);
-                const minute = m % 60;
-                availability.get(dayKey)?.delete(`${hour}:${minute}`);
+        const rule = entry.recurrence_rule || '';
+        const freqMatch = rule.match(/FREQ=(\w+)/);
+        const intervalMatch = rule.match(/INTERVAL=(\d+)/);
+        
+        const freq = freqMatch ? freqMatch[1] : 'WEEKLY';
+        const interval = intervalMatch ? parseInt(intervalMatch[1]) : 1;
+        
+        // Determine which weeks this entry should occupy based on recurrence rule
+        const weeksToOccupy: number[] = [];
+        
+        if (!rule) {
+            // No recurrence - only the first occurrence
+            if (startWeek >= 0 && startWeek < totalWeeks) {
+                weeksToOccupy.push(startWeek);
+            }
+        } else if (freq === 'WEEKLY') {
+            // Weekly - occupy all weeks (or every N weeks based on interval)
+            for (let week = startWeek; week < totalWeeks; week++) {
+                if ((week - startWeek) % interval === 0) {
+                    weeksToOccupy.push(week);
+                }
+            }
+        } else if (freq === '2WEEKLY') {
+            // Every 2 weeks - occupy even weeks relative to start
+            for (let week = startWeek; week < totalWeeks; week += 2) {
+                weeksToOccupy.push(week);
+            }
+        } else if (freq === 'MONTHLY') {
+            // Legacy: monthly with BYSETPOS (e.g., 1st Monday of month)
+            for (let week = startWeek; week < totalWeeks; week += 4) {
+                weeksToOccupy.push(week);
+            }
+        }
+        
+        // Mark slots as occupied for all applicable weeks
+        for (const week of weeksToOccupy) {
+            if (week >= 0 && week < totalWeeks) {
+                const dayKey = `${week}-${entryDay}`;
+                
+                const startMinutes = entryStart.getHours() * 60 + entryStart.getMinutes();
+                const endMinutes = entryEnd.getHours() * 60 + entryEnd.getMinutes();
+                
+                for (let m = startMinutes; m < endMinutes; m += 15) {
+                    const hour = Math.floor(m / 60);
+                    const minute = m % 60;
+                    availability.get(dayKey)?.delete(`${hour}:${minute}`);
+                }
             }
         }
     }
@@ -142,6 +180,45 @@ function markSlotOccupied(timing: TimingSlot, availability: Map<string, Set<stri
     }
 }
 
+function doesTimingConflict(
+    timing: TimingSlot,
+    availability: Map<string, Set<string>>,
+    totalWeeks: number,
+    frequency: string
+): boolean {
+    // Check if this timing conflicts with ANY occupied week
+    // For weekly: check all weeks
+    // For 2weekly: check weeks 0, 2, 4...
+    const startWeek = 0;
+    const interval = frequency === '2weekly' ? 2 : 1;
+    
+    for (let week = startWeek; week < totalWeeks; week++) {
+        // Only check weeks where this frequency would have events
+        if ((week - startWeek) % interval !== 0) continue;
+        
+        if (!isSlotAvailable(timing, availability, week)) {
+            return true; // Conflict found
+        }
+    }
+    return false; // No conflicts
+}
+
+function markTimingAsOccupied(
+    timing: TimingSlot,
+    availability: Map<string, Set<string>>,
+    totalWeeks: number,
+    frequency: string
+): void {
+    // Mark this timing as occupied across ALL applicable weeks
+    const startWeek = 0;
+    const interval = frequency === '2weekly' ? 2 : 1;
+    
+    for (let week = startWeek; week < totalWeeks; week++) {
+        if ((week - startWeek) % interval !== 0) continue;
+        markSlotOccupied(timing, availability, week);
+    }
+}
+
 export function scheduleStudents(
     students: FormResponse[],
     existingEntries: ScheduleEntry[],
@@ -160,7 +237,6 @@ export function scheduleStudents(
     })).filter(s => s.timings.length > 0);
     
     const assignments: ScheduledAssignment[] = [];
-    const usedSlots = new Set<string>();
     
     for (const { student, timings } of studentsWithTimings) {
         let scheduled = false;
@@ -170,22 +246,18 @@ export function scheduleStudents(
         for (let i = 0; i < timings.length; i++) {
             const timing = timings[i];
             const choiceRank = i + 1;
-            const slotKey = `${student.id}-${choiceRank}`;
             
-            if (usedSlots.has(slotKey)) continue;
+            // Check if this timing has conflicts with ANY week it would occupy
+            const hasConflict = doesTimingConflict(timing, availability, totalWeeks, timing.frequency);
             
-            for (let week = 0; week < totalWeeks; week++) {
-                if (isSlotAvailable(timing, availability, week)) {
-                    scheduled = true;
-                    bestTiming = timing;
-                    bestRank = choiceRank;
-                    usedSlots.add(slotKey);
-                    markSlotOccupied(timing, availability, week);
-                    break;
-                }
+            if (!hasConflict) {
+                scheduled = true;
+                bestTiming = timing;
+                bestRank = choiceRank;
+                // Mark as occupied across ALL applicable weeks
+                markTimingAsOccupied(timing, availability, totalWeeks, timing.frequency);
+                break;
             }
-            
-            if (scheduled) break;
         }
         
         if (scheduled && bestTiming) {
