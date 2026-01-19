@@ -303,15 +303,17 @@ export default function SchedulePage() {
      const entryDay = entryStart.getDay(); // 0-6
      const dayAbbrev = ['SU', 'MO', 'TU', 'WE', 'TH', 'FR', 'SA'][entryDay];
      
-     // Parse recurrence rule
-     const rule = entry.recurrence_rule || '';
-     const freqMatch = rule.match(/FREQ=(\w+)/);
-     const byDayMatch = rule.match(/BYDAY=([^;]+)/);
-     const bySetPosMatch = rule.match(/BYSETPOS=([^;]+)/);
-     
-     const freq = freqMatch ? freqMatch[1] : 'WEEKLY';
-     const byDay = byDayMatch ? byDayMatch[1] : dayAbbrev;
-     const bySetPos = bySetPosMatch ? parseInt(bySetPosMatch[1]) : null;
+      // Parse recurrence rule
+      const rule = entry.recurrence_rule || '';
+      const freqMatch = rule.match(/FREQ=(\w+)/);
+      const byDayMatch = rule.match(/BYDAY=([^;]+)/);
+      const bySetPosMatch = rule.match(/BYSETPOS=([^;]+)/);
+      const intervalMatch = rule.match(/INTERVAL=(\d+)/);
+      
+      const freq = freqMatch ? freqMatch[1] : 'WEEKLY';
+      const byDay = byDayMatch ? byDayMatch[1] : dayAbbrev;
+      const bySetPos = bySetPosMatch ? parseInt(bySetPosMatch[1]) : null;
+      const interval = intervalMatch ? parseInt(intervalMatch[1]) : 1;
      
      // Check if the entry's day matches
      if (!byDay.includes(dayAbbrev)) return false;
@@ -353,30 +355,30 @@ export default function SchedulePage() {
      const weeksSinceStart = Math.floor((occurrenceDate.getTime() - scheduleFirstDay.getTime()) / (7 * 24 * 60 * 60 * 1000));
      
      // Apply frequency rules
-     if (freq === 'WEEKLY') {
-       return true; // Show every week
-     } else if (freq === '2WEEKLY') {
-       return weeksSinceStart % 2 === 0; // Show every other week (even weeks)
-     } else if (freq === 'MONTHLY') {
-       // For monthly, check if this is the Nth occurrence of the day in the month
-       if (bySetPos) {
-         const monthStart = new Date(occurrenceDate.getFullYear(), occurrenceDate.getMonth(), 1);
-         const monthEnd = new Date(occurrenceDate.getFullYear(), occurrenceDate.getMonth() + 1, 0);
-         
-         // Find all occurrences of this day in the month
-         let occurrenceCount = 0;
-         for (let d = new Date(monthStart); d <= monthEnd; d.setDate(d.getDate() + 1)) {
-           if (d.getDay() === entryDayIndex) {
-             occurrenceCount++;
-             if (d.getTime() === occurrenceDate.getTime()) {
-               break;
-             }
-           }
-         }
-         return occurrenceCount === bySetPos;
-       }
-       return true;
-     }
+      if (freq === 'WEEKLY') {
+        return weeksSinceStart % interval === 0; // Show every N weeks based on interval
+      } else if (freq === '2WEEKLY') {
+        return weeksSinceStart % 2 === 0; // Show every other week (even weeks)
+      } else if (freq === 'MONTHLY') {
+        // Legacy: For monthly, check if this is the Nth occurrence of the day in the month
+        if (bySetPos) {
+          const monthStart = new Date(occurrenceDate.getFullYear(), occurrenceDate.getMonth(), 1);
+          const monthEnd = new Date(occurrenceDate.getFullYear(), occurrenceDate.getMonth() + 1, 0);
+          
+          // Find all occurrences of this day in the month
+          let occurrenceCount = 0;
+          for (let d = new Date(monthStart); d <= monthEnd; d.setDate(d.getDate() + 1)) {
+            if (d.getDay() === entryDayIndex) {
+              occurrenceCount++;
+              if (d.getTime() === occurrenceDate.getTime()) {
+                break;
+              }
+            }
+          }
+          return occurrenceCount === bySetPos;
+        }
+        return true;
+      }
      
      return true;
    };

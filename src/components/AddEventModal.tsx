@@ -264,15 +264,7 @@ export default function AddEventModal({
       } else if (frequency === '2weekly') {
         recurrenceRule = `FREQ=2WEEKLY;BYDAY=${dayAbbrev}`;
       } else if (frequency === 'monthly') {
-        const dayIndex = dayOfWeek;
-        const monthStart = new Date(firstOccurrence.getFullYear(), firstOccurrence.getMonth(), 1);
-        let occurrenceCount = 0;
-        for (let d = new Date(monthStart); d <= firstOccurrence; d.setDate(d.getDate() + 1)) {
-            if (d.getDay() === dayIndex) {
-                occurrenceCount++;
-            }
-        }
-        recurrenceRule = `FREQ=MONTHLY;BYDAY=${dayAbbrev};BYSETPOS=${occurrenceCount}`;
+        recurrenceRule = `FREQ=WEEKLY;INTERVAL=4;BYDAY=${dayAbbrev}`;
       } else {
         // Default to weekly
         recurrenceRule = `FREQ=WEEKLY;BYDAY=${dayAbbrev}`;
