@@ -245,7 +245,15 @@ export function createEntryFromAssignment(
     } else if (timing.frequency === '2weekly') {
         recurrenceRule = `FREQ=2WEEKLY;BYDAY=${dayAbbrev}`;
     } else if (timing.frequency === 'monthly') {
-        recurrenceRule = `FREQ=MONTHLY;BYDAY=${dayAbbrev}`;
+        const dayIndex = DAYS.indexOf(timing.day);
+        const monthStart = new Date(firstOccurrence.getFullYear(), firstOccurrence.getMonth(), 1);
+        let occurrenceCount = 0;
+        for (let d = new Date(monthStart); d <= firstOccurrence; d.setDate(d.getDate() + 1)) {
+            if (d.getDay() === dayIndex) {
+                occurrenceCount++;
+            }
+        }
+        recurrenceRule = `FREQ=MONTHLY;BYDAY=${dayAbbrev};BYSETPOS=${occurrenceCount}`;
     } else {
         recurrenceRule = `FREQ=WEEKLY;BYDAY=${dayAbbrev}`;
     }
