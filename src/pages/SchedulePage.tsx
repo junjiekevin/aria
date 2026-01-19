@@ -1560,10 +1560,11 @@ export default function SchedulePage() {
             <button
               onClick={async () => {
                 if (!entryToDelete) return;
+                const entryIdToDelete = entryToDelete.id;
                 try {
-                  const entryIdToDelete = entryToDelete.id;
                   await deleteScheduleEntry(entryIdToDelete);
-                  // Force reload to ensure fresh data
+                  // Force complete reload to ensure fresh data from server
+                  setEntries([]);
                   await loadScheduleData();
                   setEntryToDelete(null);
                 } catch (err) {
