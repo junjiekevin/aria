@@ -234,12 +234,11 @@ export async function deleteSchedule(scheduleId: string) {
         throw error;
     }
 
-    // First check if schedule exists and belongs to user
+    // First get current status of the schedule
     const { data: existingSchedule, error: fetchError } = await supabase
         .from('schedules')
         .select('id, status, previous_status')
         .eq('id', scheduleId)
-        .eq('user_id', user.id)
         .single();
 
     if (fetchError || !existingSchedule) {
@@ -248,7 +247,7 @@ export async function deleteSchedule(scheduleId: string) {
         throw notFoundError;
     }
 
-    // Update to trashed status
+    // Update to trashed status (RLS will handle user check)
     const { error } = await supabase
         .from('schedules')
         .update({
@@ -256,8 +255,7 @@ export async function deleteSchedule(scheduleId: string) {
             deleted_at: new Date().toISOString(),
             previous_status: existingSchedule.status
         })
-        .eq('id', scheduleId)
-        .eq('user_id', user.id);
+        .eq('id', scheduleId);
     
     if (error) {
         throw new Error(`Failed to delete schedule: ${error.message}`);
