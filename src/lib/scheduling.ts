@@ -36,10 +36,6 @@ export function dayToIndex(day: string): number {
     return DAYS.indexOf(day);
 }
 
-export function formatDate(date: Date): string {
-    return date.toISOString().split('T')[0];
-}
-
 export function parseTiming(response: FormResponse, rank: number): TimingSlot | null {
     const day = rank === 1 ? response.preferred_1_day :
                 rank === 2 ? response.preferred_2_day :
@@ -67,108 +63,6 @@ export function parseTiming(response: FormResponse, rank: number): TimingSlot | 
         endMinute: endMinutes % 60,
         frequency: frequency || 'weekly',
     };
-}
-
-export function buildAvailabilityMap(
-    entries: ScheduleEntry[], 
-    scheduleStart: Date, 
-    totalWeeks: number,
-    exceptions: Record<string, string[]> = {}
-): Map<string, Set<string>> {
-    const availability = new Map<string, Set<string>>();
-
-    for (let week = 0; week < totalWeeks; week++) {
-        for (const day of DAYS) {
-            const dayKey = `${week}-${day}`;
-            availability.set(dayKey, new Set<string>());
-            
-            for (let hour = 8; hour < 21; hour++) {
-                for (let minute = 0; minute < 60; minute += 15) {
-                    availability.get(dayKey)!.add(`${hour}:${minute}`);
-                }
-            }
-        }
-    }
-
-    for (const entry of entries) {
-        const entryStart = new Date(entry.start_time);
-        const entryEnd = new Date(entry.end_time);
-        const entryDayIndex = entryStart.getDay();
-        const entryDay = DAYS[entryDayIndex];
-        
-        const daysFromScheduleStart = Math.floor((entryStart.getTime() - scheduleStart.getTime()) / (1000 * 60 * 60 * 24));
-        const startWeek = Math.floor(daysFromScheduleStart / 7);
-        
-        const rule = entry.recurrence_rule || '';
-        const freqMatch = rule.match(/FREQ=(\w+)/);
-        const intervalMatch = rule.match(/INTERVAL=(\d+)/);
-        
-        const freq = freqMatch ? freqMatch[1] : 'WEEKLY';
-        const interval = intervalMatch ? parseInt(intervalMatch[1]) : 1;
-        
-        // Get exceptions for this entry
-        const entryExceptions = exceptions[entry.id] || [];
-        
-        // Determine which weeks this entry should occupy based on recurrence rule
-        const weeksToOccupy: number[] = [];
-        
-        if (!rule) {
-            // No recurrence - only the first occurrence
-            if (startWeek >= 0 && startWeek < totalWeeks) {
-                weeksToOccupy.push(startWeek);
-            }
-        } else if (freq === 'WEEKLY') {
-            // Weekly - occupy all weeks (or every N weeks based on interval)
-            for (let week = startWeek; week < totalWeeks; week++) {
-                if ((week - startWeek) % interval === 0) {
-                    weeksToOccupy.push(week);
-                }
-            }
-        } else if (freq === '2WEEKLY') {
-            // Every 2 weeks - occupy even weeks relative to start
-            for (let week = startWeek; week < totalWeeks; week += 2) {
-                weeksToOccupy.push(week);
-            }
-        } else if (freq === 'MONTHLY') {
-            // Monthly
-            for (let week = startWeek; week < totalWeeks; week += 4) {
-                weeksToOccupy.push(week);
-            }
-        }
-        
-        // Mark slots as occupied for all applicable weeks
-        for (const week of weeksToOccupy) {
-            if (week >= 0 && week < totalWeeks) {
-                const dayKey = `${week}-${entryDay}`;
-                
-                // Calculate the actual date for this occurrence
-                const weekStart = new Date(scheduleStart);
-                weekStart.setDate(weekStart.getDate() + (week * 7));
-                
-                // Find the day in this week that matches entryDay
-                const targetDate = new Date(weekStart);
-                targetDate.setDate(weekStart.getDate() + entryDayIndex);
-                const dateStr = formatDate(targetDate);
-                
-                // Skip if this date is an exception
-                if (entryExceptions.includes(dateStr)) {
-                    console.log(`Skipping ${entry.student_name} on ${dateStr} (exception)`);
-                    continue;
-                }
-                
-                const startMinutes = entryStart.getHours() * 60 + entryStart.getMinutes();
-                const endMinutes = entryEnd.getHours() * 60 + entryEnd.getMinutes();
-                
-                for (let m = startMinutes; m < endMinutes; m += 15) {
-                    const hour = Math.floor(m / 60);
-                    const minute = m % 60;
-                    availability.get(dayKey)?.delete(`${hour}:${minute}`);
-                }
-            }
-        }
-    }
-
-    return availability;
 }
 
 function isSlotAvailable(timing: TimingSlot, availability: Map<string, Set<string>>, week: number): boolean {
@@ -220,10 +114,10 @@ function doesTimingConflict(
         if ((week - startWeek) % interval !== 0) continue;
         
         if (!isSlotAvailable(timing, availability, week)) {
-            return true; // Conflict found
+            return true;
         }
     }
-    return false; // No conflicts
+    return false;
 }
 
 function markTimingAsOccupied(
@@ -241,14 +135,56 @@ function markTimingAsOccupied(
     }
 }
 
+// Build availability map - each entry is a single time slot
+export function buildAvailabilityMap(entries: ScheduleEntry[], scheduleStart: Date, totalWeeks: number): Map<string, Set<string>> {
+    const availability = new Map<string, Set<string>>();
+
+    for (let week = 0; week < totalWeeks; week++) {
+        for (const day of DAYS) {
+            const dayKey = `${week}-${day}`;
+            availability.set(dayKey, new Set<string>());
+            
+            for (let hour = 8; hour < 21; hour++) {
+                for (let minute = 0; minute < 60; minute += 15) {
+                    availability.get(dayKey)!.add(`${hour}:${minute}`);
+                }
+            }
+        }
+    }
+
+    for (const entry of entries) {
+        const entryStart = new Date(entry.start_time);
+        const entryEnd = new Date(entry.end_time);
+        
+        // Calculate which week this entry falls in
+        const daysFromScheduleStart = Math.floor((entryStart.getTime() - scheduleStart.getTime()) / (1000 * 60 * 60 * 24));
+        const week = Math.floor(daysFromScheduleStart / 7);
+        
+        if (week >= 0 && week < totalWeeks) {
+            const entryDay = DAYS[entryStart.getDay()];
+            const dayKey = `${week}-${entryDay}`;
+            
+            const startMinutes = entryStart.getHours() * 60 + entryStart.getMinutes();
+            const endMinutes = entryEnd.getHours() * 60 + entryEnd.getMinutes();
+            
+            for (let m = startMinutes; m < endMinutes; m += 15) {
+                const hour = Math.floor(m / 60);
+                const minute = m % 60;
+                availability.get(dayKey)?.delete(`${hour}:${minute}`);
+            }
+        }
+    }
+
+    return availability;
+}
+
 export function scheduleStudents(
     students: FormResponse[],
     existingEntries: ScheduleEntry[],
     scheduleStart: Date,
-    totalWeeks: number,
-    exceptions: Record<string, string[]> = {}
+    totalWeeks: number
 ): SchedulingResult {
-    const availability = buildAvailabilityMap(existingEntries, scheduleStart, totalWeeks, exceptions);
+    const availability = buildAvailabilityMap(existingEntries, scheduleStart, totalWeeks);
     
     const studentsWithTimings = students.map(student => ({
         student,
@@ -270,7 +206,6 @@ export function scheduleStudents(
             const timing = timings[i];
             const choiceRank = i + 1;
             
-            // Check if this timing has conflicts with ANY week it would occupy
             const hasConflict = doesTimingConflict(timing, availability, totalWeeks, timing.frequency);
             
             if (!hasConflict) {
@@ -310,6 +245,7 @@ export function scheduleStudents(
     };
 }
 
+// Create a single entry for one week
 export function createEntryFromAssignment(
     assignment: ScheduledAssignment,
     scheduleStart: Date,
@@ -324,29 +260,76 @@ export function createEntryFromAssignment(
     if (daysToAdd < 0) daysToAdd += 7;
     daysToAdd += week * 7;
     
-    const firstOccurrence = new Date(scheduleStartDate);
-    firstOccurrence.setDate(scheduleStartDate.getDate() + daysToAdd);
-    firstOccurrence.setHours(timing.startHour, timing.startMinute, 0, 0);
+    const occurrence = new Date(scheduleStartDate);
+    occurrence.setDate(scheduleStartDate.getDate() + daysToAdd);
+    occurrence.setHours(timing.startHour, timing.startMinute, 0, 0);
     
-    const endTime = new Date(firstOccurrence);
+    const endTime = new Date(occurrence);
     endTime.setHours(timing.endHour, timing.endMinute, 0, 0);
     
-    const dayAbbrev = ['SU', 'MO', 'TU', 'WE', 'TH', 'FR', 'SA'][dayIndex];
-    let recurrenceRule = '';
+    // No recurrence rule - each entry is a single occurrence
+    return {
+        start_time: occurrence.toISOString(),
+        end_time: endTime.toISOString(),
+        recurrence_rule: '',
+    };
+}
+
+// Expand a recurring entry to multiple individual entries
+export function expandRecurringEntry(
+    entry: ScheduleEntry,
+    scheduleStart: Date,
+    totalWeeks: number
+): { start_time: string; end_time: string }[] {
+    const results: { start_time: string; end_time: string }[] = [];
     
-    if (timing.frequency === 'once') {
-        recurrenceRule = '';
-    } else if (timing.frequency === '2weekly') {
-        recurrenceRule = `FREQ=2WEEKLY;BYDAY=${dayAbbrev}`;
-    } else if (timing.frequency === 'monthly') {
-        recurrenceRule = `FREQ=WEEKLY;INTERVAL=4;BYDAY=${dayAbbrev}`;
-    } else {
-        recurrenceRule = `FREQ=WEEKLY;BYDAY=${dayAbbrev}`;
+    const entryStart = new Date(entry.start_time);
+    const entryEnd = new Date(entry.end_time);
+    const entryDayIndex = entryStart.getDay();
+    
+    const daysFromScheduleStart = Math.floor((entryStart.getTime() - scheduleStart.getTime()) / (1000 * 60 * 60 * 24));
+    const startWeek = Math.floor(daysFromScheduleStart / 7);
+    
+    const rule = entry.recurrence_rule || '';
+    const freqMatch = rule.match(/FREQ=(\w+)/);
+    const intervalMatch = rule.match(/INTERVAL=(\d+)/);
+    
+    const freq = freqMatch ? freqMatch[1] : 'WEEKLY';
+    const interval = intervalMatch ? parseInt(intervalMatch[1]) : 1;
+    
+    // Find the first occurrence of this day after schedule start
+    let daysToFirst = entryDayIndex - scheduleStart.getDay();
+    if (daysToFirst < 0) daysToFirst += 7;
+    
+    const firstOccurrenceDate = new Date(scheduleStart);
+    firstOccurrenceDate.setDate(scheduleStart.getDate() + daysToFirst);
+    
+    // Generate entries for all weeks
+    for (let week = 0; week < totalWeeks; week++) {
+        const occurrenceDate = new Date(firstOccurrenceDate);
+        occurrenceDate.setDate(firstOccurrenceDate.getDate() + (week * 7));
+        
+        if (week < startWeek) continue;
+        
+        if (freq === 'WEEKLY') {
+            if ((week - startWeek) % interval !== 0) continue;
+        } else if (freq === '2WEEKLY') {
+            if ((week - startWeek) % 2 !== 0) continue;
+        } else if (freq === 'MONTHLY') {
+            if ((week - startWeek) % 4 !== 0) continue;
+        }
+        
+        const startTime = new Date(occurrenceDate);
+        startTime.setHours(entryStart.getHours(), entryStart.getMinutes(), 0, 0);
+        
+        const endTime = new Date(occurrenceDate);
+        endTime.setHours(entryEnd.getHours(), entryEnd.getMinutes(), 0, 0);
+        
+        results.push({
+            start_time: startTime.toISOString(),
+            end_time: endTime.toISOString(),
+        });
     }
     
-    return {
-        start_time: firstOccurrence.toISOString(),
-        end_time: endTime.toISOString(),
-        recurrence_rule: recurrenceRule,
-    };
+    return results;
 }

@@ -1,19 +1,17 @@
 // src/pages/SchedulePage.tsx
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Calendar, Users, ChevronLeft, ChevronRight, Trash2, Copy, Check } from 'lucide-react';
+import { ArrowLeft, ChevronLeft, ChevronRight, Trash2, Copy, Check } from 'lucide-react';
 import { getSchedule, updateSchedule, type Schedule } from '../lib/api/schedules';
-import { getScheduleEntries, createScheduleEntry, updateScheduleEntry, deleteScheduleEntry, deleteThisAndSubsequentEntries, getEntryExceptions, type ScheduleEntry } from '../lib/api/schedule-entries';
+import { getScheduleEntries, createScheduleEntry, updateScheduleEntry, deleteScheduleEntry, type ScheduleEntry } from '../lib/api/schedule-entries';
 import { getFormResponses, deleteFormResponse, type FormResponse } from '../lib/api/form-responses';
 import AddEventModal from '../components/AddEventModal';
 import Modal from '../components/Modal';
-import AddParticipantModal from '../components/AddParticipantModal';
-import ParticipantDetailsModal from '../components/ParticipantDetailsModal';
 import SchedulingPreviewModal from '../components/SchedulingPreviewModal';
 import { DndContext, DragOverlay, useDraggable, useDroppable, PointerSensor, useSensor, useSensors, type DragEndEvent, type DragStartEvent } from '@dnd-kit/core';
 
 const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-const HOURS = Array.from({ length: 14 }, (_, i) => i + 8); // 8 AM to 9 PM
+const HOURS = Array.from({ length: 14 }, (_, i) => i + 8);
 
 const styles = {
   container: {
@@ -61,10 +59,6 @@ const styles = {
     alignItems: 'center',
     gap: '0.5rem',
   },
-  logo: {
-    height: '32px',
-    width: 'auto',
-  },
   subtitle: {
     fontSize: '0.7rem',
     color: '#6b7280',
@@ -78,25 +72,25 @@ const styles = {
     gridTemplateColumns: '1fr 280px',
     gap: '0.85rem',
   },
-   timetableContainer: {
-     backgroundColor: 'white',
-     borderRadius: '0.5rem',
-     boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
-     border: '1px solid #e5e7eb',
-     overflow: 'hidden',
-   },
-   timetableHeader: {
-     display: 'grid',
-     gridTemplateColumns: '55px repeat(7, 1fr)',
-     borderBottom: '2px solid #f97316',
-     backgroundColor: '#fff7ed',
-   },
-   dayHeader: {
-     padding: '0.35rem 0.5rem',
-     textAlign: 'center' as const,
-     fontWeight: '600',
-     fontSize: '0.7rem',
-     color: '#c2410c',
+  timetableContainer: {
+    backgroundColor: 'white',
+    borderRadius: '0.5rem',
+    boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
+    border: '1px solid #e5e7eb',
+    overflow: 'hidden',
+  },
+  timetableHeader: {
+    display: 'grid',
+    gridTemplateColumns: '55px repeat(7, 1fr)',
+    borderBottom: '2px solid #f97316',
+    backgroundColor: '#fff7ed',
+  },
+  dayHeader: {
+    padding: '0.35rem 0.5rem',
+    textAlign: 'center' as const,
+    fontWeight: '600',
+    fontSize: '0.7rem',
+    color: '#c2410c',
     borderRight: '1px solid #fed7aa',
     backgroundColor: '#ffedd5',
     display: 'flex',
@@ -158,27 +152,27 @@ const styles = {
     color: '#6b7280',
     fontSize: '0.7rem',
   },
-   lessonBlock: {
-     position: 'absolute' as const,
-     top: 0,
-     left: '2px',
-     right: '2px',
-     backgroundColor: '#f97316',
-     color: 'white',
-     borderRadius: '0.25rem',
-     padding: '0.25rem 0.5rem',
-     fontSize: '0.625rem',
-     fontWeight: '600',
-     cursor: 'pointer',
-     boxShadow: '0 1px 3px rgba(0, 0, 0, 0.2)',
-     transition: 'all 0.2s',
-     display: 'flex',
-     flexDirection: 'column' as const,
-     justifyContent: 'center',
-     alignItems: 'center',
-     textAlign: 'center' as const,
-   },
-    statusSelect: {
+  lessonBlock: {
+    position: 'absolute' as const,
+    top: 0,
+    left: '2px',
+    right: '2px',
+    backgroundColor: '#f97316',
+    color: 'white',
+    borderRadius: '0.25rem',
+    padding: '0.25rem 0.5rem',
+    fontSize: '0.625rem',
+    fontWeight: '600',
+    cursor: 'pointer',
+    boxShadow: '0 1px 3px rgba(0, 0, 0, 0.2)',
+    transition: 'all 0.2s',
+    display: 'flex',
+    flexDirection: 'column' as const,
+    justifyContent: 'center',
+    alignItems: 'center',
+    textAlign: 'center' as const,
+  },
+  statusSelect: {
     padding: '0.5rem 0.75rem',
     border: '1px solid #d1d5db',
     borderRadius: '0.375rem',
@@ -242,7 +236,6 @@ function FormLink({ scheduleId }: { scheduleId: string }) {
 }
 
 export default function SchedulePage() {
-  // Sensor configuration - must be inside component
   const sensors = useSensors(
     useSensor(PointerSensor, {
       activationConstraint: {
@@ -256,7 +249,6 @@ export default function SchedulePage() {
   const [schedule, setSchedule] = useState<Schedule | null>(null);
   const [entries, setEntries] = useState<ScheduleEntry[]>([]);
   const [responses, setResponses] = useState<FormResponse[]>([]);
-  const [exceptions, setExceptions] = useState<Record<string, string[]>>({}); // entryId -> exception dates
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showAddModal, setShowAddModal] = useState(false);
@@ -265,17 +257,12 @@ export default function SchedulePage() {
   const [isDragging, setIsDragging] = useState(false);
   const [activeDragId, setActiveDragId] = useState<string | null>(null);
   const [currentWeekOffset, setCurrentWeekOffset] = useState(0);
-   
-  // Participant modal states
-  const [showAddParticipantModal, setShowAddParticipantModal] = useState(false);
-  const [selectedParticipant, setSelectedParticipant] = useState<FormResponse | null>(null);
+    
   const [participantToDelete, setParticipantToDelete] = useState<FormResponse | null>(null);
   const [entryToDelete, setEntryToDelete] = useState<ScheduleEntry | null>(null);
   
-  // Scheduling preview modal state
   const [showSchedulingPreview, setShowSchedulingPreview] = useState(false);
   
-  // Inline editing states
   const [isEditingName, setIsEditingName] = useState(false);
   const [editingName, setEditingName] = useState('');
   const [isEditingDates, setIsEditingDates] = useState(false);
@@ -292,30 +279,25 @@ export default function SchedulePage() {
     }
   }, [scheduleId]);
 
-  // Get user's local timezone abbreviation (e.g., EST, PST)
   const userTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
   const userTimezoneAbbrev = new Date().toLocaleString('en-US', { 
     timeZone: userTimezone,
     timeZoneName: 'short' 
   }).split(' ').pop() || userTimezone;
 
-  // Calculate week dates based on schedule start date and current offset
   const { weekStart, weekEnd, weekNumber, totalWeeks } = useMemo(() => {
     if (!schedule) return { weekStart: null, weekEnd: null, weekNumber: 0, totalWeeks: 0 };
     
     const start = new Date(schedule.start_date);
     const end = new Date(schedule.end_date);
     
-    // Calculate total weeks
     const totalMs = end.getTime() - start.getTime();
     const totalDays = Math.ceil(totalMs / (1000 * 60 * 60 * 24));
     const total = Math.ceil(totalDays / 7);
     
-    // Calculate current week start (schedule start + 7 days * offset)
     const weekStartDate = new Date(start);
     weekStartDate.setDate(start.getDate() + (currentWeekOffset * 7));
     
-    // Calculate week end (week start + 6 days)
     const weekEndDate = new Date(weekStartDate);
     weekEndDate.setDate(weekStartDate.getDate() + 6);
     
@@ -327,7 +309,6 @@ export default function SchedulePage() {
     };
   }, [schedule, currentWeekOffset]);
 
-  // Format date in user's local timezone
   const formatLocalDate = (date: Date) => {
     return date.toLocaleDateString(undefined, { 
       month: 'short', 
@@ -337,7 +318,6 @@ export default function SchedulePage() {
     });
   };
 
-  // Format time in user's local timezone
   const formatLocalTime = (isoString: string) => {
     const date = new Date(isoString);
     return date.toLocaleTimeString(undefined, { 
@@ -347,98 +327,61 @@ export default function SchedulePage() {
     });
   };
 
-   // Check if an entry should appear in the current week based on recurrence rule
-    const isEntryInCurrentWeek = (entry: ScheduleEntry): boolean => {
-      if (!weekStart) return false;
-      
-      const entryStart = new Date(entry.start_time);
-      const entryDay = entryStart.getDay(); // 0-6
-      const dayAbbrev = ['SU', 'MO', 'TU', 'WE', 'TH', 'FR', 'SA'][entryDay];
-      
-       // Parse recurrence rule
-       const rule = entry.recurrence_rule || '';
-       const freqMatch = rule.match(/FREQ=(\w+)/);
-       const byDayMatch = rule.match(/BYDAY=([^;]+)/);
-       const bySetPosMatch = rule.match(/BYSETPOS=([^;]+)/);
-       const intervalMatch = rule.match(/INTERVAL=(\d+)/);
-       
-       const freq = freqMatch ? freqMatch[1] : 'WEEKLY';
-       const byDay = byDayMatch ? byDayMatch[1] : dayAbbrev;
-       const bySetPos = bySetPosMatch ? parseInt(bySetPosMatch[1]) : null;
-       const interval = intervalMatch ? parseInt(intervalMatch[1]) : 1;
-      
-      // Check if the entry's day matches
-      if (!byDay.includes(dayAbbrev)) {
-        console.log(entry.student_name + ' day ' + dayAbbrev + ' not in ' + byDay + ' - hiding');
-        return false;
-      }
-      
-      // "Once" frequency (empty rule) - only show in the week containing the original date
-      if (!rule) {
-        const entryWeekStart = new Date(entryStart);
-        entryWeekStart.setDate(entryStart.getDay() ? entryStart.getDate() - entryStart.getDay() : entryStart.getDate());
-        entryWeekStart.setHours(0, 0, 0, 0);
-        
-        const currentViewWeekStart = new Date(weekStart);
-        currentViewWeekStart.setHours(0, 0, 0, 0);
-        
-        return entryWeekStart.getTime() === currentViewWeekStart.getTime();
-      }
-      
-      // Calculate which week this entry originally falls on
-      const scheduleStart = schedule ? new Date(schedule.start_date) : weekStart;
-      const entryWeekStart = new Date(scheduleStart);
-      entryWeekStart.setDate(scheduleStart.getDate() + (currentWeekOffset * 7));
-      
-      // Get the day index for this entry
-      const entryDayIndex = ['SU', 'MO', 'TU', 'WE', 'TH', 'FR', 'SA'].indexOf(dayAbbrev);
-      
-      // Find the first occurrence of this day in the current view week
-      const viewWeekFirstDay = weekStart.getDay();
-      let daysToAdd = entryDayIndex - viewWeekFirstDay;
-      if (daysToAdd < 0) daysToAdd += 7;
-      
-      const occurrenceDate = new Date(weekStart);
-      occurrenceDate.setDate(weekStart.getDate() + daysToAdd);
-      
-      // Calculate the week number of this occurrence relative to schedule start
-      const scheduleFirstDay = new Date(scheduleStart);
-      scheduleFirstDay.setDate(scheduleStart.getDate() - scheduleStart.getDay()); // Start of first week
-      
-      const weeksSinceStart = Math.floor((occurrenceDate.getTime() - scheduleFirstDay.getTime()) / (7 * 24 * 60 * 60 * 1000));
-      
-      // Apply frequency rules
-       if (freq === 'WEEKLY') {
-         const shouldShow = weeksSinceStart % interval === 0;
-         if (!shouldShow) {
-           console.log(entry.student_name + ' weeksSinceStart=' + weeksSinceStart + ' interval=' + interval + ' - hiding');
-         }
-         return shouldShow;
-       } else if (freq === '2WEEKLY') {
-         return weeksSinceStart % 2 === 0;
-       } else if (freq === 'MONTHLY') {
-         if (bySetPos) {
-           const monthStart = new Date(occurrenceDate.getFullYear(), occurrenceDate.getMonth(), 1);
-           const monthEnd = new Date(occurrenceDate.getFullYear(), occurrenceDate.getMonth() + 1, 0);
-           
-           let occurrenceCount = 0;
-           for (let d = new Date(monthStart); d <= monthEnd; d.setDate(d.getDate() + 1)) {
-             if (d.getDay() === entryDayIndex) {
-               occurrenceCount++;
-               if (d.getTime() === occurrenceDate.getTime()) {
-                 break;
-               }
-             }
-           }
-           return occurrenceCount === bySetPos;
-         }
-         return true;
-       }
-      
-      return true;
-   };
+  const parseRecurrenceRule = (rule: string) => {
+    if (!rule) return null;
+    
+    const freqMatch = rule.match(/FREQ=(\w+)/);
+    const intervalMatch = rule.match(/INTERVAL=(\d+)/);
+    const byDayMatch = rule.match(/BYDAY=(\w+)/);
+    
+    const freq = freqMatch ? freqMatch[1] : 'WEEKLY';
+    const interval = intervalMatch ? parseInt(intervalMatch[1]) : 1;
+    
+    const byDayStr = byDayMatch ? byDayMatch[1] : '';
+    const dayAbbrevs = ['SU', 'MO', 'TU', 'WE', 'TH', 'FR', 'SA'];
+    const dayIndex = dayAbbrevs.indexOf(byDayStr);
+    
+    return { freq, interval, dayIndex: dayIndex >= 0 ? dayIndex : null };
+  };
 
-  // Navigate weeks
+  const isEntryInCurrentWeek = (entry: ScheduleEntry): boolean => {
+    if (!weekStart || !schedule) return false;
+    
+    const entryStart = new Date(entry.start_time);
+    const rule = parseRecurrenceRule(entry.recurrence_rule);
+    
+    if (!rule || !rule.dayIndex) {
+      return entryStart >= weekStart && entryStart <= weekEnd;
+    }
+    
+    const scheduleStart = new Date(schedule.start_date);
+    const scheduleFirstDay = new Date(scheduleStart);
+    scheduleFirstDay.setDate(scheduleStart.getDate() - scheduleStart.getDay());
+    
+    const daysFromFirst = Math.floor((entryStart.getTime() - scheduleFirstDay.getTime()) / (1000 * 60 * 60 * 24));
+    const entryWeekOffset = Math.floor(daysFromFirst / 7);
+    
+    const currentWeekFirstDay = new Date(weekStart);
+    const daysFromCurrentFirst = Math.floor((currentWeekFirstDay.getTime() - scheduleFirstDay.getTime()) / (1000 * 60 * 60 * 24));
+    const currentWeekOffset = Math.floor(daysFromCurrentFirst / 7);
+    
+    if (rule.freq === 'WEEKLY' || rule.freq === '2WEEKLY') {
+      const weekDiff = Math.abs(entryWeekOffset - currentWeekOffset);
+      const interval = rule.freq === '2WEEKLY' ? 2 : 1;
+      return weekDiff % interval === 0;
+    }
+    
+    if (rule.freq === 'MONTHLY') {
+      const entryMonth = entryStart.getMonth();
+      const entryYear = entryStart.getFullYear();
+      const currentWeekMonth = weekStart.getMonth();
+      const currentWeekYear = weekStart.getFullYear();
+      return entryMonth === currentWeekMonth && entryYear === currentWeekYear;
+    }
+    
+    return entryWeekOffset === currentWeekOffset;
+  };
+
   const goToPreviousWeek = () => {
     setCurrentWeekOffset(prev => Math.max(0, prev - 1));
   };
@@ -447,7 +390,6 @@ export default function SchedulePage() {
     setCurrentWeekOffset(prev => Math.min(totalWeeks - 1, prev + 1));
   };
 
-  // Name editing handlers
   const handleNameClick = () => {
     if (!schedule) return;
     setIsEditingName(true);
@@ -482,7 +424,6 @@ export default function SchedulePage() {
     }
   };
 
-  // Date editing handlers
   const handleDatesClick = () => {
     if (!schedule) return;
     setIsEditingDates(true);
@@ -495,8 +436,6 @@ export default function SchedulePage() {
   const handleStartDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setEditingStartDate(e.target.value);
     setDateError(null);
-    
-    // Check if end date is before start date
     if (editingEndDate && e.target.value > editingEndDate) {
       setDateError('End date must be after start date');
     }
@@ -505,8 +444,6 @@ export default function SchedulePage() {
   const handleEndDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setEditingEndDate(e.target.value);
     setDateError(null);
-    
-    // Check if end date is before start date
     if (editingStartDate && e.target.value < editingStartDate) {
       setDateError('End date must be after start date');
     }
@@ -562,7 +499,6 @@ export default function SchedulePage() {
       setLoading(true);
       setError(null);
       
-      // Load schedule and entries first (required)
       const [scheduleData, entriesData] = await Promise.all([
         getSchedule(scheduleId),
         getScheduleEntries(scheduleId)
@@ -571,19 +507,10 @@ export default function SchedulePage() {
       setSchedule(scheduleData);
       setEntries(entriesData);
       
-      // Fetch exceptions for entries
-      const entryIds = entriesData.map(e => e.id);
-      const exceptionsData = await getEntryExceptions(entryIds);
-      console.log('Loaded exceptions:', exceptionsData);
-      setExceptions(exceptionsData);
-      
-      // Try to load form responses (optional - may fail if table doesn't exist yet)
       try {
         const responsesData = await getFormResponses(scheduleId);
         setResponses(responsesData);
       } catch (err) {
-        console.warn('Could not load form responses:', err);
-        // It's okay if this fails - the form feature may not be set up yet
         setResponses([]);
       }
     } catch (err) {
@@ -595,46 +522,40 @@ export default function SchedulePage() {
     }
   };
 
-  // Helper to get unassigned students (responses without matching entries)
   const getUnassignedStudents = () => {
     const assignedNames = entries.map(e => e.student_name.toLowerCase());
     return responses.filter(r => !assignedNames.includes(r.student_name.toLowerCase()));
   };
 
-  // Handle time slot click (for adding new event)
   const handleSlotClick = (day: string, hour: number) => {
     setSelectedSlot({ day, hour });
-    setSelectedEntry(null); // Clear any existing entry selection
+    setSelectedEntry(null);
     setShowAddModal(true);
   };
 
-  // Handle lesson block click (for editing existing event)
   const handleEntryClick = (entry: ScheduleEntry, e: React.MouseEvent) => {
-    e.stopPropagation(); // Prevent slot click from firing
+    e.stopPropagation();
     setSelectedEntry(entry);
-    setSelectedSlot(null); // Clear slot selection
+    setSelectedSlot(null);
     setShowAddModal(true);
   };
 
-  // Handle successful lesson creation/update
   const handleEventSaved = () => {
-    loadScheduleData(); // Refresh the schedule data
+    loadScheduleData();
   };
 
-  // Handle status change
   const handleStatusChange = async (newStatus: 'draft' | 'collecting' | 'archived' | 'trashed') => {
     if (!scheduleId) return;
     
     try {
       await updateSchedule(scheduleId, { status: newStatus });
-      loadScheduleData(); // Refresh to show new status
+      loadScheduleData();
     } catch (err) {
       console.error('Failed to update status:', err);
       alert(err instanceof Error ? err.message : 'Failed to update status');
     }
   };
 
-  // Drag and drop handlers
   const handleDragStart = (event: DragStartEvent) => {
     setActiveDragId(event.active.id as string);
     setIsDragging(true);
@@ -649,18 +570,15 @@ export default function SchedulePage() {
 
     const dropId = over.id as string;
     
-    // Check if dragging an unassigned card
     if (typeof active.id === 'string' && active.id.startsWith('unassigned-')) {
       const responseId = active.id.replace('unassigned-', '');
       const response = responses.find(r => r.id === responseId);
       
       if (!response || !dropId.startsWith('slot-')) return;
       
-      // Dropped unassigned card on empty slot - create new entry
       const [, day, hourStr] = dropId.split('-');
       const hour = parseInt(hourStr);
       
-      // Calculate times
       const scheduleStart = new Date(schedule.start_date);
       const dayIndex = DAYS.indexOf(day);
       const currentDay = scheduleStart.getDay();
@@ -671,7 +589,6 @@ export default function SchedulePage() {
       firstOccurrence.setDate(scheduleStart.getDate() + daysToAdd);
       firstOccurrence.setHours(hour, 0, 0, 0);
       
-      // Use the first preferred timing to determine duration
       const preferredStart = response.preferred_1_start;
       const preferredEnd = response.preferred_1_end;
       
@@ -682,18 +599,15 @@ export default function SchedulePage() {
         
         const newEnd = new Date(firstOccurrence.getTime() + durationMs * 60 * 1000);
         
-        // Check for overlaps
         const overlappingEntry = entries.find(entry => {
           const entryStart = new Date(entry.start_time);
           const entryEnd = new Date(entry.end_time);
-          
           if (entryStart.getDay() !== dayIndex) return false;
-          
           return (firstOccurrence < entryEnd && newEnd > entryStart);
         });
         
         if (overlappingEntry) {
-          alert(`Cannot schedule - slot conflicts with "${overlappingEntry.student_name}" (${formatLocalTime(overlappingEntry.start_time)} - ${formatLocalTime(overlappingEntry.end_time)})`);
+          alert(`Cannot schedule - slot conflicts with "${overlappingEntry.student_name}"`);
           return;
         }
         
@@ -705,7 +619,6 @@ export default function SchedulePage() {
           `FREQ=WEEKLY;BYDAY=${dayAbbrev}`;
         
         try {
-          // Create new entry
           const newEntry = await createScheduleEntry({
             schedule_id: scheduleId!,
             student_name: response.student_name,
@@ -714,10 +627,7 @@ export default function SchedulePage() {
             recurrence_rule: recurrenceRule,
           });
           
-          // Remove from unassigned
           setResponses(responses.filter(r => r.id !== responseId));
-          
-          // Add to entries
           setEntries([...entries, newEntry]);
         } catch (err) {
           console.error('Failed to create entry:', err);
@@ -731,11 +641,9 @@ export default function SchedulePage() {
     if (!draggedEntry) return;
     
     if (dropId.startsWith('slot-')) {
-      // Dropped on empty slot
       const [, day, hourStr] = dropId.split('-');
       const hour = parseInt(hourStr);
 
-      // Calculate new times
       const scheduleStart = new Date(schedule.start_date);
       const dayIndex = DAYS.indexOf(day);
       const currentDay = scheduleStart.getDay();
@@ -752,50 +660,30 @@ export default function SchedulePage() {
 
       const newEnd = new Date(firstOccurrence.getTime() + durationMs);
 
-      // Check for overlaps
       const overlappingEntry = entries.find(entry => {
         if (entry.id === draggedEntry.id) return false;
-        
         const entryStart = new Date(entry.start_time);
         const entryEnd = new Date(entry.end_time);
-        
         if (entryStart.getDay() !== dayIndex) return false;
-        
         return (firstOccurrence < entryEnd && newEnd > entryStart);
       });
 
       if (overlappingEntry) {
-        // Instead of blocking, offer to swap
         const confirmSwap = window.confirm(
-          `"${draggedEntry.student_name}" conflicts with "${overlappingEntry.student_name}" (${formatLocalTime(overlappingEntry.start_time)} - ${formatLocalTime(overlappingEntry.end_time)}). Swap them?`
+          `"${draggedEntry.student_name}" conflicts with "${overlappingEntry.student_name}". Swap them?`
         );
         
         if (!confirmSwap) return;
         
-        // Swap the two events
         const dayAbbrev = ['SU', 'MO', 'TU', 'WE', 'TH', 'FR', 'SA'][dayIndex];
-        const draggedRule = draggedEntry.recurrence_rule;
-        const draggedStart = draggedEntry.start_time;
-        const draggedEnd = draggedEntry.end_time;
         
         try {
-          // Update dragged entry to new slot
           setEntries(entries.map(e => {
             if (e.id === draggedEntry.id) {
-              return {
-                ...e,
-                start_time: firstOccurrence.toISOString(),
-                end_time: newEnd.toISOString(),
-                recurrence_rule: `FREQ=WEEKLY;BYDAY=${dayAbbrev}`,
-              };
+              return { ...e, start_time: firstOccurrence.toISOString(), end_time: newEnd.toISOString(), recurrence_rule: `FREQ=WEEKLY;BYDAY=${dayAbbrev}` };
             }
             if (e.id === overlappingEntry.id) {
-              return {
-                ...e,
-                start_time: draggedStart,
-                end_time: draggedEnd,
-                recurrence_rule: draggedRule,
-              };
+              return { ...e, start_time: draggedEntry.start_time, end_time: draggedEntry.end_time, recurrence_rule: draggedEntry.recurrence_rule };
             }
             return e;
           }));
@@ -807,13 +695,12 @@ export default function SchedulePage() {
           });
           
           await updateScheduleEntry(overlappingEntry.id, {
-            start_time: draggedStart,
-            end_time: draggedEnd,
-            recurrence_rule: draggedRule,
+            start_time: draggedEntry.start_time,
+            end_time: draggedEntry.end_time,
+            recurrence_rule: draggedEntry.recurrence_rule,
           });
         } catch (err) {
           console.error('Failed to swap events:', err);
-          alert('Failed to swap events');
           loadScheduleData();
         }
         return;
@@ -822,7 +709,6 @@ export default function SchedulePage() {
       const dayAbbrev = ['SU', 'MO', 'TU', 'WE', 'TH', 'FR', 'SA'][dayIndex];
       const recurrenceRule = `FREQ=WEEKLY;BYDAY=${dayAbbrev}`;
 
-      // Optimistic update - update local state directly
       const updatedEntry = {
         ...draggedEntry,
         start_time: firstOccurrence.toISOString(),
@@ -840,14 +726,11 @@ export default function SchedulePage() {
         });
       } catch (err) {
         console.error('Failed to move event:', err);
-        alert('Failed to move event');
-        loadScheduleData(); // Reload on error to restore state
+        loadScheduleData();
       }
     } else if (dropId === 'trash') {
-      // Dropped on trash - confirm and delete
       setEntryToDelete(draggedEntry);
     } else if (dropId.startsWith('entry-')) {
-      // Dropped on another entry - offer to swap
       const targetEntryId = dropId.replace('entry-', '');
       const targetEntry = entries.find(e => e.id === targetEntryId);
       
@@ -860,11 +743,6 @@ export default function SchedulePage() {
       if (!confirmSwap) return;
 
       try {
-        // Swap times - optimistic update
-        const draggedStart = draggedEntry.start_time;
-        const draggedEnd = draggedEntry.end_time;
-        const draggedRule = draggedEntry.recurrence_rule;
-
         const updatedDraggedEntry = {
           ...draggedEntry,
           start_time: targetEntry.start_time,
@@ -874,9 +752,9 @@ export default function SchedulePage() {
 
         const updatedTargetEntry = {
           ...targetEntry,
-          start_time: draggedStart,
-          end_time: draggedEnd,
-          recurrence_rule: draggedRule,
+          start_time: draggedEntry.start_time,
+          end_time: draggedEntry.end_time,
+          recurrence_rule: draggedEntry.recurrence_rule,
         };
 
         setEntries(entries.map(e => {
@@ -892,208 +770,174 @@ export default function SchedulePage() {
         });
 
         await updateScheduleEntry(targetEntry.id, {
-          start_time: draggedStart,
-          end_time: draggedEnd,
-          recurrence_rule: draggedRule,
+          start_time: draggedEntry.start_time,
+          end_time: draggedEntry.end_time,
+          recurrence_rule: draggedEntry.recurrence_rule,
         });
       } catch (err) {
         console.error('Failed to swap events:', err);
-        alert('Failed to swap events');
-        loadScheduleData(); // Reload on error
+        loadScheduleData();
       }
     }
    };
 
-   // Helper to calculate lesson block height and position
-   const getLessonBlockStyle = (entry: ScheduleEntry) => {
-     const startTime = new Date(entry.start_time);
-     const endTime = new Date(entry.end_time);
-     
-     const startMinutes = startTime.getMinutes();
-     const durationMinutes = (endTime.getTime() - startTime.getTime()) / (1000 * 60);
-     
-     const topOffset = (startMinutes / 60) * 40; // 40px per hour
-     const height = (durationMinutes / 60) * 40;
-     
-     return {
-       ...styles.lessonBlock,
-       top: `${topOffset}px`,
-       height: `${height}px`,
+    const getLessonBlockStyle = (entry: ScheduleEntry) => {
+      const startTime = new Date(entry.start_time);
+      const endTime = new Date(entry.end_time);
+      
+      const startMinutes = startTime.getMinutes();
+      const durationMinutes = (endTime.getTime() - startTime.getTime()) / (1000 * 60);
+      
+      const topOffset = (startMinutes / 60) * 40;
+      const height = (durationMinutes / 60) * 40;
+      
+      return {
+        ...styles.lessonBlock,
+        top: `${topOffset}px`,
+        height: `${height}px`,
+      };
      };
-    };
 
-    const getEntriesForSlot = (day: string, hour: number) => {
-      const result = entries.filter(entry => {
-        const shouldShow = isEntryInCurrentWeek(entry);
-        if (!shouldShow) {
-          return false;
-        }
-        
-        const startTime = new Date(entry.start_time);
-        const dayOfWeek = startTime.getDay(); // 0 = Sunday, 1 = Monday, ...
-        const dayIndex = DAYS.indexOf(day); // 0 = Sunday, 1 = Monday, ...
-        
-        if (dayOfWeek !== dayIndex || startTime.getHours() !== hour) return false;
-        
-        // Check if this specific occurrence date is an exception (should be hidden)
-        const entryExceptions = exceptions[entry.id] || [];
-        const occurrenceDate = startTime.toISOString().split('T')[0]; // YYYY-MM-DD
-        
-        if (entryExceptions.includes(occurrenceDate)) {
-          console.log('Hiding', entry.student_name, 'on', occurrenceDate, '(exception)');
-          return false; // Skip this occurrence
-        }
-        
-        console.log('Showing', entry.student_name, 'on', occurrenceDate, 'at', hour);
-        return true;
+     const getEntriesForSlot = (day: string, hour: number) => {
+       return entries.filter(entry => {
+         const shouldShow = isEntryInCurrentWeek(entry);
+         if (!shouldShow) return false;
+         
+         const startTime = new Date(entry.start_time);
+         const dayOfWeek = startTime.getDay();
+         const dayIndex = DAYS.indexOf(day);
+         
+         return dayOfWeek === dayIndex && startTime.getHours() === hour;
+       });
+     };
+
+    function DraggableLessonBlock({ entry, children }: { entry: ScheduleEntry; children: React.ReactNode }) {
+      const { attributes, listeners, setNodeRef } = useDraggable({
+        id: entry.id,
+        data: entry,
+      });
+
+      const isBeingDragged = activeDragId === entry.id;
+
+      return (
+        <div
+          ref={setNodeRef}
+          style={{
+            ...getLessonBlockStyle(entry),
+            opacity: isBeingDragged ? 0 : 1,
+            visibility: isBeingDragged ? 'hidden' : 'visible',
+            pointerEvents: isBeingDragged ? 'none' : 'auto',
+          }}
+          onClick={(e) => {
+            if (!isDragging) {
+              handleEntryClick(entry, e);
+            }
+          }}
+          {...attributes}
+          {...listeners}
+          onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#ea580c'; }}
+          onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = '#fb923c'; }}
+        >
+          {children}
+        </div>
+      );
+    }
+
+    function DraggableUnassignedCard({ response }: { response: FormResponse }) {
+      const { attributes, listeners, setNodeRef } = useDraggable({
+        id: `unassigned-${response.id}`,
+        data: { ...response, isUnassigned: true },
+      });
+
+      const isBeingDragged = activeDragId === `unassigned-${response.id}`;
+
+      return (
+        <div
+          ref={setNodeRef}
+          style={{
+            padding: '0.6rem 0.75rem',
+            backgroundColor: isBeingDragged ? '#fbbf24' : '#fef3c7',
+            borderRadius: '0.5rem',
+            border: `1px solid ${isBeingDragged ? '#f59e0b' : '#fde68a'}`,
+            fontSize: '0.875rem',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            opacity: isBeingDragged ? 0.5 : 1,
+            cursor: 'grab',
+          }}
+          {...attributes}
+          {...listeners}
+        >
+          <div style={{ cursor: 'pointer', flex: 1 }}>
+            <div style={{ fontWeight: '600', color: '#92400e' }}>
+              {response.student_name}
+            </div>
+          </div>
+          <Trash2
+            size={16}
+            style={{ color: '#9ca3af', cursor: 'pointer' }}
+            onClick={(e: React.MouseEvent) => {
+              e.stopPropagation();
+              setParticipantToDelete(response);
+            }}
+            onMouseEnter={(e: React.MouseEvent) => { (e.target as HTMLElement).style.color = '#dc2626'; }}
+            onMouseLeave={(e: React.MouseEvent) => { (e.target as HTMLElement).style.color = '#9ca3af'; }}
+          />
+        </div>
+      );
+    }
+    
+    function DroppableSlot({ children, day, hour }: { children: React.ReactNode; day: string; hour: number }) {
+      const { setNodeRef: setSlotRef, isOver } = useDroppable({
+        id: `slot-${day}-${hour}`,
       });
       
-      if (day === 'Wednesday' && hour === 15) {
-        console.log('Wednesday 3pm slot - entries count:', result.length);
-        console.log('All entries:', entries.map(e => e.student_name + ' ' + e.start_time));
-        console.log('WeekStart:', weekStart);
-        console.log('CurrentWeekOffset:', currentWeekOffset);
-      }
-      
-      return result;
-    };
+      return (
+        <div
+          ref={setSlotRef}
+          style={{
+            ...styles.timeSlot,
+            backgroundColor: isOver ? '#ffedd5' : 'white',
+          }}
+          onClick={() => handleSlotClick(day, hour)}
+          onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#ffedd5'; e.currentTarget.style.cursor = 'pointer'; }}
+          onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'white'; }}
+        >
+          {children}
+        </div>
+      );
+    }
 
-    // Draggable lesson block component
-   function DraggableLessonBlock({ entry, children }: { entry: ScheduleEntry; children: React.ReactNode }) {
-     const { attributes, listeners, setNodeRef } = useDraggable({
-       id: entry.id,
-       data: entry,
-     });
-
-     // Hide the original element while dragging, show ghost in DragOverlay instead
-     const isBeingDragged = activeDragId === entry.id;
-
-     return (
-       <div
-         ref={setNodeRef}
-         style={{
-           ...getLessonBlockStyle(entry),
-           opacity: isBeingDragged ? 0 : 1,
-           visibility: isBeingDragged ? 'hidden' : 'visible',
-           pointerEvents: isBeingDragged ? 'none' : 'auto',
-         }}
-         onClick={(e) => {
-           if (!isDragging) {
-             handleEntryClick(entry, e);
-           }
-         }}
-         {...attributes}
-         {...listeners}
-         onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#ea580c'; }}
-         onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = '#fb923c'; }}
-       >
-         {children}
-       </div>
-     );
-   }
-
-   // Draggable unassigned card component
-   function DraggableUnassignedCard({ response }: { response: FormResponse }) {
-     const { attributes, listeners, setNodeRef } = useDraggable({
-       id: `unassigned-${response.id}`,
-       data: { ...response, isUnassigned: true },
-     });
-
-     const isBeingDragged = activeDragId === `unassigned-${response.id}`;
-
-     return (
-       <div
-         ref={setNodeRef}
-         style={{
-           padding: '0.6rem 0.75rem',
-           backgroundColor: isBeingDragged ? '#fbbf24' : '#fef3c7',
-           borderRadius: '0.5rem',
-           border: `1px solid ${isBeingDragged ? '#f59e0b' : '#fde68a'}`,
-           fontSize: '0.875rem',
-           display: 'flex',
-           alignItems: 'center',
-           justifyContent: 'space-between',
-           opacity: isBeingDragged ? 0.5 : 1,
-           cursor: 'grab',
-         }}
-         {...attributes}
-         {...listeners}
-       >
-         <div
-           onClick={() => setSelectedParticipant(response)}
-           style={{
-             cursor: 'pointer',
-             flex: 1,
-           }}
-         >
-           <div style={{ fontWeight: '600', color: '#92400e' }}>
-             {response.student_name}
-           </div>
-         </div>
-         <Trash2
-           size={16}
-           style={{ color: '#9ca3af', cursor: 'pointer' }}
-           onClick={(e) => {
-             e.stopPropagation();
-             setParticipantToDelete(response);
-           }}
-           onMouseEnter={(e) => { e.currentTarget.style.color = '#dc2626'; }}
-           onMouseLeave={(e) => { e.currentTarget.style.color = '#9ca3af'; }}
-         />
-       </div>
-     );
-   }
-   
-   function DroppableSlot({ children, day, hour }: { children: React.ReactNode; day: string; hour: number }) {
-     const { setNodeRef: setSlotRef, isOver } = useDroppable({
-       id: `slot-${day}-${hour}`,
+   function TrashDroppable() {
+     const { setNodeRef, isOver } = useDroppable({
+       id: 'trash',
      });
      
      return (
        <div
-         ref={setSlotRef}
+         ref={setNodeRef}
          style={{
-           ...styles.timeSlot,
-           backgroundColor: isOver ? '#ffedd5' : 'white',
+           display: 'flex',
+           alignItems: 'center',
+           justifyContent: 'center',
+           padding: '0.6rem',
+           border: '2px dashed',
+           borderColor: isOver ? '#dc2626' : '#d1d5db',
+           borderRadius: '0.3rem',
+           backgroundColor: isOver ? '#fef2f2' : 'white',
+           color: isOver ? '#dc2626' : '#6b7280',
+           fontSize: '0.7rem',
+           fontWeight: '500',
+           transition: 'all 0.2s',
+           cursor: 'pointer',
+           marginTop: '0.6rem',
          }}
-         onClick={() => handleSlotClick(day, hour)}
-         onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#ffedd5'; e.currentTarget.style.cursor = 'pointer'; }}
-         onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'white'; }}
        >
-         {children}
+         {isOver ? 'Drop here to delete' : 'Drag here to delete'}
        </div>
      );
    }
-
-  function TrashDroppable() {
-    const { setNodeRef, isOver } = useDroppable({
-      id: 'trash',
-    });
-    
-    return (
-      <div
-        ref={setNodeRef}
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          padding: '0.6rem',
-          border: '2px dashed',
-          borderColor: isOver ? '#dc2626' : '#d1d5db',
-          borderRadius: '0.3rem',
-          backgroundColor: isOver ? '#fef2f2' : 'white',
-          color: isOver ? '#dc2626' : '#6b7280',
-          fontSize: '0.7rem',
-          fontWeight: '500',
-          transition: 'all 0.2s',
-          cursor: 'pointer',
-          marginTop: '0.6rem',
-        }}
-      >
-        {isOver ? 'Drop here to delete' : 'Drag here to delete'}
-      </div>
-    );
-  }
 
   if (loading) {
     return (
@@ -1111,14 +955,7 @@ export default function SchedulePage() {
         </div>
         <button
           onClick={() => navigate('/dashboard')}
-          style={{
-            ...styles.backButton,
-            backgroundColor: '#f97316',
-            color: 'white',
-            borderColor: '#f97316',
-          }}
-          onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#ea580c'; }}
-          onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = '#f97316'; }}
+          style={{ ...styles.backButton, backgroundColor: '#f97316', color: 'white', borderColor: '#f97316' }}
         >
           <ArrowLeft size={18} />
           Back to Dashboard
@@ -1135,22 +972,17 @@ export default function SchedulePage() {
         onDragEnd={handleDragEnd}
         autoScroll={false}
       >
-      {/* Header */}
       <header style={styles.header}>
         <div style={styles.headerContent}>
-          {/* Left: Back button + Editable schedule name + Overall date range */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
             <button
               onClick={() => navigate('/dashboard')}
               style={styles.backButton}
-              onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#f9fafb'; }}
-              onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; }}
             >
               <ArrowLeft size={18} />
               Back
             </button>
             
-             {/* Name and date stacked vertically */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.15rem' }}>
               {isEditingName ? (
                 <input
@@ -1175,14 +1007,11 @@ export default function SchedulePage() {
                 <h1 
                   style={{ ...styles.title, cursor: 'pointer', margin: 0 }}
                   onClick={handleNameClick}
-                  onMouseEnter={(e) => { e.currentTarget.style.color = '#f97316'; }}
-                  onMouseLeave={(e) => { e.currentTarget.style.color = '#111827'; }}
                 >
                   {schedule.label}
                 </h1>
               )}
               
-              {/* Overall date range - below the name */}
               <span style={{ color: '#6b7280', fontSize: '0.8rem' }}>
                 {isEditingDates ? (
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
@@ -1223,12 +1052,10 @@ export default function SchedulePage() {
                   </div>
                 ) : (
                   <span 
-                    style={{ cursor: 'pointer', color: '#6b7280' }}
+                    style={{ cursor: 'pointer' }}
                     onClick={handleDatesClick}
-                    onMouseEnter={(e) => { e.currentTarget.style.color = '#f97316'; }}
-                    onMouseLeave={(e) => { e.currentTarget.style.color = '#6b7280'; }}
                   >
-                    {schedule ? `${formatLocalDate(new Date(schedule.start_date))} - ${formatLocalDate(new Date(schedule.end_date))}` : ''}
+                    {formatLocalDate(new Date(schedule.start_date))} - {formatLocalDate(new Date(schedule.end_date))}
                     <span style={{ marginLeft: '0.5rem', color: '#9ca3af', fontSize: '0.75rem' }}>
                       ({userTimezoneAbbrev})
                     </span>
@@ -1238,39 +1065,23 @@ export default function SchedulePage() {
             </div>
           </div>
           
-          {/* Center: Navigation + Date Range + Week */}
           <div style={{ 
             display: 'flex', 
             flexDirection: 'column' as const,
             alignItems: 'center',
             flex: 1,
           }}>
-            {/* Arrows close to date range with week below */}
             <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
               <button
                 onClick={goToPreviousWeek}
                 disabled={currentWeekOffset === 0}
-                style={{
-                  ...styles.backButton,
-                  opacity: currentWeekOffset === 0 ? 0.5 : 1,
-                  cursor: currentWeekOffset === 0 ? 'not-allowed' : 'pointer',
-                }}
-                onMouseEnter={(e) => { if (currentWeekOffset > 0) e.currentTarget.style.backgroundColor = '#f9fafb'; }}
-                onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; }}
+                style={{ ...styles.backButton, opacity: currentWeekOffset === 0 ? 0.5 : 1 }}
               >
                 <ChevronLeft size={20} />
               </button>
               
               <div style={{ textAlign: 'center' }}>
-                <p 
-                  style={{ 
-                    fontSize: '1.1rem', 
-                    fontWeight: '600', 
-                    color: '#111827',
-                    margin: 0,
-                    whiteSpace: 'nowrap' as const,
-                  }}
-                >
+                <p style={{ fontSize: '1.1rem', fontWeight: '600', color: '#111827', margin: 0 }}>
                   {weekStart && weekEnd ? `${formatLocalDate(weekStart)} - ${formatLocalDate(weekEnd)}` : ''}
                 </p>
               </div>
@@ -1278,46 +1089,28 @@ export default function SchedulePage() {
               <button
                 onClick={goToNextWeek}
                 disabled={currentWeekOffset >= totalWeeks - 1}
-                style={{
-                  ...styles.backButton,
-                  opacity: currentWeekOffset >= totalWeeks - 1 ? 0.5 : 1,
-                  cursor: currentWeekOffset >= totalWeeks - 1 ? 'not-allowed' : 'pointer',
-                }}
-                onMouseEnter={(e) => { if (currentWeekOffset < totalWeeks - 1) e.currentTarget.style.backgroundColor = '#f9fafb'; }}
-                onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; }}
+                style={{ ...styles.backButton, opacity: currentWeekOffset >= totalWeeks - 1 ? 0.5 : 1 }}
               >
                 <ChevronRight size={20} />
               </button>
             </div>
             
-            {/* Week indicator below */}
-            <span style={{ 
-              marginTop: '0.35rem',
-              fontSize: '0.85rem', 
-              fontWeight: '500', 
-              color: '#f97316',
-            }}>
+            <span style={{ marginTop: '0.35rem', fontSize: '0.85rem', fontWeight: '500', color: '#f97316' }}>
               Week {weekNumber} of {totalWeeks}
             </span>
           </div>
           
-          {/* Right: Empty for balance */}
           <div style={{ width: '100px' }}></div>
         </div>
       </header>
 
-      {/* Main Content */}
       <main style={styles.main}>
-        {/* Timetable Grid */}
         <div style={styles.timetableContainer}>
-          {/* Day Headers */}
           <div style={styles.timetableHeader}>
             <div style={styles.dayHeader}></div>
             {DAYS.map((day, index) => {
               const date = weekStart ? new Date(weekStart) : null;
-              if (date) {
-                date.setDate(date.getDate() + index);
-              }
+              if (date) date.setDate(date.getDate() + index);
               const dateStr = date ? date.getDate() : '';
               return (
                 <div key={day} style={styles.dayHeader}>
@@ -1328,42 +1121,36 @@ export default function SchedulePage() {
             })}
           </div>
 
-           {/* Time Grid */}
-          {HOURS.map((hour) => (
-            <div key={hour} style={styles.timetableGrid}>
-              <div style={styles.timeLabel}>
-                {hour === 12 ? '12 PM' : hour > 12 ? `${hour - 12} PM` : `${hour} AM`}
-              </div>
-               {DAYS.map((day) => {
-                const slotEntries = getEntriesForSlot(day, hour);
-                
-                return (
-                  <DroppableSlot key={`${day}-${hour}`} day={day} hour={hour}>
-                    {slotEntries.map((entry) => (
-                      <DraggableLessonBlock key={entry.id} entry={entry}>
-                        <div style={{ fontWeight: '600' }}>{entry.student_name}</div>
-                        <div style={{ fontSize: '0.625rem', opacity: 0.9 }}>
-                          {formatLocalTime(entry.start_time)}
-                          {' - '}
-                          {formatLocalTime(entry.end_time)}
-                        </div>
-                      </DraggableLessonBlock>
-                    ))}
-                  </DroppableSlot>
-                );
-              })}
-            </div>
-          ))}
+           {HOURS.map((hour) => (
+             <div key={hour} style={styles.timetableGrid}>
+               <div style={styles.timeLabel}>
+                 {hour === 12 ? '12 PM' : hour > 12 ? `${hour - 12} PM` : `${hour} AM`}
+               </div>
+                {DAYS.map((day) => {
+                 const slotEntries = getEntriesForSlot(day, hour);
+                 
+                 return (
+                   <DroppableSlot key={`${day}-${hour}`} day={day} hour={hour}>
+                     {slotEntries.map((entry) => (
+                       <DraggableLessonBlock key={entry.id} entry={entry}>
+                         <div style={{ fontWeight: '600' }}>{entry.student_name}</div>
+                         <div style={{ fontSize: '0.625rem', opacity: 0.9 }}>
+                           {formatLocalTime(entry.start_time)}
+                           {' - '}
+                           {formatLocalTime(entry.end_time)}
+                         </div>
+                       </DraggableLessonBlock>
+                     ))}
+                   </DroppableSlot>
+                 );
+               })}
+             </div>
+           ))}
         </div>
 
-        {/* Side Panel */}
         <div style={styles.sidePanel}>
-          {/* Schedule Info */}
           <div style={styles.panel}>
-            <h3 style={styles.panelTitle}>
-              <Calendar size={20} />
-              Schedule Info
-            </h3>
+            <h3 style={styles.panelTitle}>Schedule Info</h3>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', fontSize: '0.875rem' }}>
               <div>
                 <span style={{ color: '#6b7280', display: 'block', marginBottom: '0.5rem' }}>Status:</span>
@@ -1371,8 +1158,6 @@ export default function SchedulePage() {
                   value={schedule.status}
                   onChange={(e) => handleStatusChange(e.target.value as any)}
                   style={styles.statusSelect}
-                  onFocus={(e) => { e.target.style.borderColor = '#f97316'; e.target.style.outline = 'none'; }}
-                  onBlur={(e) => { e.target.style.borderColor = '#d1d5db'; }}
                 >
                   <option value="draft">Draft</option>
                   <option value="collecting">Active (Collecting)</option>
@@ -1391,62 +1176,22 @@ export default function SchedulePage() {
                 <div style={{ marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid #e5e7eb' }}>
                   <span style={{ color: '#6b7280', display: 'block', marginBottom: '0.5rem' }}>Form Link:</span>
                   <FormLink scheduleId={scheduleId!} />
-                  <p style={{ fontSize: '0.75rem', color: '#6b7280', marginTop: '0.5rem' }}>
-                    Confirmation emails are automatically sent to all form submitters.
-                  </p>
                 </div>
               )}
             </div>
           </div>
 
-          {/* Unassigned Events */}
           <div style={styles.panel}>
             <div style={{ display: 'flex', alignItems: 'center', marginBottom: '0.6rem' }}>
-              <h3 style={{ ...styles.panelTitle, margin: 0 }}>
-                <Users size={20} />
-                Unassigned Events
-                {getUnassignedStudents().length > 0 && (
-                  <span style={{
-                    marginLeft: '0.5rem',
-                    backgroundColor: '#f97316',
-                    color: 'white',
-                    padding: '0.25rem 0.5rem',
-                    borderRadius: '9999px',
-                    fontSize: '0.75rem',
-                    fontWeight: '600',
-                  }}>
-                    {getUnassignedStudents().length}
-                  </span>
-                )}
-              </h3>
+              <h3 style={{ ...styles.panelTitle, margin: 0 }}>Unassigned Events</h3>
               {getUnassignedStudents().length > 0 && (
-                <button
-                  onClick={() => setShowSchedulingPreview(true)}
-                  style={{
-                    marginLeft: 'auto',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '0.25rem',
-                    padding: '0.35rem 0.6rem',
-                    backgroundColor: '#22c55e',
-                    color: 'white',
-                    border: 'none',
-                    borderRadius: '0.375rem',
-                    cursor: 'pointer',
-                    fontSize: '0.75rem',
-                    fontWeight: '500',
-                  }}
-                  onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#16a34a'; }}
-                  onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = '#22c55e'; }}
-                >
-                  Schedule
-                </button>
+                <span style={{ marginLeft: '0.5rem', backgroundColor: '#f97316', color: 'white', padding: '0.25rem 0.5rem', borderRadius: '9999px', fontSize: '0.75rem', fontWeight: '600' }}>
+                  {getUnassignedStudents().length}
+                </span>
               )}
             </div>
             {getUnassignedStudents().length === 0 ? (
-              <div style={styles.emptyState}>
-                No unassigned events
-              </div>
+              <div style={styles.emptyState}>No unassigned events</div>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                 {getUnassignedStudents().map((response) => (
@@ -1456,14 +1201,12 @@ export default function SchedulePage() {
             )}
           </div>
           
-          {/* Trash Zone */}
           <div style={styles.panel}>
             <TrashDroppable />
           </div>
         </div>
       </main>
 
-      {/* Add/Edit Event Modal */}
       <AddEventModal
         isOpen={showAddModal}
         onClose={() => {
@@ -1476,95 +1219,45 @@ export default function SchedulePage() {
         initialDay={selectedSlot?.day}
         initialHour={selectedSlot?.hour}
         scheduleStartDate={schedule.start_date}
-        currentWeekStart={weekStart ? weekStart.toISOString() : undefined}
         existingEntry={selectedEntry}
       />
 
-      {/* Add Participant Modal */}
-      <AddParticipantModal
-        isOpen={showAddParticipantModal}
-        onClose={() => setShowAddParticipantModal(false)}
-        onSuccess={(participant) => {
-          setResponses([...responses, participant]);
-        }}
-        scheduleId={scheduleId!}
-      />
-
-      {/* Participant Details Modal */}
-      {selectedParticipant && (
-        <ParticipantDetailsModal
-          isOpen={!!selectedParticipant}
-          onClose={() => setSelectedParticipant(null)}
-          participant={selectedParticipant}
-        />
-      )}
-
-      {/* Scheduling Preview Modal */}
-      <SchedulingPreviewModal
-        isOpen={showSchedulingPreview}
-        onClose={() => setShowSchedulingPreview(false)}
-        students={getUnassignedStudents()}
-        existingEntries={entries}
-        scheduleStart={weekStart || new Date()}
-        scheduleId={scheduleId!}
-        onScheduled={() => {
-          loadScheduleData();
-        }}
-      />
-
-      {/* Delete Confirmation Modal */}
       <Modal
         isOpen={!!participantToDelete}
         onClose={() => setParticipantToDelete(null)}
-        title="Delete Unassigned Event"
+        title="Delete Participant"
         maxWidth="30rem"
       >
-        <div style={{ padding: '1rem 0' }}>
-          <p style={{ color: '#374151', marginBottom: '1.5rem' }}>
-            Delete <strong>{participantToDelete?.student_name}</strong> from unassigned events? This cannot be undone.
+        <div style={{ padding: '0.5rem 0' }}>
+          <p style={{ color: '#374151', marginBottom: '1rem' }}>
+            Delete <strong>{participantToDelete?.student_name}</strong>? This cannot be undone.
           </p>
-          <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end' }}>
-            <button
-              onClick={() => setParticipantToDelete(null)}
-              style={{
-                padding: '0.5rem 1rem',
-                backgroundColor: 'white',
-                color: '#374151',
-                border: '1px solid #d1d5db',
-                borderRadius: '0.5rem',
-                cursor: 'pointer',
-              }}
-            >
-              Cancel
-            </button>
+          <div style={{ display: 'flex', gap: '0.75rem' }}>
             <button
               onClick={async () => {
-                if (participantToDelete) {
-                  try {
-                    await deleteFormResponse(participantToDelete.id);
-                    setResponses(responses.filter(r => r.id !== participantToDelete.id));
-                    setParticipantToDelete(null);
-                  } catch (err) {
-                    console.error('Failed to delete:', err);
-                  }
+                if (!participantToDelete) return;
+                try {
+                  await deleteFormResponse(participantToDelete.id);
+                  setResponses(responses.filter(r => r.id !== participantToDelete.id));
+                  setParticipantToDelete(null);
+                } catch (err) {
+                  console.error('Failed to delete participant:', err);
                 }
               }}
-              style={{
-                padding: '0.5rem 1rem',
-                backgroundColor: '#dc2626',
-                color: 'white',
-                border: 'none',
-                borderRadius: '0.5rem',
-                cursor: 'pointer',
-              }}
+              style={{ flex: 1, padding: '0.75rem', backgroundColor: '#dc2626', color: 'white', border: 'none', borderRadius: '0.5rem', cursor: 'pointer' }}
             >
               Delete
+            </button>
+            <button
+              onClick={() => setParticipantToDelete(null)}
+              style={{ flex: 1, padding: '0.75rem', backgroundColor: 'white', color: '#374151', border: '1px solid #d1d5db', borderRadius: '0.5rem', cursor: 'pointer' }}
+            >
+              Cancel
             </button>
           </div>
         </div>
       </Modal>
 
-      {/* Schedule Entry Delete Confirmation Modal */}
       <Modal
         isOpen={!!entryToDelete}
         onClose={() => setEntryToDelete(null)}
@@ -1572,78 +1265,28 @@ export default function SchedulePage() {
         maxWidth="35rem"
       >
         <div style={{ padding: '0.5rem 0' }}>
-          <p style={{ color: '#374151', marginBottom: '1.25rem' }}>
+          <p style={{ color: '#374151', marginBottom: '1rem' }}>
             Delete <strong>{entryToDelete?.student_name}</strong>?
           </p>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+          <div style={{ display: 'flex', gap: '0.75rem' }}>
             <button
               onClick={async () => {
                 if (!entryToDelete) return;
-                const entryIdToDelete = entryToDelete.id;
                 try {
-                  await deleteScheduleEntry(entryIdToDelete);
-                  // Force complete reload to ensure fresh data from server
-                  setEntries([]);
-                  await loadScheduleData();
+                  await deleteScheduleEntry(entryToDelete.id);
+                  setEntries(entries.filter(e => e.id !== entryToDelete.id));
                   setEntryToDelete(null);
                 } catch (err) {
                   console.error('Failed to delete event:', err);
-                  loadScheduleData();
                 }
               }}
-              style={{
-                padding: '0.75rem 1rem',
-                backgroundColor: 'white',
-                color: '#374151',
-                border: '1px solid #d1d5db',
-                borderRadius: '0.5rem',
-                cursor: 'pointer',
-                textAlign: 'left',
-              }}
-              onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#f9fafb'; }}
-              onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'white'; }}
+              style={{ flex: 1, padding: '0.75rem', backgroundColor: '#dc2626', color: 'white', border: 'none', borderRadius: '0.5rem', cursor: 'pointer' }}
             >
-              <div style={{ fontWeight: '500' }}>This event only</div>
-              <div style={{ fontSize: '0.8rem', color: '#6b7280', marginTop: '0.25rem' }}>Keep future occurrences</div>
-            </button>
-            <button
-              onClick={async () => {
-                if (!entryToDelete) return;
-                try {
-                  await deleteThisAndSubsequentEntries(entryToDelete.id, entryToDelete.start_time);
-                  await loadScheduleData();
-                  setEntryToDelete(null);
-                } catch (err) {
-                  console.error('Failed to delete events:', err);
-                  loadScheduleData();
-                }
-              }}
-              style={{
-                padding: '0.75rem 1rem',
-                backgroundColor: '#fef2f2',
-                color: '#dc2626',
-                border: '1px solid #fecaca',
-                borderRadius: '0.5rem',
-                cursor: 'pointer',
-                textAlign: 'left',
-              }}
-              onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#fee2e2'; }}
-              onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = '#fef2f2'; }}
-            >
-              <div style={{ fontWeight: '500' }}>This and all future events</div>
-              <div style={{ fontSize: '0.8rem', color: '#991b1b', marginTop: '0.25rem' }}>Delete the entire series</div>
+              Delete
             </button>
             <button
               onClick={() => setEntryToDelete(null)}
-              style={{
-                padding: '0.5rem 1rem',
-                backgroundColor: 'transparent',
-                color: '#6b7280',
-                border: 'none',
-                borderRadius: '0.5rem',
-                cursor: 'pointer',
-                marginTop: '0.5rem',
-              }}
+              style={{ flex: 1, padding: '0.75rem', backgroundColor: 'white', color: '#374151', border: '1px solid #d1d5db', borderRadius: '0.5rem', cursor: 'pointer' }}
             >
               Cancel
             </button>
@@ -1651,57 +1294,43 @@ export default function SchedulePage() {
         </div>
       </Modal>
 
-      {/* Drag Overlay for smooth ghost */}
+      <SchedulingPreviewModal
+        isOpen={showSchedulingPreview}
+        onClose={() => setShowSchedulingPreview(false)}
+        students={getUnassignedStudents()}
+        existingEntries={entries}
+        scheduleStart={new Date(schedule.start_date)}
+        scheduleId={scheduleId!}
+        onScheduled={loadScheduleData}
+      />
+
       <DragOverlay>
         {activeDragId && (() => {
-          // Check if it's an unassigned card
           if (typeof activeDragId === 'string' && activeDragId.startsWith('unassigned-')) {
             const responseId = activeDragId.replace('unassigned-', '');
             const response = responses.find(r => r.id === responseId);
             if (!response) return null;
             return (
-              <div style={{
-                padding: '0.6rem 0.75rem',
-                backgroundColor: '#fbbf24',
-                borderRadius: '0.5rem',
-                border: '1px solid #f59e0b',
-                fontSize: '0.875rem',
-                opacity: 0.7,
-                cursor: 'grabbing',
-                zIndex: 9999,
-                position: 'fixed',
-                pointerEvents: 'none',
-              }}>
-                <div style={{ fontWeight: '600', color: '#92400e' }}>
-                  {response.student_name}
-                </div>
+              <div style={{ padding: '0.6rem 0.75rem', backgroundColor: '#fbbf24', borderRadius: '0.5rem', border: '1px solid #f59e0b', fontSize: '0.875rem', opacity: 0.7, cursor: 'grabbing', zIndex: 9999 }}>
+                <div style={{ fontWeight: '600', color: '#92400e' }}>{response.student_name}</div>
               </div>
             );
           }
-          
-          // Regular schedule entry
+
           const entry = entries.find(e => e.id === activeDragId);
           if (!entry) return null;
+
           return (
-            <div style={{
-              ...getLessonBlockStyle(entry),
-              opacity: 0.7,
-              cursor: 'grabbing',
-              zIndex: 9999,
-              position: 'fixed',
-              pointerEvents: 'none',
-            }}>
+            <div style={{ ...getLessonBlockStyle(entry), opacity: 0.7, cursor: 'grabbing', zIndex: 9999 }}>
               <div style={{ fontWeight: '600' }}>{entry.student_name}</div>
               <div style={{ fontSize: '0.625rem', opacity: 0.9 }}>
-                {formatLocalTime(entry.start_time)}
-                {' - '}
-                {formatLocalTime(entry.end_time)}
+                {formatLocalTime(entry.start_time)} - {formatLocalTime(entry.end_time)}
               </div>
             </div>
           );
         })()}
       </DragOverlay>
-      </DndContext>
+    </DndContext>
     </div>
   );
 }

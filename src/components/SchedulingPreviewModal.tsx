@@ -189,24 +189,35 @@ export default function SchedulingPreviewModal({
         setCreating(true);
         const scheduledAssignments = result.assignments.filter(a => a.isScheduled);
         
-        // Schedule for the current week (week 0)
-        const week = 0;
+        // Calculate total weeks from schedule
+        const scheduleEnd = new Date(scheduleStart);
+        scheduleEnd.setMonth(scheduleEnd.getMonth() + 3);
+        const totalWeeks = Math.ceil((scheduleEnd.getTime() - scheduleStart.getTime()) / (7 * 24 * 60 * 60 * 1000));
+        
         let created = 0;
         
         for (const assignment of scheduledAssignments) {
             try {
-                const entryData = createEntryFromAssignment(assignment, scheduleStart, week);
-                await createScheduleEntry({
-                    schedule_id: scheduleId,
-                    student_name: assignment.student.student_name,
-                    ...entryData,
-                });
-                // Delete the form response after successfully scheduling
+                // Create entries for all weeks in the schedule
+                for (let week = 0; week < totalWeeks; week++) {
+                    // Skip weeks based on frequency
+                    const frequency = assignment.timing.frequency;
+                    if (frequency === '2weekly' && week % 2 !== 0) continue;
+                    if (frequency === 'monthly' && week % 4 !== 0) continue;
+                    
+                    const entryData = createEntryFromAssignment(assignment, scheduleStart, week);
+                    await createScheduleEntry({
+                        schedule_id: scheduleId,
+                        student_name: assignment.student.student_name,
+                        ...entryData,
+                    });
+                    created++;
+                    setCreatedCount(created);
+                }
+                // Delete the form response after successfully scheduling all entries
                 await deleteFormResponse(assignment.student.id);
-                created++;
-                setCreatedCount(created);
             } catch (err) {
-                console.error('Failed to create entry:', err);
+                console.error('Failed to create entries:', err);
             }
         }
         

@@ -1,6 +1,5 @@
-// src/components/AddEventModal.tsx
 import { useState, useEffect } from 'react';
-import { createScheduleEntry, updateScheduleEntry, deleteScheduleEntry, deleteThisAndSubsequentEntries, getScheduleEntries, type ScheduleEntry } from '../lib/api/schedule-entries';
+import { createScheduleEntry, updateScheduleEntry, deleteScheduleEntry, getScheduleEntries, type ScheduleEntry } from '../lib/api/schedule-entries';
 import Modal from './Modal';
 
 interface AddEventModalProps {
@@ -8,11 +7,10 @@ interface AddEventModalProps {
   onClose: () => void;
   onSuccess: () => void;
   scheduleId: string;
-  initialDay?: string; // e.g., "Monday"
-  initialHour?: number; // e.g., 14 (for 2 PM)
-  scheduleStartDate: string; // YYYY-MM-DD
-  currentWeekStart?: string; // ISO date for calculating entry dates from current view week
-  existingEntry?: ScheduleEntry | null; // If editing existing event
+  initialDay?: string;
+  initialHour?: number;
+  scheduleStartDate: string;
+  existingEntry?: ScheduleEntry | null;
 }
 
 const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
@@ -106,7 +104,6 @@ export default function AddEventModal({
   initialDay,
   initialHour,
   scheduleStartDate,
-  currentWeekStart,
   existingEntry,
 }: AddEventModalProps) {
   const isEditMode = !!existingEntry;
@@ -115,36 +112,29 @@ export default function AddEventModal({
   const [day, setDay] = useState(initialDay || 'Sunday');
   const [startHour, setStartHour] = useState('09');
   const [startMinute, setStartMinute] = useState('00');
-  const [duration, setDuration] = useState('60'); // minutes
-  const [frequency, setFrequency] = useState('weekly'); // once, weekly, 2weekly, monthly
+  const [duration, setDuration] = useState('60');
+  const [frequency, setFrequency] = useState('weekly');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
-  // Pre-fill form when editing existing entry
   useEffect(() => {
     if (existingEntry && isOpen) {
       const startDate = new Date(existingEntry.start_time);
       const endDate = new Date(existingEntry.end_time);
       
-      // Set name
       setStudentName(existingEntry.student_name);
       
-      // Set day
       const dayOfWeek = startDate.getDay();
       setDay(DAYS[dayOfWeek]);
       
-      // Set time
       const hours = startDate.getHours().toString().padStart(2, '0');
       const minutes = startDate.getMinutes().toString().padStart(2, '0');
       setStartHour(hours);
       setStartMinute(minutes);
       
-      // Calculate duration
       const durationMinutes = (endDate.getTime() - startDate.getTime()) / (1000 * 60);
       setDuration(durationMinutes.toString());
       
-      // Set frequency based on recurrence rule
       const rule = existingEntry.recurrence_rule || '';
       if (!rule) {
         setFrequency('once');
@@ -158,7 +148,6 @@ export default function AddEventModal({
     }
   }, [existingEntry, isOpen]);
 
-  // Pre-fill start time based on initialHour (for new entries)
   useEffect(() => {
     if (initialHour !== undefined && isOpen && !existingEntry) {
       const hour = initialHour.toString().padStart(2, '0');
@@ -167,14 +156,12 @@ export default function AddEventModal({
     }
   }, [initialHour, isOpen, existingEntry]);
 
-  // Pre-fill day (for new entries)
   useEffect(() => {
     if (initialDay && isOpen && !existingEntry) {
       setDay(initialDay);
     }
   }, [initialDay, isOpen, existingEntry]);
 
-  // Reset form when modal opens/closes
   useEffect(() => {
     if (!isOpen) {
       if (!existingEntry) {
@@ -203,17 +190,15 @@ export default function AddEventModal({
     try {
       setLoading(true);
 
-      // Calculate the time range for the new/updated event
-      // Use currentWeekStart if available (for entries in current view), otherwise use schedule start
-      const baseDate = currentWeekStart ? new Date(currentWeekStart) : new Date(scheduleStartDate);
       const dayIndex = DAYS.indexOf(day);
       const dayOfWeek = dayIndex;
-      const currentDay = baseDate.getDay();
+      const scheduleStart = new Date(scheduleStartDate);
+      const currentDay = scheduleStart.getDay();
       let daysToAdd = dayOfWeek - currentDay;
       if (daysToAdd < 0) daysToAdd += 7;
       
-      const firstOccurrence = new Date(baseDate);
-      firstOccurrence.setDate(baseDate.getDate() + daysToAdd);
+      const firstOccurrence = new Date(scheduleStart);
+      firstOccurrence.setDate(scheduleStart.getDate() + daysToAdd);
 
       const hours = parseInt(startHour);
       const minutes = parseInt(startMinute);
@@ -222,10 +207,9 @@ export default function AddEventModal({
       const endTime = new Date(firstOccurrence);
       endTime.setMinutes(endTime.getMinutes() + parseInt(duration));
 
-      // Check for overlaps
       const allEntries = await getScheduleEntries(scheduleId);
+      
       const overlappingEntry = allEntries.find(entry => {
-        // Skip comparing with itself when editing
         if (isEditMode && existingEntry && entry.id === existingEntry.id) {
           return false;
         }
@@ -233,12 +217,10 @@ export default function AddEventModal({
         const entryStart = new Date(entry.start_time);
         const entryEnd = new Date(entry.end_time);
 
-        // Check if on same day of week
         if (entryStart.getDay() !== dayOfWeek) {
           return false;
         }
 
-        // Check for any time overlap (partial or full)
         const hasOverlap = 
           (firstOccurrence < entryEnd && endTime > entryStart);
 
@@ -257,22 +239,18 @@ export default function AddEventModal({
 
       const dayAbbrev = ['SU', 'MO', 'TU', 'WE', 'TH', 'FR', 'SA'][dayOfWeek];
       
-      // Generate recurrence rule based on frequency
       let recurrenceRule = '';
       if (frequency === 'once') {
-        // No recurrence - single occurrence only
         recurrenceRule = '';
       } else if (frequency === '2weekly') {
         recurrenceRule = `FREQ=2WEEKLY;BYDAY=${dayAbbrev}`;
       } else if (frequency === 'monthly') {
         recurrenceRule = `FREQ=WEEKLY;INTERVAL=4;BYDAY=${dayAbbrev}`;
       } else {
-        // Default to weekly
         recurrenceRule = `FREQ=WEEKLY;BYDAY=${dayAbbrev}`;
       }
 
       if (isEditMode && existingEntry) {
-        // UPDATE existing entry
         await updateScheduleEntry(existingEntry.id, {
           student_name: studentName.trim(),
           start_time: firstOccurrence.toISOString(),
@@ -280,7 +258,6 @@ export default function AddEventModal({
           recurrence_rule: recurrenceRule,
         });
       } else {
-        // CREATE new entry
         await createScheduleEntry({
           schedule_id: scheduleId,
           student_name: studentName.trim(),
@@ -302,12 +279,6 @@ export default function AddEventModal({
 
   const handleDelete = async () => {
     if (!existingEntry) return;
-    setShowDeleteConfirm(true);
-  };
-
-  const confirmDeleteThis = async () => {
-    if (!existingEntry) return;
-    setShowDeleteConfirm(false);
     
     try {
       setLoading(true);
@@ -322,27 +293,9 @@ export default function AddEventModal({
     }
   };
 
-  const confirmDeleteAll = async () => {
-    if (!existingEntry) return;
-    setShowDeleteConfirm(false);
-    
-    try {
-      setLoading(true);
-      await deleteThisAndSubsequentEntries(existingEntry.id, existingEntry.start_time);
-      onSuccess();
-      onClose();
-    } catch (err) {
-      console.error('Failed to delete events:', err);
-      setError(err instanceof Error ? err.message : 'Failed to delete events');
-    } finally {
-      setLoading(false);
-    }
-  };
-
   return (
     <Modal isOpen={isOpen} onClose={onClose} title={isEditMode ? "Edit Event" : "Add Event"} maxWidth="40rem">
       <form onSubmit={handleSubmit} style={styles.form}>
-        {/* Name */}
         <div style={styles.formGroup}>
           <label style={styles.label}>
             Name <span style={styles.required}>*</span>
@@ -353,13 +306,10 @@ export default function AddEventModal({
             onChange={(e) => setStudentName(e.target.value)}
             placeholder="Enter name"
             style={styles.input}
-            onFocus={(e) => { e.target.style.borderColor = '#f97316'; e.target.style.outline = 'none'; }}
-            onBlur={(e) => { e.target.style.borderColor = '#d1d5db'; }}
             disabled={loading}
           />
         </div>
 
-        {/* Day and Start Time */}
         <div style={styles.row}>
           <div style={styles.formGroup}>
             <label style={styles.label}>
@@ -369,8 +319,6 @@ export default function AddEventModal({
               value={day}
               onChange={(e) => setDay(e.target.value)}
               style={styles.select}
-              onFocus={(e) => { e.target.style.borderColor = '#f97316'; e.target.style.outline = 'none'; }}
-              onBlur={(e) => { e.target.style.borderColor = '#d1d5db'; }}
               disabled={loading}
             >
               {DAYS.map((d) => (
@@ -390,8 +338,6 @@ export default function AddEventModal({
                 value={startHour}
                 onChange={(e) => setStartHour(e.target.value)}
                 style={{ ...styles.select, flex: 1 }}
-                onFocus={(e) => { e.target.style.borderColor = '#f97316'; e.target.style.outline = 'none'; }}
-                onBlur={(e) => { e.target.style.borderColor = '#d1d5db'; }}
                 disabled={loading}
               >
                 {Array.from({ length: 14 }, (_, i) => i + 8).map((hour) => (
@@ -404,8 +350,6 @@ export default function AddEventModal({
                 value={startMinute}
                 onChange={(e) => setStartMinute(e.target.value)}
                 style={{ ...styles.select, flex: 1, minWidth: '70px' }}
-                onFocus={(e) => { e.target.style.borderColor = '#f97316'; e.target.style.outline = 'none'; }}
-                onBlur={(e) => { e.target.style.borderColor = '#d1d5db'; }}
                 disabled={loading}
               >
                 <option value="00">00</option>
@@ -417,7 +361,6 @@ export default function AddEventModal({
           </div>
         </div>
 
-        {/* Duration and Frequency */}
         <div style={styles.row}>
           <div style={styles.formGroup}>
             <label style={styles.label}>
@@ -427,8 +370,6 @@ export default function AddEventModal({
               value={duration}
               onChange={(e) => setDuration(e.target.value)}
               style={styles.select}
-              onFocus={(e) => { e.target.style.borderColor = '#f97316'; e.target.style.outline = 'none'; }}
-              onBlur={(e) => { e.target.style.borderColor = '#d1d5db'; }}
               disabled={loading}
             >
               <option value="30">30 minutes</option>
@@ -447,8 +388,6 @@ export default function AddEventModal({
               value={frequency}
               onChange={(e) => setFrequency(e.target.value)}
               style={styles.select}
-              onFocus={(e) => { e.target.style.borderColor = '#f97316'; e.target.style.outline = 'none'; }}
-              onBlur={(e) => { e.target.style.borderColor = '#d1d5db'; }}
               disabled={loading}
             >
               <option value="once">Once</option>
@@ -459,24 +398,19 @@ export default function AddEventModal({
           </div>
         </div>
 
-        {/* Frequency hint */}
         <div style={styles.hint}>
           {frequency === 'once' 
             ? `This is a single event on ${day} at ${startHour}:${startMinute}`
             : `This event will repeat on ${day}s at ${startHour}:${startMinute}`}
         </div>
 
-        {/* Error Message */}
         {error && <div style={styles.errorText}>{error}</div>}
 
-        {/* Action Buttons */}
         <div style={styles.buttonGroup}>
           <button
             type="submit"
             disabled={loading}
             style={{ ...styles.button, ...styles.primaryButton, flex: 1 }}
-            onMouseEnter={(e) => { if (!loading) e.currentTarget.style.backgroundColor = '#ea580c'; }}
-            onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = '#f97316'; }}
           >
             {loading ? (isEditMode ? 'Updating...' : 'Adding...') : (isEditMode ? 'Update Event' : 'Add Event')}
           </button>
@@ -487,8 +421,6 @@ export default function AddEventModal({
               onClick={handleDelete}
               disabled={loading}
               style={{ ...styles.button, ...styles.deleteButton }}
-              onMouseEnter={(e) => { if (!loading) e.currentTarget.style.backgroundColor = '#b91c1c'; }}
-              onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = '#dc2626'; }}
             >
               Delete
             </button>
@@ -499,77 +431,11 @@ export default function AddEventModal({
             onClick={onClose}
             disabled={loading}
             style={{ ...styles.button, ...styles.secondaryButton }}
-            onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#f9fafb'; }}
-            onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'white'; }}
           >
             Cancel
           </button>
         </div>
       </form>
-
-      {/* Delete Confirmation Modal */}
-      <Modal
-        isOpen={showDeleteConfirm}
-        onClose={() => setShowDeleteConfirm(false)}
-        title="Delete Event"
-        maxWidth="35rem"
-      >
-        <div style={{ padding: '0.5rem 0' }}>
-          <p style={{ color: '#374151', marginBottom: '1.25rem' }}>
-            Delete <strong>{existingEntry?.student_name}</strong>?
-          </p>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-            <button
-              onClick={confirmDeleteThis}
-              style={{
-                padding: '0.75rem 1rem',
-                backgroundColor: 'white',
-                color: '#374151',
-                border: '1px solid #d1d5db',
-                borderRadius: '0.5rem',
-                cursor: 'pointer',
-                textAlign: 'left',
-              }}
-              onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#f9fafb'; }}
-              onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'white'; }}
-            >
-              <div style={{ fontWeight: '500' }}>This event only</div>
-              <div style={{ fontSize: '0.8rem', color: '#6b7280', marginTop: '0.25rem' }}>Keep future occurrences</div>
-            </button>
-            <button
-              onClick={confirmDeleteAll}
-              style={{
-                padding: '0.75rem 1rem',
-                backgroundColor: '#fef2f2',
-                color: '#dc2626',
-                border: '1px solid #fecaca',
-                borderRadius: '0.5rem',
-                cursor: 'pointer',
-                textAlign: 'left',
-              }}
-              onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#fee2e2'; }}
-              onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = '#fef2f2'; }}
-            >
-              <div style={{ fontWeight: '500' }}>This and all future events</div>
-              <div style={{ fontSize: '0.8rem', color: '#991b1b', marginTop: '0.25rem' }}>Delete the entire series</div>
-            </button>
-            <button
-              onClick={() => setShowDeleteConfirm(false)}
-              style={{
-                padding: '0.5rem 1rem',
-                backgroundColor: 'transparent',
-                color: '#6b7280',
-                border: 'none',
-                borderRadius: '0.5rem',
-                cursor: 'pointer',
-                marginTop: '0.5rem',
-              }}
-            >
-              Cancel
-            </button>
-          </div>
-        </div>
-      </Modal>
     </Modal>
   );
 }
