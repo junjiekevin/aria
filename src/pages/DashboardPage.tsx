@@ -1,9 +1,9 @@
 // src/pages/DashboardPage.tsx
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { getAllSchedules, type Schedule, deleteSchedule, restoreSchedule, permanentDeleteAllTrashed, updateSchedule } from '../lib/api/schedules';
+import { getAllSchedules, type Schedule, deleteSchedule, restoreSchedule, permanentDeleteAllTrashed, updateSchedule, permanentDeleteSchedule } from '../lib/api/schedules';
 import { supabase } from '../lib/supabase';
-import { Plus, Calendar, Clock, Archive, Trash2, FileText, RotateCcw, AlertTriangle, XCircle } from 'lucide-react';
+import { Plus, Calendar, Clock, Archive, Trash2, FileText, RotateCcw, XCircle } from 'lucide-react';
 import Chat from '../components/Chat';
 import CreateScheduleModal from '../components/CreateScheduleModal';
 import EditScheduleModal from '../components/EditScheduleModal';
@@ -146,10 +146,11 @@ function StatusBadge({ status }: StatusBadgeProps) {
 function ScheduleCard({ 
 	schedule, 
 	onView, 
-	onEdit, 
+	onEdit,
 	onTrash,
 	onRecover,
 	onRename,
+	onHardDelete,
 	isTrashed = false 
 }: { 
 	schedule: Schedule; 
@@ -158,8 +159,9 @@ function ScheduleCard({
 	onTrash?: (schedule: Schedule) => void;
 	onRecover?: (schedule: Schedule) => void;
 	onRename?: (schedule: Schedule, newLabel: string) => void;
+	onHardDelete?: (schedule: Schedule) => void;
 	isTrashed?: boolean;
-}) {
+ }) {
 	const [isEditingName, setIsEditingName] = useState(false);
 	const [editingName, setEditingName] = useState(schedule.label);
 	const nameInputRef = useRef<HTMLInputElement>(null);
@@ -294,7 +296,7 @@ function ScheduleCard({
 								Recover
 							</button>
 							<button 
-								onClick={() => onTrash?.(schedule)}
+								onClick={() => onHardDelete?.(schedule)}
 								style={{ 
 									...styles.button, 
 									backgroundColor: 'white', 
@@ -501,6 +503,16 @@ export default function DashboardPage() {
 			loadSchedules();
 		} catch (err) {
 			showToast(err instanceof Error ? err.message : 'Failed to restore schedule', 'error');
+		}
+	};
+
+	const handleHardDelete = async (schedule: Schedule) => {
+		try {
+			await permanentDeleteSchedule(schedule.id);
+			showToast(`"${schedule.label}" permanently deleted`, 'success');
+			loadSchedules();
+		} catch (err) {
+			showToast(err instanceof Error ? err.message : 'Failed to delete', 'error');
 		}
 	};
 
@@ -778,6 +790,7 @@ export default function DashboardPage() {
 											onTrash={handleTrashClick}
 											onRecover={handleRecover}
 											onRename={handleRename}
+											onHardDelete={handleHardDelete}
 											isTrashed={schedule.status === 'trashed'}
 										/>
 									))}
@@ -838,7 +851,7 @@ export default function DashboardPage() {
 						alignItems: 'center',
 						justifyContent: 'center',
 					}}>
-						<AlertTriangle size={24} color="#f59e0b" />
+						<Trash2 size={24} color="#f59e0b" />
 					</div>
 					<h3 style={{ margin: 0, fontSize: '1.125rem', fontWeight: '600' }}>Move to Trash?</h3>
 				</div>
