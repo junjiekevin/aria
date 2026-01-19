@@ -36,6 +36,10 @@ export function dayToIndex(day: string): number {
     return DAYS.indexOf(day);
 }
 
+export function formatDate(date: Date): string {
+    return date.toISOString().split('T')[0];
+}
+
 export function parseTiming(response: FormResponse, rank: number): TimingSlot | null {
     const day = rank === 1 ? response.preferred_1_day :
                 rank === 2 ? response.preferred_2_day :
@@ -65,7 +69,12 @@ export function parseTiming(response: FormResponse, rank: number): TimingSlot | 
     };
 }
 
-export function buildAvailabilityMap(entries: ScheduleEntry[], scheduleStart: Date, totalWeeks: number): Map<string, Set<string>> {
+export function buildAvailabilityMap(
+    entries: ScheduleEntry[], 
+    scheduleStart: Date, 
+    totalWeeks: number,
+    exceptions: Record<string, string[]> = {}
+): Map<string, Set<string>> {
     const availability = new Map<string, Set<string>>();
 
     for (let week = 0; week < totalWeeks; week++) {
@@ -97,6 +106,9 @@ export function buildAvailabilityMap(entries: ScheduleEntry[], scheduleStart: Da
         const freq = freqMatch ? freqMatch[1] : 'WEEKLY';
         const interval = intervalMatch ? parseInt(intervalMatch[1]) : 1;
         
+        // Get exceptions for this entry
+        const entryExceptions = exceptions[entry.id] || [];
+        
         // Determine which weeks this entry should occupy based on recurrence rule
         const weeksToOccupy: number[] = [];
         
@@ -118,7 +130,7 @@ export function buildAvailabilityMap(entries: ScheduleEntry[], scheduleStart: Da
                 weeksToOccupy.push(week);
             }
         } else if (freq === 'MONTHLY') {
-            // Legacy: monthly with BYSETPOS (e.g., 1st Monday of month)
+            // Monthly
             for (let week = startWeek; week < totalWeeks; week += 4) {
                 weeksToOccupy.push(week);
             }
@@ -128,6 +140,21 @@ export function buildAvailabilityMap(entries: ScheduleEntry[], scheduleStart: Da
         for (const week of weeksToOccupy) {
             if (week >= 0 && week < totalWeeks) {
                 const dayKey = `${week}-${entryDay}`;
+                
+                // Calculate the actual date for this occurrence
+                const weekStart = new Date(scheduleStart);
+                weekStart.setDate(weekStart.getDate() + (week * 7));
+                
+                // Find the day in this week that matches entryDay
+                const targetDate = new Date(weekStart);
+                targetDate.setDate(weekStart.getDate() + entryDayIndex);
+                const dateStr = formatDate(targetDate);
+                
+                // Skip if this date is an exception
+                if (entryExceptions.includes(dateStr)) {
+                    console.log(`Skipping ${entry.student_name} on ${dateStr} (exception)`);
+                    continue;
+                }
                 
                 const startMinutes = entryStart.getHours() * 60 + entryStart.getMinutes();
                 const endMinutes = entryEnd.getHours() * 60 + entryEnd.getMinutes();
@@ -186,14 +213,10 @@ function doesTimingConflict(
     totalWeeks: number,
     frequency: string
 ): boolean {
-    // Check if this timing conflicts with ANY occupied week
-    // For weekly: check all weeks
-    // For 2weekly: check weeks 0, 2, 4...
     const startWeek = 0;
     const interval = frequency === '2weekly' ? 2 : 1;
     
     for (let week = startWeek; week < totalWeeks; week++) {
-        // Only check weeks where this frequency would have events
         if ((week - startWeek) % interval !== 0) continue;
         
         if (!isSlotAvailable(timing, availability, week)) {
@@ -209,7 +232,6 @@ function markTimingAsOccupied(
     totalWeeks: number,
     frequency: string
 ): void {
-    // Mark this timing as occupied across ALL applicable weeks
     const startWeek = 0;
     const interval = frequency === '2weekly' ? 2 : 1;
     
@@ -223,9 +245,10 @@ export function scheduleStudents(
     students: FormResponse[],
     existingEntries: ScheduleEntry[],
     scheduleStart: Date,
-    totalWeeks: number
+    totalWeeks: number,
+    exceptions: Record<string, string[]> = {}
 ): SchedulingResult {
-    const availability = buildAvailabilityMap(existingEntries, scheduleStart, totalWeeks);
+    const availability = buildAvailabilityMap(existingEntries, scheduleStart, totalWeeks, exceptions);
     
     const studentsWithTimings = students.map(student => ({
         student,
@@ -254,7 +277,6 @@ export function scheduleStudents(
                 scheduled = true;
                 bestTiming = timing;
                 bestRank = choiceRank;
-                // Mark as occupied across ALL applicable weeks
                 markTimingAsOccupied(timing, availability, totalWeeks, timing.frequency);
                 break;
             }

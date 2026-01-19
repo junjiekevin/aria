@@ -348,91 +348,94 @@ export default function SchedulePage() {
   };
 
    // Check if an entry should appear in the current week based on recurrence rule
-   const isEntryInCurrentWeek = (entry: ScheduleEntry): boolean => {
-     if (!weekStart) return false;
-     
-     const entryStart = new Date(entry.start_time);
-     const entryDay = entryStart.getDay(); // 0-6
-     const dayAbbrev = ['SU', 'MO', 'TU', 'WE', 'TH', 'FR', 'SA'][entryDay];
-     
-      // Parse recurrence rule
-      const rule = entry.recurrence_rule || '';
-      const freqMatch = rule.match(/FREQ=(\w+)/);
-      const byDayMatch = rule.match(/BYDAY=([^;]+)/);
-      const bySetPosMatch = rule.match(/BYSETPOS=([^;]+)/);
-      const intervalMatch = rule.match(/INTERVAL=(\d+)/);
+    const isEntryInCurrentWeek = (entry: ScheduleEntry): boolean => {
+      if (!weekStart) return false;
       
-      const freq = freqMatch ? freqMatch[1] : 'WEEKLY';
-      const byDay = byDayMatch ? byDayMatch[1] : dayAbbrev;
-      const bySetPos = bySetPosMatch ? parseInt(bySetPosMatch[1]) : null;
-      const interval = intervalMatch ? parseInt(intervalMatch[1]) : 1;
-     
-     // Check if the entry's day matches
-     if (!byDay.includes(dayAbbrev)) return false;
-     
-     // "Once" frequency (empty rule) - only show in the week containing the original date
-     if (!rule) {
-       // Get the entry's actual week start (Sunday)
-       const entryWeekStart = new Date(entryStart);
-       entryWeekStart.setDate(entryStart.getDate() - entryStart.getDay());
-       entryWeekStart.setHours(0, 0, 0, 0);
+      const entryStart = new Date(entry.start_time);
+      const entryDay = entryStart.getDay(); // 0-6
+      const dayAbbrev = ['SU', 'MO', 'TU', 'WE', 'TH', 'FR', 'SA'][entryDay];
+      
+       // Parse recurrence rule
+       const rule = entry.recurrence_rule || '';
+       const freqMatch = rule.match(/FREQ=(\w+)/);
+       const byDayMatch = rule.match(/BYDAY=([^;]+)/);
+       const bySetPosMatch = rule.match(/BYSETPOS=([^;]+)/);
+       const intervalMatch = rule.match(/INTERVAL=(\d+)/);
        
-       // Get the current view's week start (Sunday)
-       const currentViewWeekStart = new Date(weekStart);
-       currentViewWeekStart.setHours(0, 0, 0, 0);
-       
-       return entryWeekStart.getTime() === currentViewWeekStart.getTime();
-     }
-     
-     // Calculate which week this entry originally falls on
-     const scheduleStart = schedule ? new Date(schedule.start_date) : weekStart;
-     const entryWeekStart = new Date(scheduleStart);
-     entryWeekStart.setDate(scheduleStart.getDate() + (currentWeekOffset * 7));
-     
-     // Get the day index for this entry
-     const entryDayIndex = ['SU', 'MO', 'TU', 'WE', 'TH', 'FR', 'SA'].indexOf(dayAbbrev);
-     
-     // Find the first occurrence of this day in the current view week
-     const viewWeekFirstDay = weekStart.getDay();
-     let daysToAdd = entryDayIndex - viewWeekFirstDay;
-     if (daysToAdd < 0) daysToAdd += 7;
-     
-     const occurrenceDate = new Date(weekStart);
-     occurrenceDate.setDate(weekStart.getDate() + daysToAdd);
-     
-     // Calculate the week number of this occurrence relative to schedule start
-     const scheduleFirstDay = new Date(scheduleStart);
-     scheduleFirstDay.setDate(scheduleStart.getDate() - scheduleStart.getDay()); // Start of first week
-     
-     const weeksSinceStart = Math.floor((occurrenceDate.getTime() - scheduleFirstDay.getTime()) / (7 * 24 * 60 * 60 * 1000));
-     
-     // Apply frequency rules
-      if (freq === 'WEEKLY') {
-        return weeksSinceStart % interval === 0; // Show every N weeks based on interval
-      } else if (freq === '2WEEKLY') {
-        return weeksSinceStart % 2 === 0; // Show every other week (even weeks)
-      } else if (freq === 'MONTHLY') {
-        // Legacy: For monthly, check if this is the Nth occurrence of the day in the month
-        if (bySetPos) {
-          const monthStart = new Date(occurrenceDate.getFullYear(), occurrenceDate.getMonth(), 1);
-          const monthEnd = new Date(occurrenceDate.getFullYear(), occurrenceDate.getMonth() + 1, 0);
-          
-          // Find all occurrences of this day in the month
-          let occurrenceCount = 0;
-          for (let d = new Date(monthStart); d <= monthEnd; d.setDate(d.getDate() + 1)) {
-            if (d.getDay() === entryDayIndex) {
-              occurrenceCount++;
-              if (d.getTime() === occurrenceDate.getTime()) {
-                break;
-              }
-            }
-          }
-          return occurrenceCount === bySetPos;
-        }
-        return true;
+       const freq = freqMatch ? freqMatch[1] : 'WEEKLY';
+       const byDay = byDayMatch ? byDayMatch[1] : dayAbbrev;
+       const bySetPos = bySetPosMatch ? parseInt(bySetPosMatch[1]) : null;
+       const interval = intervalMatch ? parseInt(intervalMatch[1]) : 1;
+      
+      // Check if the entry's day matches
+      if (!byDay.includes(dayAbbrev)) {
+        console.log(entry.student_name + ' day ' + dayAbbrev + ' not in ' + byDay + ' - hiding');
+        return false;
       }
-     
-     return true;
+      
+      // "Once" frequency (empty rule) - only show in the week containing the original date
+      if (!rule) {
+        const entryWeekStart = new Date(entryStart);
+        entryWeekStart.setDate(entryStart.getDay() ? entryStart.getDate() - entryStart.getDay() : entryStart.getDate());
+        entryWeekStart.setHours(0, 0, 0, 0);
+        
+        const currentViewWeekStart = new Date(weekStart);
+        currentViewWeekStart.setHours(0, 0, 0, 0);
+        
+        return entryWeekStart.getTime() === currentViewWeekStart.getTime();
+      }
+      
+      // Calculate which week this entry originally falls on
+      const scheduleStart = schedule ? new Date(schedule.start_date) : weekStart;
+      const entryWeekStart = new Date(scheduleStart);
+      entryWeekStart.setDate(scheduleStart.getDate() + (currentWeekOffset * 7));
+      
+      // Get the day index for this entry
+      const entryDayIndex = ['SU', 'MO', 'TU', 'WE', 'TH', 'FR', 'SA'].indexOf(dayAbbrev);
+      
+      // Find the first occurrence of this day in the current view week
+      const viewWeekFirstDay = weekStart.getDay();
+      let daysToAdd = entryDayIndex - viewWeekFirstDay;
+      if (daysToAdd < 0) daysToAdd += 7;
+      
+      const occurrenceDate = new Date(weekStart);
+      occurrenceDate.setDate(weekStart.getDate() + daysToAdd);
+      
+      // Calculate the week number of this occurrence relative to schedule start
+      const scheduleFirstDay = new Date(scheduleStart);
+      scheduleFirstDay.setDate(scheduleStart.getDate() - scheduleStart.getDay()); // Start of first week
+      
+      const weeksSinceStart = Math.floor((occurrenceDate.getTime() - scheduleFirstDay.getTime()) / (7 * 24 * 60 * 60 * 1000));
+      
+      // Apply frequency rules
+       if (freq === 'WEEKLY') {
+         const shouldShow = weeksSinceStart % interval === 0;
+         if (!shouldShow) {
+           console.log(entry.student_name + ' weeksSinceStart=' + weeksSinceStart + ' interval=' + interval + ' - hiding');
+         }
+         return shouldShow;
+       } else if (freq === '2WEEKLY') {
+         return weeksSinceStart % 2 === 0;
+       } else if (freq === 'MONTHLY') {
+         if (bySetPos) {
+           const monthStart = new Date(occurrenceDate.getFullYear(), occurrenceDate.getMonth(), 1);
+           const monthEnd = new Date(occurrenceDate.getFullYear(), occurrenceDate.getMonth() + 1, 0);
+           
+           let occurrenceCount = 0;
+           for (let d = new Date(monthStart); d <= monthEnd; d.setDate(d.getDate() + 1)) {
+             if (d.getDay() === entryDayIndex) {
+               occurrenceCount++;
+               if (d.getTime() === occurrenceDate.getTime()) {
+                 break;
+               }
+             }
+           }
+           return occurrenceCount === bySetPos;
+         }
+         return true;
+       }
+      
+      return true;
    };
 
   // Navigate weeks
@@ -921,8 +924,10 @@ export default function SchedulePage() {
 
     const getEntriesForSlot = (day: string, hour: number) => {
       return entries.filter(entry => {
-        // First check if entry should appear in current week based on recurrence
-        if (!isEntryInCurrentWeek(entry)) return false;
+        const shouldShow = isEntryInCurrentWeek(entry);
+        if (!shouldShow) {
+          return false;
+        }
         
         const startTime = new Date(entry.start_time);
         const dayOfWeek = startTime.getDay(); // 0 = Sunday, 1 = Monday, ...
@@ -935,9 +940,11 @@ export default function SchedulePage() {
         const occurrenceDate = startTime.toISOString().split('T')[0]; // YYYY-MM-DD
         
         if (entryExceptions.includes(occurrenceDate)) {
+          console.log('Hiding', entry.student_name, 'on', occurrenceDate, '(exception)');
           return false; // Skip this occurrence
         }
         
+        console.log('Showing', entry.student_name, 'on', occurrenceDate, 'at', hour);
         return true;
       });
     };
