@@ -1,7 +1,7 @@
 // src/pages/SchedulePage.tsx
 import { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Calendar, Users, ChevronLeft, ChevronRight, Home } from 'lucide-react';
+import { ArrowLeft, Calendar, Users, ChevronLeft, ChevronRight } from 'lucide-react';
 import { getSchedule, updateSchedule, type Schedule } from '../lib/api/schedules';
 import { getScheduleEntries, updateScheduleEntry, deleteScheduleEntry, type ScheduleEntry } from '../lib/api/schedule-entries';
 import { getFormResponses, type FormResponse } from '../lib/api/form-responses';
@@ -95,6 +95,15 @@ const styles = {
     color: '#c2410c',
     borderRight: '1px solid #fed7aa',
     backgroundColor: '#ffedd5',
+    display: 'flex',
+    flexDirection: 'column' as const,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: '0.15rem',
+  },
+  dayHeaderDate: {
+    fontSize: '0.8rem',
+    color: '#92400e',
   },
   timeLabel: {
     width: '55px',
@@ -210,8 +219,12 @@ export default function SchedulePage() {
     }
   }, [scheduleId]);
 
-  // Get user's local timezone
+  // Get user's local timezone abbreviation (e.g., EST, PST)
   const userTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  const userTimezoneAbbrev = new Date().toLocaleString('en-US', { 
+    timeZone: userTimezone,
+    timeZoneName: 'short' 
+  }).split(' ').pop() || userTimezone;
 
   // Calculate week dates based on schedule start date and current offset
   const { weekStart, weekEnd, weekNumber, totalWeeks } = useMemo(() => {
@@ -340,18 +353,6 @@ export default function SchedulePage() {
 
   const goToNextWeek = () => {
     setCurrentWeekOffset(prev => Math.min(totalWeeks - 1, prev + 1));
-  };
-
-  const goToToday = () => {
-    if (!schedule) return;
-    const today = new Date();
-    const scheduleStart = new Date(schedule.start_date);
-    
-    // Calculate which week today falls into
-    const daysSinceStart = Math.floor((today.getTime() - scheduleStart.getTime()) / (1000 * 60 * 60 * 24));
-    const weekOffset = Math.floor(daysSinceStart / 7);
-    
-    setCurrentWeekOffset(Math.max(0, Math.min(totalWeeks - 1, weekOffset)));
   };
 
   const loadScheduleData = async () => {
@@ -792,6 +793,7 @@ export default function SchedulePage() {
       {/* Header */}
       <header style={styles.header}>
         <div style={styles.headerContent}>
+          {/* Left: Back button + Schedule name */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
             <button
               onClick={() => navigate('/dashboard')}
@@ -800,79 +802,77 @@ export default function SchedulePage() {
               onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; }}
             >
               <ArrowLeft size={18} />
-              Back to Dashboard
+              Back
             </button>
-            <div>
-              <h1 style={styles.title}>{schedule.label}</h1>
-              <p style={styles.subtitle}>
-                {weekStart && weekEnd ? `${formatLocalDate(weekStart)} - ${formatLocalDate(weekEnd)}` : `${formatLocalDate(new Date(schedule.start_date))} - ${formatLocalDate(new Date(schedule.end_date))}`}
-                <span style={{ marginLeft: '0.5rem', color: '#9ca3af' }}>({userTimezone})</span>
-              </p>
-            </div>
+            <h1 style={styles.title}>{schedule.label}</h1>
           </div>
           
-          {/* Week Navigation */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <button
-              onClick={goToPreviousWeek}
-              disabled={currentWeekOffset === 0}
-              style={{
-                ...styles.backButton,
-                opacity: currentWeekOffset === 0 ? 0.5 : 1,
-                cursor: currentWeekOffset === 0 ? 'not-allowed' : 'pointer',
-              }}
-              onMouseEnter={(e) => { if (currentWeekOffset > 0) e.currentTarget.style.backgroundColor = '#f9fafb'; }}
-              onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; }}
-            >
-              <ChevronLeft size={18} />
-            </button>
+          {/* Center: Navigation + Date Range + Week */}
+          <div style={{ 
+            display: 'flex', 
+            flexDirection: 'column' as const,
+            alignItems: 'center',
+            flex: 1,
+          }}>
+            {/* Arrows close to date range with week below */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+              <button
+                onClick={goToPreviousWeek}
+                disabled={currentWeekOffset === 0}
+                style={{
+                  ...styles.backButton,
+                  opacity: currentWeekOffset === 0 ? 0.5 : 1,
+                  cursor: currentWeekOffset === 0 ? 'not-allowed' : 'pointer',
+                }}
+                onMouseEnter={(e) => { if (currentWeekOffset > 0) e.currentTarget.style.backgroundColor = '#f9fafb'; }}
+                onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; }}
+              >
+                <ChevronLeft size={20} />
+              </button>
+              
+              <div style={{ textAlign: 'center' }}>
+                <p style={{ 
+                  fontSize: '1.1rem', 
+                  fontWeight: '600', 
+                  color: '#111827',
+                  margin: 0,
+                  whiteSpace: 'nowrap' as const,
+                }}>
+                  {weekStart && weekEnd ? `${formatLocalDate(weekStart)} - ${formatLocalDate(weekEnd)}` : ''}
+                  <span style={{ marginLeft: '0.5rem', color: '#9ca3af', fontWeight: '400' }}>
+                    ({userTimezoneAbbrev})
+                  </span>
+                </p>
+              </div>
+              
+              <button
+                onClick={goToNextWeek}
+                disabled={currentWeekOffset >= totalWeeks - 1}
+                style={{
+                  ...styles.backButton,
+                  opacity: currentWeekOffset >= totalWeeks - 1 ? 0.5 : 1,
+                  cursor: currentWeekOffset >= totalWeeks - 1 ? 'not-allowed' : 'pointer',
+                }}
+                onMouseEnter={(e) => { if (currentWeekOffset < totalWeeks - 1) e.currentTarget.style.backgroundColor = '#f9fafb'; }}
+                onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; }}
+              >
+                <ChevronRight size={20} />
+              </button>
+            </div>
             
-            <button
-              onClick={goToToday}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.25rem',
-                padding: '0.35rem 0.6rem',
-                background: 'none',
-                border: '1px solid #d1d5db',
-                borderRadius: '0.3rem',
-                cursor: 'pointer',
-                fontSize: '0.8rem',
-                color: '#374151',
-              }}
-              onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#f9fafb'; }}
-              onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; }}
-            >
-              <Home size={16} />
-              Today
-            </button>
-            
-            <button
-              onClick={goToNextWeek}
-              disabled={currentWeekOffset >= totalWeeks - 1}
-              style={{
-                ...styles.backButton,
-                opacity: currentWeekOffset >= totalWeeks - 1 ? 0.5 : 1,
-                cursor: currentWeekOffset >= totalWeeks - 1 ? 'not-allowed' : 'pointer',
-              }}
-              onMouseEnter={(e) => { if (currentWeekOffset < totalWeeks - 1) e.currentTarget.style.backgroundColor = '#f9fafb'; }}
-              onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; }}
-            >
-              <ChevronRight size={18} />
-            </button>
-            
+            {/* Week indicator below */}
             <span style={{ 
-              marginLeft: '0.5rem', 
-              fontSize: '0.9rem', 
+              marginTop: '0.35rem',
+              fontSize: '0.85rem', 
               fontWeight: '500', 
               color: '#f97316',
-              minWidth: '120px',
-              textAlign: 'center',
             }}>
               Week {weekNumber} of {totalWeeks}
             </span>
           </div>
+          
+          {/* Right: Empty for balance */}
+          <div style={{ width: '100px' }}></div>
         </div>
       </header>
 
@@ -883,11 +883,19 @@ export default function SchedulePage() {
           {/* Day Headers */}
           <div style={styles.timetableHeader}>
             <div style={styles.dayHeader}></div>
-            {DAYS.map((day) => (
-              <div key={day} style={styles.dayHeader}>
-                {day}
-              </div>
-            ))}
+            {DAYS.map((day, index) => {
+              const date = weekStart ? new Date(weekStart) : null;
+              if (date) {
+                date.setDate(date.getDate() + index);
+              }
+              const dateStr = date ? date.getDate() : '';
+              return (
+                <div key={day} style={styles.dayHeader}>
+                  <span>{day}</span>
+                  <span style={styles.dayHeaderDate}>{dateStr}</span>
+                </div>
+              );
+            })}
           </div>
 
           {/* Time Grid */}
