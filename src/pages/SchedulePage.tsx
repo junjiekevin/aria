@@ -571,6 +571,7 @@ export default function SchedulePage() {
       // Fetch exceptions for entries
       const entryIds = entriesData.map(e => e.id);
       const exceptionsData = await getEntryExceptions(entryIds);
+      console.log('Loaded exceptions:', exceptionsData);
       setExceptions(exceptionsData);
       
       // Try to load form responses (optional - may fail if table doesn't exist yet)

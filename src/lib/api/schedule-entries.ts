@@ -108,6 +108,8 @@ export async function updateScheduleEntry(
 // Delete schedule entry - for non-recurring: just delete
 // For recurring: add an exception for this date (skip this occurrence)
 export async function deleteScheduleEntry(entryId: string): Promise<void> {
+    console.log('deleteScheduleEntry called for:', entryId);
+    
     // First get the entry
     const { data: entry, error: fetchError } = await supabase
         .from('schedule_entries')
@@ -120,15 +122,17 @@ export async function deleteScheduleEntry(entryId: string): Promise<void> {
         return;
     }
     
+    console.log('Found entry:', entry.student_name, 'recurrence:', entry.recurrence_rule);
+    
     // Check if this is a recurring entry
     if (entry.recurrence_rule && entry.recurrence_rule !== '') {
         // For recurring entries: add an exception for this date
-        // The entry stays in DB, calendar will skip this date
         const entryDate = new Date(entry.start_time);
         const exceptionDate = entryDate.toISOString().split('T')[0]; // YYYY-MM-DD
         
+        console.log('Adding exception for:', exceptionDate);
         await addEntryException(entryId, exceptionDate);
-        console.log('Added exception for', exceptionDate);
+        console.log('Exception added successfully');
     } else {
         // Non-recurring: just delete
         const { error } = await supabase
@@ -139,6 +143,7 @@ export async function deleteScheduleEntry(entryId: string): Promise<void> {
         if (error) {
             throw new Error(`Failed to delete: ${error.message}`);
         }
+        console.log('Entry deleted successfully');
     }
 }
 
