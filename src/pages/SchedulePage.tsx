@@ -3,7 +3,7 @@ import { useState, useEffect, useMemo, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Calendar, Users, ChevronLeft, ChevronRight, Trash2, Copy, Check } from 'lucide-react';
 import { getSchedule, updateSchedule, type Schedule } from '../lib/api/schedules';
-import { getScheduleEntries, createScheduleEntry, updateScheduleEntry, deleteScheduleEntry, deleteThisAndSubsequentEntries, type ScheduleEntry } from '../lib/api/schedule-entries';
+import { getScheduleEntries, createScheduleEntry, updateScheduleEntry, deleteScheduleEntry, deleteThisAndSubsequentEntries, getEntryExceptions, type ScheduleEntry } from '../lib/api/schedule-entries';
 import { getFormResponses, deleteFormResponse, type FormResponse } from '../lib/api/form-responses';
 import AddEventModal from '../components/AddEventModal';
 import Modal from '../components/Modal';
@@ -256,6 +256,7 @@ export default function SchedulePage() {
   const [schedule, setSchedule] = useState<Schedule | null>(null);
   const [entries, setEntries] = useState<ScheduleEntry[]>([]);
   const [responses, setResponses] = useState<FormResponse[]>([]);
+  const [exceptions, setExceptions] = useState<Record<string, string[]>>({}); // entryId -> exception dates
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showAddModal, setShowAddModal] = useState(false);
@@ -566,6 +567,11 @@ export default function SchedulePage() {
       
       setSchedule(scheduleData);
       setEntries(entriesData);
+      
+      // Fetch exceptions for entries
+      const entryIds = entriesData.map(e => e.id);
+      const exceptionsData = await getEntryExceptions(entryIds);
+      setExceptions(exceptionsData);
       
       // Try to load form responses (optional - may fail if table doesn't exist yet)
       try {
@@ -921,7 +927,17 @@ export default function SchedulePage() {
         const dayOfWeek = startTime.getDay(); // 0 = Sunday, 1 = Monday, ...
         const dayIndex = DAYS.indexOf(day); // 0 = Sunday, 1 = Monday, ...
         
-        return dayOfWeek === dayIndex && startTime.getHours() === hour;
+        if (dayOfWeek !== dayIndex || startTime.getHours() !== hour) return false;
+        
+        // Check if this specific occurrence date is an exception (should be hidden)
+        const entryExceptions = exceptions[entry.id] || [];
+        const occurrenceDate = startTime.toISOString().split('T')[0]; // YYYY-MM-DD
+        
+        if (entryExceptions.includes(occurrenceDate)) {
+          return false; // Skip this occurrence
+        }
+        
+        return true;
       });
     };
 
@@ -1358,23 +1374,9 @@ export default function SchedulePage() {
                 <div style={{ marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid #e5e7eb' }}>
                   <span style={{ color: '#6b7280', display: 'block', marginBottom: '0.5rem' }}>Form Link:</span>
                   <FormLink scheduleId={scheduleId!} />
-                  
-                  <div style={{ marginTop: '1rem' }}>
-                    <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
-                      <input
-                        type="checkbox"
-                        checked={schedule.send_confirmation_email || false}
-                        onChange={(e) => {
-                          updateSchedule(scheduleId!, { send_confirmation_email: e.target.checked });
-                          setSchedule({ ...schedule, send_confirmation_email: e.target.checked });
-                        }}
-                        style={{ width: '16px', height: '16px', accentColor: '#f97316' }}
-                      />
-                      <span style={{ fontSize: '0.8rem', color: '#374151' }}>
-                        Send confirmation emails
-                      </span>
-                    </label>
-                  </div>
+                  <p style={{ fontSize: '0.75rem', color: '#6b7280', marginTop: '0.5rem' }}>
+                    Confirmation emails are automatically sent to all form submitters.
+                  </p>
                 </div>
               )}
             </div>

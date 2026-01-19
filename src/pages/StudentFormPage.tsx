@@ -476,10 +476,8 @@ export default function StudentFormPage() {
                 preferred_3_frequency: timing3.frequency,
             });
             
-            // Send confirmation email if enabled
-            if (schedule?.send_confirmation_email) {
-                await sendConfirmationEmail(email.trim(), `${firstName} ${lastName}`, schedule.label);
-            }
+            // Always send confirmation email
+            await sendConfirmationEmail(email.trim(), `${firstName} ${lastName}`, schedule.label);
             
             setSubmitted(true);
         } catch (err) {
