@@ -87,11 +87,26 @@ export async function deleteScheduleEntry(entryId: string): Promise<void> {
     
     // Check if this is a recurring entry
     if (entry.recurrence_rule && entry.recurrence_rule !== '') {
-        // For recurring entries: delete this one AND create new one starting next week
-        console.log('Recurring entry detected - will create replacement starting next week');
-        
         const entryStart = new Date(entry.start_time);
         const entryEnd = new Date(entry.end_time);
+        const now = new Date();
+        
+        // Check if this occurrence is in the past
+        if (entryStart < now) {
+            console.log('This occurrence is in the past - deleting without replacement');
+            const { error } = await supabase
+                .from('schedule_entries')
+                .delete()
+                .eq('id', entryId);
+            
+            if (error) {
+                throw new Error(`Failed to delete: ${error.message}`);
+            }
+            return;
+        }
+        
+        // For future occurrences: delete this one AND create new one starting next week
+        console.log('Future recurring entry - will create replacement starting next week');
         
         // Create new entry starting 7 days later (next occurrence)
         const nextStart = new Date(entryStart);
