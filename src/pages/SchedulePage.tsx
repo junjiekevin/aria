@@ -564,6 +564,9 @@ export default function SchedulePage() {
         getScheduleEntries(scheduleId)
       ]);
       
+      console.log('loadScheduleData - entries fetched:', entriesData.length);
+      entriesData.forEach(e => console.log(' -', e.student_name, e.id, e.start_time));
+      
       setSchedule(scheduleData);
       setEntries(entriesData);
       

@@ -29,6 +29,8 @@ export async function getScheduleEntries(scheduleId: string): Promise<ScheduleEn
         throw new Error(`Failed to fetch schedule entries: ${error.message}`);
     }
 
+    console.log('getScheduleEntries - fetched from DB:', data?.length || 0, 'entries');
+    
     return data || [];
 }
 
