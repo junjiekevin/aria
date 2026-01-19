@@ -3,7 +3,7 @@ import { useState, useEffect, useMemo, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Calendar, Users, ChevronLeft, ChevronRight, Trash2, Copy, Check } from 'lucide-react';
 import { getSchedule, updateSchedule, type Schedule } from '../lib/api/schedules';
-import { getScheduleEntries, createScheduleEntry, updateScheduleEntry, deleteScheduleEntry, deleteThisAndSubsequentEntries, getEntryExceptions, type ScheduleEntry } from '../lib/api/schedule-entries';
+import { getScheduleEntries, createScheduleEntry, updateScheduleEntry, deleteScheduleEntry, deleteThisAndSubsequentEntries, type ScheduleEntry } from '../lib/api/schedule-entries';
 import { getFormResponses, deleteFormResponse, type FormResponse } from '../lib/api/form-responses';
 import AddEventModal from '../components/AddEventModal';
 import Modal from '../components/Modal';
@@ -256,7 +256,6 @@ export default function SchedulePage() {
   const [schedule, setSchedule] = useState<Schedule | null>(null);
   const [entries, setEntries] = useState<ScheduleEntry[]>([]);
   const [responses, setResponses] = useState<FormResponse[]>([]);
-  const [exceptions, setExceptions] = useState<Record<string, string[]>>({}); // entryId -> array of exception dates
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showAddModal, setShowAddModal] = useState(false);
@@ -565,22 +564,8 @@ export default function SchedulePage() {
         getScheduleEntries(scheduleId)
       ]);
       
-      console.log('loadScheduleData - entries fetched:', entriesData.length);
-      entriesData.forEach(e => console.log(' -', e.student_name, e.id, e.start_time));
-      
       setSchedule(scheduleData);
       setEntries(entriesData);
-      
-      // Fetch exceptions for each entry
-      const exceptionsMap: Record<string, string[]> = {};
-      for (const entry of entriesData) {
-        const exc = await getEntryExceptions(entry.id);
-        if (exc.length > 0) {
-          exceptionsMap[entry.id] = exc;
-          console.log(' - Exceptions for', entry.student_name + ':', exc);
-        }
-      }
-      setExceptions(exceptionsMap);
       
       // Try to load form responses (optional - may fail if table doesn't exist yet)
       try {
@@ -936,18 +921,7 @@ export default function SchedulePage() {
         const dayOfWeek = startTime.getDay(); // 0 = Sunday, 1 = Monday, ...
         const dayIndex = DAYS.indexOf(day); // 0 = Sunday, 1 = Monday, ...
         
-        if (dayOfWeek !== dayIndex || startTime.getHours() !== hour) return false;
-        
-        // Check if this specific occurrence date is an exception (should be hidden)
-        const entryExceptions = exceptions[entry.id] || [];
-        const occurrenceDate = startTime.toISOString().split('T')[0]; // YYYY-MM-DD
-        
-        if (entryExceptions.includes(occurrenceDate)) {
-          console.log('Hiding', entry.student_name, 'on', occurrenceDate, '(exception)');
-          return false; // Skip this occurrence
-        }
-        
-        return true;
+        return dayOfWeek === dayIndex && startTime.getHours() === hour;
       });
     };
 

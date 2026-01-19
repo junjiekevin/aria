@@ -28,51 +28,8 @@ export async function getScheduleEntries(scheduleId: string): Promise<ScheduleEn
     if (error) {
         throw new Error(`Failed to fetch schedule entries: ${error.message}`);
     }
-
-    console.log('getScheduleEntries - fetched from DB:', data?.length || 0, 'entries');
     
     return data || [];
-}
-
-// Get exceptions for an entry
-export async function getEntryExceptions(entryId: string): Promise<string[]> {
-    const { data, error } = await supabase
-        .from('schedule_entry_exceptions')
-        .select('exception_date')
-        .eq('entry_id', entryId);
-    
-    if (error) {
-        console.warn('Failed to fetch exceptions:', error.message);
-        return [];
-    }
-    
-    return data?.map(row => row.exception_date) || [];
-}
-
-// Add exception date (to skip/hide a specific occurrence)
-export async function addEntryException(entryId: string, exceptionDate: string): Promise<void> {
-    const { error } = await supabase
-        .from('schedule_entry_exceptions')
-        .insert([{
-            entry_id: entryId,
-            exception_date: exceptionDate, // YYYY-MM-DD format
-        }]);
-    
-    if (error) {
-        throw new Error(`Failed to add exception: ${error.message}`);
-    }
-}
-
-// Remove exception date
-export async function removeEntryException(exceptionId: string): Promise<void> {
-    const { error } = await supabase
-        .from('schedule_entry_exceptions')
-        .delete()
-        .eq('id', exceptionId);
-    
-    if (error) {
-        throw new Error(`Failed to remove exception: ${error.message}`);
-    }
 }
 
 // Create a new schedule entry
@@ -109,60 +66,15 @@ export async function updateScheduleEntry(
     return data;
 }
 
-// Delete schedule entry - for "this event only" on recurring entries, add an exception
+// Delete schedule entry - just deletes ONE entry by ID
 export async function deleteScheduleEntry(entryId: string): Promise<void> {
-    console.log('Deleting entry by ID:', entryId);
-    
-    // First get the full entry
-    const { data: entry, error: fetchError } = await supabase
-        .from('schedule_entries')
-        .select('*')
-        .eq('id', entryId)
-        .single();
-    
-    if (fetchError || !entry) {
-        console.log('Entry not found or already deleted');
-        return;
-    }
-    
-    console.log('Found entry to delete:', entry);
-    
-    // Check if this is a recurring entry
-    if (entry.recurrence_rule && entry.recurrence_rule !== '') {
-        // For recurring entries: add an exception instead of deleting
-        // The date to skip is the entry's start_time date
-        const entryDate = new Date(entry.start_time);
-        const exceptionDate = entryDate.toISOString().split('T')[0]; // YYYY-MM-DD
-        
-        console.log('Recurring entry - adding exception for:', exceptionDate);
-        
-        await addEntryException(entryId, exceptionDate);
-        
-        console.log('Added exception - entry stays in DB, calendar will skip this date');
-    } else {
-        // Non-recurring: just delete
-        const { error, count } = await supabase
-            .from('schedule_entries')
-            .delete({ count: 'exact' })
-            .eq('id', entryId);
-        
-        console.log('Delete result - count:', count, 'error:', error);
-        
-        if (error) {
-            throw new Error(`Failed to delete: ${error.message}`);
-        }
-    }
-}
-
-// Delete ONLY this occurrence (not future ones) - for recurring entries
-export async function deleteThisOccurrenceOnly(entryId: string): Promise<void> {
     const { error } = await supabase
         .from('schedule_entries')
         .delete()
         .eq('id', entryId);
     
     if (error) {
-        throw new Error(`Failed to delete occurrence: ${error.message}`);
+        throw new Error(`Failed to delete schedule entry: ${error.message}`);
     }
 }
 
