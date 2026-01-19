@@ -1561,8 +1561,10 @@ export default function SchedulePage() {
               onClick={async () => {
                 if (!entryToDelete) return;
                 try {
-                  setEntries(entries.filter(e => e.id !== entryToDelete.id));
-                  await deleteScheduleEntry(entryToDelete.id);
+                  const entryIdToDelete = entryToDelete.id;
+                  await deleteScheduleEntry(entryIdToDelete);
+                  // Force reload to ensure fresh data
+                  await loadScheduleData();
                   setEntryToDelete(null);
                 } catch (err) {
                   console.error('Failed to delete event:', err);
@@ -1589,7 +1591,7 @@ export default function SchedulePage() {
                 if (!entryToDelete) return;
                 try {
                   await deleteThisAndSubsequentEntries(entryToDelete.id, entryToDelete.start_time);
-                  setEntries(entries.filter(e => e.id !== entryToDelete.id));
+                  await loadScheduleData();
                   setEntryToDelete(null);
                 } catch (err) {
                   console.error('Failed to delete events:', err);
