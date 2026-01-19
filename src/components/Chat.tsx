@@ -1,14 +1,15 @@
 // src/components/Chat.tsx
 import { useState, useRef, useEffect } from 'react';
-import { Send, Loader2, Bot, User } from 'lucide-react';
+import { Send, Loader2, User } from 'lucide-react';
 import { sendChatMessage, ARIA_SYSTEM_PROMPT, type Message } from '../lib/openrouter';
 import { executeFunction } from '../lib/functions';
+import ariaProfile from '../assets/images/aria-profile.png';
 
 const styles = {
   container: {
     display: 'flex',
     flexDirection: 'column' as const,
-    height: '600px',
+    maxHeight: 'calc(100vh - 180px)',
     backgroundColor: 'white',
     borderRadius: '0.75rem',
     boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
@@ -27,10 +28,7 @@ const styles = {
     width: '2rem',
     height: '2rem',
     borderRadius: '50%',
-    background: 'linear-gradient(135deg, #fb923c, #fdba74)',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
+    objectFit: 'cover' as const,
   },
   headerText: {
     fontSize: '1.125rem',
@@ -74,6 +72,12 @@ const styles = {
   assistantAvatar: {
     background: 'linear-gradient(135deg, #fb923c, #fdba74)',
     color: 'white',
+  },
+  assistantAvatarImage: {
+    width: '2rem',
+    height: '2rem',
+    borderRadius: '50%',
+    objectFit: 'cover' as const,
   },
   messageBubble: {
     padding: '0.75rem 1rem',
@@ -240,7 +244,7 @@ export default function Chat({ onScheduleChange }: ChatProps) {
             resultContent = `✓ Created ${result.data.count} schedules: ${scheduleNames}`;
             scheduleModified = true;
           } else if (name === 'listSchedules' && Array.isArray(result.data)) {
-            // Format the schedule list nicely (hide IDs from user)
+            // Format the schedule list with first 12 chars of ID for AI extraction
             if (result.data.length === 0) {
               resultContent = 'You have no schedules yet.';
             } else {
@@ -251,8 +255,9 @@ export default function Chat({ onScheduleChange }: ChatProps) {
                 trashed: 'Trashed'
               };
               
+              // Show first 12 chars of ID in format AI can use: take first 12 chars and add remaining dashes
               resultContent = `You currently have ${result.data.length} schedule${result.data.length > 1 ? 's' : ''}:\n${result.data.map((s: any, idx: number) => 
-                `${idx + 1}. "${s.label}" (${statusMap[s.status] || s.status})`
+                `${idx + 1}. "${s.label}" (${statusMap[s.status] || s.status}) [${s.id}]`
               ).join('\n')}`;
             }
           } else if (name === 'deleteSchedule') {
@@ -273,6 +278,25 @@ export default function Chat({ onScheduleChange }: ChatProps) {
           } else if (name === 'trashSchedule') {
             resultContent = '✓ Schedule moved to trash';
             scheduleModified = true;
+          } else if (name === 'listTrashedSchedules' && Array.isArray(result.data)) {
+            if (result.data.length === 0) {
+              resultContent = 'Your trash is empty. No schedules have been deleted.';
+            } else {
+              const statusMap: Record<string, string> = {
+                draft: 'Draft',
+                collecting: 'Active',
+                archived: 'Archived',
+                trashed: 'Trashed'
+              };
+              
+              // Build list internally but DON'T show to user - only AI needs it
+              resultContent = `Trashed schedules:\n${result.data.map((s: any, idx: number) => 
+                `${idx + 1}. "${s.label}" (${statusMap[s.status] || s.status}) [${s.id}]`
+              ).join('\n')}`;
+            }
+          } else if (name === 'recoverSchedule') {
+            resultContent = '✓ Schedule restored successfully';
+            scheduleModified = true;
           } else {
             resultContent = '✓ Action completed successfully';
           }
@@ -280,24 +304,12 @@ export default function Chat({ onScheduleChange }: ChatProps) {
           resultContent = `✗ Error: ${result.error}`;
         }
 
-        const resultMessage: ChatMessage = {
-          id: (Date.now() + 3).toString(),
-          role: 'assistant',
-          content: resultContent,
-          timestamp: new Date(),
-        };
-        setMessages((prev) => [...prev, resultMessage]);
+        // AUTO-CONTINUE: Skip adding list results to UI - only AI needs them internally
+        const shouldAutoContinue = (name === 'listSchedules' || name === 'listTrashedSchedules') 
+          && result.success && Array.isArray(result.data) && result.data.length > 0;
 
-        // Trigger schedule refresh callback if schedules were modified
-        if (scheduleModified && onScheduleChange) {
-          setTimeout(() => onScheduleChange(), 100);
-        }
-
-        // AUTO-CONTINUE: Feed the result back to AI so it can continue the workflow
-        // This allows multi-step operations like "delete all" to work seamlessly
-        if (name === 'listSchedules' && result.success && Array.isArray(result.data) && result.data.length > 0) {
-          // After listing schedules, let the AI continue the conversation
-          // We'll send the result as a system message back to the AI
+        if (shouldAutoContinue) {
+          // Don't add this message to UI - AI will continue with a cleaner response
           setTimeout(async () => {
             try {
               setLoading(true);
@@ -354,6 +366,20 @@ export default function Chat({ onScheduleChange }: ChatProps) {
               setLoading(false);
             }
           }, 500); // Small delay to let UI update
+        } else {
+          // Add result message to UI for non-auto-continue cases
+          const resultMessage: ChatMessage = {
+            id: (Date.now() + 3).toString(),
+            role: 'assistant',
+            content: resultContent,
+            timestamp: new Date(),
+          };
+          setMessages((prev) => [...prev, resultMessage]);
+
+          // Trigger schedule refresh if schedules were modified
+          if (scheduleModified && onScheduleChange) {
+            setTimeout(() => onScheduleChange(), 100);
+          }
         }
       }
     } catch (error) {
@@ -376,9 +402,7 @@ export default function Chat({ onScheduleChange }: ChatProps) {
     <div style={styles.container}>
       {/* Header */}
       <div style={styles.header}>
-        <div style={styles.headerIcon}>
-          <Bot size={20} color="white" />
-        </div>
+        <img src={ariaProfile} alt="Aria" style={styles.headerIcon} />
         <h3 style={styles.headerText}>Chat with Aria</h3>
       </div>
 
@@ -386,9 +410,7 @@ export default function Chat({ onScheduleChange }: ChatProps) {
       <div style={styles.messagesContainer}>
         {messages.length === 0 ? (
           <div style={styles.emptyState}>
-            <div style={styles.emptyStateIcon}>
-              <Bot size={48} color="#d1d5db" />
-            </div>
+            <img src={ariaProfile} alt="Aria" style={{ width: '64px', height: '64px', borderRadius: '50%', objectFit: 'cover', marginBottom: '1rem' }} />
             <h4 style={styles.emptyStateTitle}>Start a conversation with Aria</h4>
             <p style={styles.emptyStateText}>
               Ask me to help you create schedules, place students, or manage your lessons.
@@ -409,10 +431,10 @@ export default function Chat({ onScheduleChange }: ChatProps) {
                 <div
                   style={{
                     ...styles.avatar,
-                    ...(message.role === 'user' ? styles.userAvatar : styles.assistantAvatar),
+                    ...(message.role === 'user' ? styles.userAvatar : {}),
                   }}
                 >
-                  {message.role === 'user' ? <User size={16} /> : <Bot size={16} />}
+                  {message.role === 'user' ? <User size={16} /> : <img src={ariaProfile} alt="Aria" style={styles.assistantAvatarImage} />}
                 </div>
                 <div
                   style={{
@@ -426,9 +448,7 @@ export default function Chat({ onScheduleChange }: ChatProps) {
             ))}
             {loading && (
               <div style={{ ...styles.messageWrapper, ...styles.assistantMessageWrapper }}>
-                <div style={{ ...styles.avatar, ...styles.assistantAvatar }}>
-                  <Bot size={16} />
-                </div>
+                <img src={ariaProfile} alt="Aria" style={styles.assistantAvatarImage} />
                 <div style={{ ...styles.messageBubble, ...styles.assistantBubble }}>
                   <Loader2 size={16} style={{ animation: 'spin 1s linear infinite' }} />
                   <style>

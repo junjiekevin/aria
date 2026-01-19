@@ -93,22 +93,39 @@ export async function sendChatMessage(
 
     const assistantMessage = data.choices[0].message.content;
 
-    // Check if the response contains a function call (JSON format)
-    // Pattern: The AI will respond with FUNCTION_CALL: {...json...}
-    const functionCallMatch = assistantMessage.match(/FUNCTION_CALL:\s*(\{[\s\S]*?\})\s*$/);
+    // Check if the response contains a function call
+    // Supports two formats:
+    // 1. FUNCTION_CALL: {...json...} (preferred)
+    // 2. <tool_call>{...json...}</tool_call> (alternative)
+    const functionCallPatterns = [
+      { regex: /FUNCTION_CALL:\s*(\{[\s\S]*?\})\s*$/, key: 'FUNCTION_CALL' },
+      { regex: /<tool_call>\s*(\{[\s\S]*?\})\s*<\/tool_call>/, key: 'tool_call' },
+    ];
+
+    let functionCallMatch = null;
+    let matchedPattern = null;
+
+    for (const pattern of functionCallPatterns) {
+      functionCallMatch = assistantMessage.match(pattern.regex);
+      if (functionCallMatch) {
+        matchedPattern = pattern.key;
+        break;
+      }
+    }
     
     if (functionCallMatch) {
       try {
-        // Clean up the JSON string - remove any extra whitespace/newlines
         const jsonString = functionCallMatch[1].trim();
-        console.log('Attempting to parse:', jsonString); // Debug
+        console.log(`Attempting to parse (${matchedPattern}):`, jsonString);
         
         const functionCall = JSON.parse(jsonString);
         
-        // Extract the text response (everything before FUNCTION_CALL)
-        const textResponse = assistantMessage.split('FUNCTION_CALL:')[0].trim();
+        const textResponse = assistantMessage
+          .replace(/FUNCTION_CALL:\s*\{[\s\S]*?\}\s*$/, '')
+          .replace(/<tool_call>\s*\{[\s\S]*?\}\s*<\/tool_call>/, '')
+          .trim();
         
-        console.log('Successfully parsed function call:', functionCall); // Debug
+        console.log('Successfully parsed function call:', functionCall);
         
         return {
           message: textResponse || 'Executing action...',
@@ -119,14 +136,16 @@ export async function sendChatMessage(
         };
       } catch (parseError) {
         console.error('Failed to parse function call:', parseError);
-        console.error('Raw match:', functionCallMatch[1]); // Debug
-        // If parsing fails, just return the message
-        return { message: assistantMessage };
+        return {
+          message: assistantMessage,
+          functionCall: undefined,
+        };
       }
     }
 
     return {
       message: assistantMessage,
+      functionCall: undefined,
     };
   } catch (error) {
     console.error('Error calling OpenRouter:', error);
@@ -170,32 +189,38 @@ FUNCTION_CALL: {"name": "deleteSchedule", "arguments": {"schedule_id": "abc123"}
 - createSchedule: {"label": "string", "start_date": "YYYY-MM-DD", "end_date": "YYYY-MM-DD"} (for ONE schedule)
 - createMultipleSchedules: {"schedules": [{"label": "...", "start_date": "...", "end_date": "..."}]} (for 2+ schedules at once)
 - listSchedules: {} (shows only non-trashed schedules)
-- listAllSchedules: {} (shows ALL schedules including trashed)
+- listTrashedSchedules: {} (shows ONLY trashed/deleted schedules)
 - deleteSchedule: {"schedule_id": "string"} (moves ONE schedule to trash, recoverable within 30 days)
 - deleteAllSchedules: {} (moves ALL schedules to trash, recoverable within 30 days)
 - recoverSchedule: {"schedule_id": "string"} (restores a trashed schedule to its previous status)
-- permanentDeleteSchedule: {"schedule_id": "string"} (permanently deletes, CANNOT be recovered)
-- permanentDeleteAllTrashed: {} (empties trash, permanently deletes all trashed schedules)
 - updateSchedule: {"schedule_id": "string", "label": "string"} (label optional)
 - activateSchedule: {"schedule_id": "string"}
 - archiveSchedule: {"schedule_id": "string"}
 
 ## Trash and Recovery:
 - Schedules moved to trash are recoverable within 30 days
-- After 30 days, trashed schedules are automatically permanently deleted
+- After 30 days, trashed schedules are automatically permanently deleted (handled automatically by system)
 - Users can restore trashed schedules to their previous status at any time
-- Always mention that deleted schedules can be recovered when confirming deletions
+- Note: Permanent deletion is ONLY available manually through the UI, AI cannot perform hard deletes
 
 ## Important Rules:
 - ALWAYS use YYYY-MM-DD format for dates (e.g., "2026-03-01" not "March 1, 2026")
 - When creating schedules, extract dates from natural language (e.g., "March 1, 2026" → "2026-03-01")
 - When user asks to create MULTIPLE schedules (2 or more), use createMultipleSchedules with all schedules in one call
-- When user asks to "delete all" and you've already shown them the list:
-  * Simply ask: "Would you like me to delete all X schedules?"
-  * Wait for them to say "yes", "confirm", or similar before calling deleteAllSchedules
+- When user asks about TRASHED or DELETED schedules, use listTrashedSchedules (NOT listSchedules)
+- When user asks to delete, update, or recover a SPECIFIC schedule (by name):
+  1. Call listSchedules for active schedules OR listTrashedSchedules for trashed schedules
+  2. Find the schedule that MATCHES or PARTIALLY MATCHES the user's request
+  3. Extract the EXACT UUID from the brackets in the response (format: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx)
+  4. Call the appropriate function IMMEDIATELY with the exact UUID
+  5. If NO schedules match, say "No schedules found matching '[user's request]'. What would you like to do next?"
+- CRITICAL: You MUST extract and use the EXACT UUID from the brackets. Examples:
+  * Response: '1. "Summer 2026 Voice" (Draft) [bdb3258e-8e85-41a9-bba3-2459a4c9e11d]'
+  * Extract: bdb3258e-8e85-41a9-bba3-2459a4c9e11d (36 characters with dashes)
+  * Use exactly: {"schedule_id": "bdb3258e-8e85-41a9-bba3-2459a4c9e11d"}
+- When user asks to "delete all" schedules, call deleteAllSchedules directly
 - NEVER show your reasoning or thinking process to the user
 - NEVER show schedule IDs to users
-- You can only call ONE function per response
 - Keep responses SHORT and conversational
 
 Remember: You're helping busy teachers. Be concise and professional.`;

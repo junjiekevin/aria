@@ -1,7 +1,7 @@
 // src/pages/DashboardPage.tsx
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { getAllSchedules, type Schedule, deleteSchedule, restoreSchedule, permanentDeleteAllTrashed } from '../lib/api/schedules';
+import { getAllSchedules, type Schedule, deleteSchedule, restoreSchedule, permanentDeleteAllTrashed, updateSchedule } from '../lib/api/schedules';
 import { supabase } from '../lib/supabase';
 import { Plus, Calendar, Clock, Archive, Trash2, FileText, RotateCcw, AlertTriangle, XCircle } from 'lucide-react';
 import Chat from '../components/Chat';
@@ -91,10 +91,10 @@ const styles = {
 		margin: '0 auto',
 		padding: '2rem 1.5rem'
 	},
-	grid: {
-		display: 'grid',
-		gap: '1.5rem',
-		gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))'
+	list: {
+		display: 'flex',
+		flexDirection: 'column' as const,
+		gap: '1rem'
 	},
 	twoColumnLayout: {
 		display: 'grid',
@@ -149,6 +149,7 @@ function ScheduleCard({
 	onEdit, 
 	onTrash,
 	onRecover,
+	onRename,
 	isTrashed = false 
 }: { 
 	schedule: Schedule; 
@@ -156,8 +157,13 @@ function ScheduleCard({
 	onEdit: () => void;
 	onTrash?: (schedule: Schedule) => void;
 	onRecover?: (schedule: Schedule) => void;
+	onRename?: (schedule: Schedule, newLabel: string) => void;
 	isTrashed?: boolean;
 }) {
+	const [isEditingName, setIsEditingName] = useState(false);
+	const [editingName, setEditingName] = useState(schedule.label);
+	const nameInputRef = useRef<HTMLInputElement>(null);
+
 	const formatDate = (dateString: string) => {
 		const date = new Date(dateString);
 		return date.toLocaleDateString("en-US", {
@@ -165,6 +171,35 @@ function ScheduleCard({
 			day: "numeric", 
 			year: "numeric",
 		});
+	};
+
+	const handleNameClick = () => {
+		if (!isTrashed && onRename) {
+			setIsEditingName(true);
+			setEditingName(schedule.label);
+			setTimeout(() => nameInputRef.current?.focus(), 50);
+		}
+	};
+
+	const handleNameBlur = () => {
+		if (isEditingName) {
+			setIsEditingName(false);
+			const trimmedName = editingName.trim();
+			if (trimmedName && trimmedName !== schedule.label) {
+				onRename?.(schedule, trimmedName);
+			} else {
+				setEditingName(schedule.label);
+			}
+		}
+	};
+
+	const handleNameKeyDown = (e: React.KeyboardEvent) => {
+		if (e.key === 'Enter') {
+			handleNameBlur();
+		} else if (e.key === 'Escape') {
+			setIsEditingName(false);
+			setEditingName(schedule.label);
+		}
 	};
 
 	return (
@@ -188,10 +223,56 @@ function ScheduleCard({
 			<div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
 				<div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '1rem' }}>
 					<div style={{ flex: 1 }}>
-						<h3 style={{ fontSize: '1.25rem', fontWeight: '600', color: isTrashed ? '#6b7280' : '#111827', margin: '0 0 0.5rem 0' }}>
-							{schedule.label}
-							{isTrashed && <span style={{ fontSize: '0.75rem', fontWeight: 'normal', marginLeft: '0.5rem', color: '#9ca3af' }}>(Trashed)</span>}
-						</h3>
+						{isEditingName ? (
+							<input
+								ref={nameInputRef}
+								type="text"
+								value={editingName}
+								onChange={(e) => setEditingName(e.target.value)}
+								onBlur={handleNameBlur}
+								onKeyDown={handleNameKeyDown}
+								style={{
+									fontSize: '1.25rem',
+									fontWeight: '600',
+									color: '#111827',
+									margin: '0 0 0.5rem 0',
+									padding: '0.25rem 0.5rem',
+									border: '1px solid #f97316',
+									borderRadius: '0.375rem',
+									width: '100%',
+									maxWidth: '300px',
+									outline: 'none',
+								}}
+							/>
+						) : (
+							<h3
+								onClick={handleNameClick}
+								style={{
+									fontSize: '1.25rem',
+									fontWeight: '600',
+									color: isTrashed ? '#6b7280' : '#111827',
+									margin: '0 0 0.5rem 0',
+									cursor: isTrashed ? 'default' : 'pointer',
+									transition: 'color 0.2s',
+								}}
+								onMouseEnter={(e) => {
+									if (!isTrashed) {
+										e.currentTarget.style.color = '#f97316';
+									}
+								}}
+								onMouseLeave={(e) => {
+									if (!isTrashed) {
+										e.currentTarget.style.color = '#111827';
+									}
+								}}
+							>
+								{schedule.label}
+								{isTrashed && <span style={{ fontSize: '0.75rem', fontWeight: 'normal', marginLeft: '0.5rem', color: '#9ca3af' }}>(Trashed)</span>}
+								{!isTrashed && onRename && (
+									<span style={{ fontSize: '0.75rem', fontWeight: 'normal', marginLeft: '0.5rem', color: '#9ca3af', opacity: 0 }}>(rename)</span>
+								)}
+							</h3>
+						)}
 						<div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: isTrashed ? '#9ca3af' : '#6b7280' }}>
 							<Calendar size={20} />
 							<span>{formatDate(schedule.start_date)} – {formatDate(schedule.end_date)}</span>
@@ -374,6 +455,16 @@ export default function DashboardPage() {
 	const handleEditSchedule = (schedule: Schedule) => {
 		setSelectedSchedule(schedule);
 		setShowEditModal(true);
+	};
+
+	const handleRename = async (schedule: Schedule, newLabel: string) => {
+		try {
+			await updateSchedule(schedule.id, { label: newLabel });
+			showToast(`Renamed to "${newLabel}"`, 'success');
+			loadSchedules();
+		} catch (err) {
+			showToast(err instanceof Error ? err.message : 'Failed to rename', 'error');
+		}
 	};
 
 	const handleScheduleCreated = () => {
@@ -649,10 +740,9 @@ export default function DashboardPage() {
 									)}
 								</div>
 							) : (
-								<div style={styles.grid}>
+								<div style={styles.list}>
 									{filter === 'trashed' && (
 										<div style={{
-											gridColumn: '1 / -1',
 											display: 'flex',
 											justifyContent: 'flex-end',
 											paddingBottom: '0.5rem',
@@ -687,6 +777,7 @@ export default function DashboardPage() {
 											onEdit={() => handleEditSchedule(schedule)}
 											onTrash={handleTrashClick}
 											onRecover={handleRecover}
+											onRename={handleRename}
 											isTrashed={schedule.status === 'trashed'}
 										/>
 									))}
@@ -697,7 +788,7 @@ export default function DashboardPage() {
 				</div>
 
 				{/* Right column: Chat */}
-				<div>
+				<div style={{ position: 'sticky', top: '100px' }}>
 					<Chat onScheduleChange={loadSchedules} />
 				</div>
 			</div>

@@ -409,6 +409,9 @@ export async function permanentDeleteAllTrashed() {
 
 // Helper function to validate status transitions
 function validateStatusTransition(currentStatus: string, newStatus: string): boolean {
+    // Same status transition is always valid (allows editing same schedule)
+    if (currentStatus === newStatus) return true;
+    
     const validTransitions: Record<string, string[]> = {
         draft: ['collecting', 'trashed'],
         collecting: ['archived', 'trashed'],
