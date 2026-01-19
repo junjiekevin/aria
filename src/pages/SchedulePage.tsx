@@ -1,11 +1,12 @@
 // src/pages/SchedulePage.tsx
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Calendar, Users, ChevronLeft, ChevronRight, Plus } from 'lucide-react';
+import { ArrowLeft, Calendar, Users, ChevronLeft, ChevronRight, Trash2 } from 'lucide-react';
 import { getSchedule, updateSchedule, type Schedule } from '../lib/api/schedules';
 import { getScheduleEntries, updateScheduleEntry, deleteScheduleEntry, type ScheduleEntry } from '../lib/api/schedule-entries';
-import { getFormResponses, type FormResponse } from '../lib/api/form-responses';
+import { getFormResponses, deleteFormResponse, type FormResponse } from '../lib/api/form-responses';
 import AddEventModal from '../components/AddEventModal';
+import Modal from '../components/Modal';
 import AddParticipantModal from '../components/AddParticipantModal';
 import ParticipantDetailsModal from '../components/ParticipantDetailsModal';
 import SchedulingPreviewModal from '../components/SchedulingPreviewModal';
@@ -217,6 +218,7 @@ export default function SchedulePage() {
   // Participant modal states
   const [showAddParticipantModal, setShowAddParticipantModal] = useState(false);
   const [selectedParticipant, setSelectedParticipant] = useState<FormResponse | null>(null);
+  const [participantToDelete, setParticipantToDelete] = useState<FormResponse | null>(null);
   
   // Scheduling preview modal state
   const [showSchedulingPreview, setShowSchedulingPreview] = useState(false);
@@ -1205,54 +1207,70 @@ export default function SchedulePage() {
                   </span>
                 )}
               </h3>
-              <button
-                onClick={() => setShowAddParticipantModal(true)}
-                style={{
-                  marginLeft: 'auto',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.25rem',
-                  padding: '0.35rem 0.6rem',
-                  backgroundColor: '#f97316',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '0.375rem',
-                  cursor: 'pointer',
-                  fontSize: '0.75rem',
-                  fontWeight: '500',
-                }}
-                onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#ea580c'; }}
-                onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = '#f97316'; }}
-              >
-                <Plus size={14} />
-                Add
-              </button>
+              {getUnassignedStudents().length > 0 && (
+                <button
+                  onClick={() => setShowSchedulingPreview(true)}
+                  style={{
+                    marginLeft: 'auto',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.25rem',
+                    padding: '0.35rem 0.6rem',
+                    backgroundColor: '#22c55e',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '0.375rem',
+                    cursor: 'pointer',
+                    fontSize: '0.75rem',
+                    fontWeight: '500',
+                  }}
+                  onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#16a34a'; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = '#22c55e'; }}
+                >
+                  Schedule
+                </button>
+              )}
             </div>
             {getUnassignedStudents().length === 0 ? (
               <div style={styles.emptyState}>
-                No student responses yet
+                No unassigned events
               </div>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                 {getUnassignedStudents().map((response) => (
                   <div
                     key={response.id}
-                    onClick={() => setSelectedParticipant(response)}
                     style={{
                       padding: '0.6rem 0.75rem',
                       backgroundColor: '#fef3c7',
                       borderRadius: '0.5rem',
                       border: '1px solid #fde68a',
                       fontSize: '0.875rem',
-                      cursor: 'pointer',
-                      transition: 'all 0.2s',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
                     }}
-                    onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#fde68a'; e.currentTarget.style.borderColor = '#fbbf24'; }}
-                    onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = '#fef3c7'; e.currentTarget.style.borderColor = '#fde68a'; }}
                   >
-                    <div style={{ fontWeight: '600', color: '#92400e' }}>
-                      {response.student_name}
+                    <div
+                      onClick={() => setSelectedParticipant(response)}
+                      style={{
+                        cursor: 'pointer',
+                        flex: 1,
+                      }}
+                      onMouseEnter={(e) => { e.currentTarget.parentElement!.style.backgroundColor = '#fde68a'; e.currentTarget.parentElement!.style.borderColor = '#fbbf24'; }}
+                      onMouseLeave={(e) => { e.currentTarget.parentElement!.style.backgroundColor = '#fef3c7'; e.currentTarget.parentElement!.style.borderColor = '#fde68a'; }}
+                    >
+                      <div style={{ fontWeight: '600', color: '#92400e' }}>
+                        {response.student_name}
+                      </div>
                     </div>
+                    <Trash2
+                      size={16}
+                      style={{ color: '#9ca3af', cursor: 'pointer' }}
+                      onClick={() => setParticipantToDelete(response)}
+                      onMouseEnter={(e) => { e.currentTarget.style.color = '#dc2626'; }}
+                      onMouseLeave={(e) => { e.currentTarget.style.color = '#9ca3af'; }}
+                    />
                   </div>
                 ))}
               </div>
@@ -1299,10 +1317,6 @@ export default function SchedulePage() {
           isOpen={!!selectedParticipant}
           onClose={() => setSelectedParticipant(null)}
           participant={selectedParticipant}
-          onScheduleWithAria={() => {
-            setSelectedParticipant(null);
-            setShowSchedulingPreview(true);
-          }}
         />
       )}
 
@@ -1318,6 +1332,58 @@ export default function SchedulePage() {
           loadScheduleData();
         }}
       />
+
+      {/* Delete Confirmation Modal */}
+      <Modal
+        isOpen={!!participantToDelete}
+        onClose={() => setParticipantToDelete(null)}
+        title="Delete Unassigned Event"
+        maxWidth="30rem"
+      >
+        <div style={{ padding: '1rem 0' }}>
+          <p style={{ color: '#374151', marginBottom: '1.5rem' }}>
+            Delete <strong>{participantToDelete?.student_name}</strong> from unassigned events? This cannot be undone.
+          </p>
+          <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end' }}>
+            <button
+              onClick={() => setParticipantToDelete(null)}
+              style={{
+                padding: '0.5rem 1rem',
+                backgroundColor: 'white',
+                color: '#374151',
+                border: '1px solid #d1d5db',
+                borderRadius: '0.5rem',
+                cursor: 'pointer',
+              }}
+            >
+              Cancel
+            </button>
+            <button
+              onClick={async () => {
+                if (participantToDelete) {
+                  try {
+                    await deleteFormResponse(participantToDelete.id);
+                    setResponses(responses.filter(r => r.id !== participantToDelete.id));
+                    setParticipantToDelete(null);
+                  } catch (err) {
+                    console.error('Failed to delete:', err);
+                  }
+                }
+              }}
+              style={{
+                padding: '0.5rem 1rem',
+                backgroundColor: '#dc2626',
+                color: 'white',
+                border: 'none',
+                borderRadius: '0.5rem',
+                cursor: 'pointer',
+              }}
+            >
+              Delete
+            </button>
+          </div>
+        </div>
+      </Modal>
 
       {/* Drag Overlay for smooth ghost */}
       <DragOverlay>

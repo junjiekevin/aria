@@ -15,7 +15,6 @@ interface ParticipantDetailsModalProps {
     isOpen: boolean;
     onClose: () => void;
     participant: FormResponse;
-    onScheduleWithAria: (participant: FormResponse) => void;
 }
 
 const styles = {
@@ -81,11 +80,6 @@ const styles = {
         transition: 'all 0.2s',
         border: 'none',
     },
-    primaryButton: {
-        backgroundColor: '#f97316',
-        color: 'white',
-        flex: 1,
-    },
     secondaryButton: {
         backgroundColor: 'white',
         color: '#374151',
@@ -119,7 +113,6 @@ export default function ParticipantDetailsModal({
     isOpen,
     onClose,
     participant,
-    onScheduleWithAria,
 }: ParticipantDetailsModalProps) {
     const timings = getPreferredTimings(participant);
 
@@ -165,16 +158,8 @@ export default function ParticipantDetailsModal({
                 {/* Actions */}
                 <div style={styles.buttonGroup}>
                     <button
-                        onClick={() => onScheduleWithAria(participant)}
-                        style={{ ...styles.button, ...styles.primaryButton }}
-                        onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#ea580c'; }}
-                        onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = '#f97316'; }}
-                    >
-                        Schedule with Aria
-                    </button>
-                    <button
                         onClick={onClose}
-                        style={{ ...styles.button, ...styles.secondaryButton }}
+                        style={{ ...styles.button, ...styles.secondaryButton, flex: 1 }}
                         onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#f9fafb'; }}
                         onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'white'; }}
                     >
