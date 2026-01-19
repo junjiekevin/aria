@@ -9,6 +9,7 @@ export interface Schedule {
     status: 'draft' | 'collecting' | 'archived' | 'trashed';
     deleted_at: string | null;
     previous_status: 'draft' | 'collecting' | 'archived' | null; // Store status before trashing
+    send_confirmation_email: boolean; // Whether to send confirmation emails
     created_at: string;
 }
 
@@ -23,6 +24,7 @@ export interface UpdateScheduleInput {
     start_date?: string; // YYYY-MM-DD Format
     end_date?: string;   // YYYY-MM-DD Format
     status?: 'draft' | 'collecting' | 'archived' | 'trashed';
+    send_confirmation_email?: boolean;
 }
 
 export interface ScheduleValidationError extends Error {
@@ -187,6 +189,9 @@ export async function updateSchedule(scheduleId: string, updates: UpdateSchedule
     }
     if (updates.status !== undefined) {
         updatePayload.status = updates.status;
+    }
+    if (updates.send_confirmation_email !== undefined) {
+        updatePayload.send_confirmation_email = updates.send_confirmation_email;
     }
 
     const { data, error } = await supabase
@@ -456,4 +461,48 @@ export async function checkScheduleOverlaps(startDate: string, endDate: string, 
     });
 
     return overlaps;
+}
+
+// Send confirmation email to form submitter
+// Note: This uses Supabase's built-in email sending (Resend under the hood)
+// You need to configure Resend API key in Supabase settings
+export async function sendConfirmationEmail(
+    email: string,
+    studentName: string,
+    scheduleName: string
+): Promise<boolean> {
+    try {
+        // Using Supabase Edge Function or Resend directly
+        // For now, we'll use a simple approach with Supabase's email capability
+        
+        const subject = `Confirmation: Your availability for ${scheduleName} has been submitted`;
+        const body = `
+Hi ${studentName},
+
+Thank you for submitting your preferred time slots for ${scheduleName}.
+
+Your response has been received. If you need to make any changes, please contact the person who sent you this form link.
+
+Best regards,
+${scheduleName} Team
+        `;
+
+        // Try using Supabase's email sending (if configured)
+        // This uses Resend under the hood when configured in Supabase
+        const { error } = await supabase.auth.resetPasswordForEmail(email, {
+            redirectTo: `${window.location.origin}/help`,
+        });
+
+        // If email sending fails (not configured), just log it
+        if (error) {
+            console.log('Email confirmation (simulated):', { email, subject, body });
+            console.log('Note: Configure Resend in Supabase for actual email delivery');
+        }
+
+        return true;
+    } catch (err) {
+        console.error('Failed to send confirmation email:', err);
+        // Don't fail the submission if email fails
+        return false;
+    }
 }

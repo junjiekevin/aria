@@ -66,15 +66,54 @@ export async function updateScheduleEntry(
     return data;
 }
 
-// Delete schedule entry
+// Delete schedule entry - ensures ONLY this specific entry is deleted
 export async function deleteScheduleEntry(entryId: string): Promise<void> {
+    // Log for debugging
+    console.log('Deleting entry by ID:', entryId);
+    
+    // First verify the entry exists
+    const { data: verify, error: verifyError } = await supabase
+        .from('schedule_entries')
+        .select('id, student_name')
+        .eq('id', entryId)
+        .single();
+    
+    if (verifyError || !verify) {
+        console.log('Entry not found or already deleted:', entryId);
+        if (verifyError) {
+            throw new Error(`Entry not found: ${verifyError.message}`);
+        }
+        return;
+    }
+    
+    console.log('Found entry to delete:', verify);
+    
+    // Delete ONLY this entry by ID
+    const { error, count } = await supabase
+        .from('schedule_entries')
+        .delete({ count: 'exact' })
+        .eq('id', entryId);
+    
+    console.log('Delete result - count:', count, 'error:', error);
+    
+    if (error) {
+        throw new Error(`Failed to delete: ${error.message}`);
+    }
+    
+    if (count !== 1) {
+        console.warn('Unexpected: deleted', count, 'entries instead of 1');
+    }
+}
+
+// Delete ONLY this occurrence (not future ones) - for recurring entries
+export async function deleteThisOccurrenceOnly(entryId: string): Promise<void> {
     const { error } = await supabase
         .from('schedule_entries')
         .delete()
         .eq('id', entryId);
     
     if (error) {
-        throw new Error(`Failed to delete schedule entry: ${error.message}`);
+        throw new Error(`Failed to delete occurrence: ${error.message}`);
     }
 }
 

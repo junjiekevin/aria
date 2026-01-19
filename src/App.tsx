@@ -16,7 +16,7 @@ const App = () => {
         <React.Suspense fallback={<div>Loading...</div>}>
             <Routes>
                 <Route path="/" element={<LandingPage />} />
-                <Route path="/form" element={<StudentFormPage />} />
+                <Route path="/form/:scheduleId" element={<StudentFormPage />} />
                 <Route path="/dashboard" element={<ProtectedRoute><DashboardPage /></ProtectedRoute>} />
                 <Route path="/schedule/:scheduleId" element={<ProtectedRoute><SchedulePage /></ProtectedRoute>} />
                 <Route path="/account" element={<ProtectedRoute><AccountPage /></ProtectedRoute>} />

@@ -1,9 +1,9 @@
 // src/pages/SchedulePage.tsx
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Calendar, Users, ChevronLeft, ChevronRight, Trash2 } from 'lucide-react';
+import { ArrowLeft, Calendar, Users, ChevronLeft, ChevronRight, Trash2, Copy, Check } from 'lucide-react';
 import { getSchedule, updateSchedule, type Schedule } from '../lib/api/schedules';
-import { getScheduleEntries, updateScheduleEntry, deleteScheduleEntry, deleteThisAndSubsequentEntries, type ScheduleEntry } from '../lib/api/schedule-entries';
+import { getScheduleEntries, createScheduleEntry, updateScheduleEntry, deleteScheduleEntry, deleteThisAndSubsequentEntries, type ScheduleEntry } from '../lib/api/schedule-entries';
 import { getFormResponses, deleteFormResponse, type FormResponse } from '../lib/api/form-responses';
 import AddEventModal from '../components/AddEventModal';
 import Modal from '../components/Modal';
@@ -190,6 +190,56 @@ const styles = {
     color: '#111827',
   },
 };
+
+function FormLink({ scheduleId }: { scheduleId: string }) {
+  const [copied, setCopied] = useState(false);
+  const formUrl = `${window.location.origin}/form/${scheduleId}`;
+
+  const copyToClipboard = async () => {
+    try {
+      await navigator.clipboard.writeText(formUrl);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch (err) {
+      console.error('Failed to copy:', err);
+    }
+  };
+
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+      <input
+        readOnly
+        value={formUrl}
+        style={{
+          flex: 1,
+          padding: '0.5rem 0.75rem',
+          border: '1px solid #d1d5db',
+          borderRadius: '0.375rem',
+          fontSize: '0.75rem',
+          backgroundColor: '#f9fafb',
+          color: '#6b7280',
+        }}
+      />
+      <button
+        onClick={copyToClipboard}
+        style={{
+          padding: '0.5rem',
+          backgroundColor: copied ? '#22c55e' : '#f97316',
+          color: 'white',
+          border: 'none',
+          borderRadius: '0.375rem',
+          cursor: 'pointer',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          transition: 'background-color 0.2s',
+        }}
+      >
+        {copied ? <Check size={16} /> : <Copy size={16} />}
+      </button>
+    </div>
+  );
+}
 
 export default function SchedulePage() {
   // Sensor configuration - must be inside component
@@ -587,11 +637,88 @@ export default function SchedulePage() {
 
     if (!over || !schedule) return;
 
+    const dropId = over.id as string;
+    
+    // Check if dragging an unassigned card
+    if (typeof active.id === 'string' && active.id.startsWith('unassigned-')) {
+      const responseId = active.id.replace('unassigned-', '');
+      const response = responses.find(r => r.id === responseId);
+      
+      if (!response || !dropId.startsWith('slot-')) return;
+      
+      // Dropped unassigned card on empty slot - create new entry
+      const [, day, hourStr] = dropId.split('-');
+      const hour = parseInt(hourStr);
+      
+      // Calculate times
+      const scheduleStart = new Date(schedule.start_date);
+      const dayIndex = DAYS.indexOf(day);
+      const currentDay = scheduleStart.getDay();
+      let daysToAdd = dayIndex - currentDay;
+      if (daysToAdd < 0) daysToAdd += 7;
+      
+      const firstOccurrence = new Date(scheduleStart);
+      firstOccurrence.setDate(scheduleStart.getDate() + daysToAdd);
+      firstOccurrence.setHours(hour, 0, 0, 0);
+      
+      // Use the first preferred timing to determine duration
+      const preferredStart = response.preferred_1_start;
+      const preferredEnd = response.preferred_1_end;
+      
+      if (preferredStart && preferredEnd) {
+        const [startH, startM] = preferredStart.split(':').map(Number);
+        const [endH, endM] = preferredEnd.split(':').map(Number);
+        const durationMs = (endH * 60 + endM) - (startH * 60 + startM);
+        
+        const newEnd = new Date(firstOccurrence.getTime() + durationMs * 60 * 1000);
+        
+        // Check for overlaps
+        const overlappingEntry = entries.find(entry => {
+          const entryStart = new Date(entry.start_time);
+          const entryEnd = new Date(entry.end_time);
+          
+          if (entryStart.getDay() !== dayIndex) return false;
+          
+          return (firstOccurrence < entryEnd && newEnd > entryStart);
+        });
+        
+        if (overlappingEntry) {
+          alert(`Cannot schedule - slot conflicts with "${overlappingEntry.student_name}" (${formatLocalTime(overlappingEntry.start_time)} - ${formatLocalTime(overlappingEntry.end_time)})`);
+          return;
+        }
+        
+        const dayAbbrev = ['SU', 'MO', 'TU', 'WE', 'TH', 'FR', 'SA'][dayIndex];
+        const frequency = response.preferred_1_frequency || 'weekly';
+        const recurrenceRule = frequency === 'once' ? '' : 
+          frequency === '2weekly' ? `FREQ=2WEEKLY;BYDAY=${dayAbbrev}` :
+          frequency === 'monthly' ? `FREQ=WEEKLY;INTERVAL=4;BYDAY=${dayAbbrev}` :
+          `FREQ=WEEKLY;BYDAY=${dayAbbrev}`;
+        
+        try {
+          // Create new entry
+          const newEntry = await createScheduleEntry({
+            schedule_id: scheduleId!,
+            student_name: response.student_name,
+            start_time: firstOccurrence.toISOString(),
+            end_time: newEnd.toISOString(),
+            recurrence_rule: recurrenceRule,
+          });
+          
+          // Remove from unassigned
+          setResponses(responses.filter(r => r.id !== responseId));
+          
+          // Add to entries
+          setEntries([...entries, newEntry]);
+        } catch (err) {
+          console.error('Failed to create entry:', err);
+          alert('Failed to schedule event');
+        }
+      }
+      return;
+    }
+
     const draggedEntry = entries.find(e => e.id === active.id);
     if (!draggedEntry) return;
-
-    // Parse the drop target (format: "slot-day-hour" or "entry-id")
-    const dropId = over.id as string;
     
     if (dropId.startsWith('slot-')) {
       // Dropped on empty slot
@@ -798,40 +925,92 @@ export default function SchedulePage() {
      });
    };
 
-   // Draggable lesson block component
-  function DraggableLessonBlock({ entry, children }: { entry: ScheduleEntry; children: React.ReactNode }) {
-    const { attributes, listeners, setNodeRef } = useDraggable({
-      id: entry.id,
-      data: entry,
-    });
+    // Draggable lesson block component
+   function DraggableLessonBlock({ entry, children }: { entry: ScheduleEntry; children: React.ReactNode }) {
+     const { attributes, listeners, setNodeRef } = useDraggable({
+       id: entry.id,
+       data: entry,
+     });
 
-    // Hide the original element while dragging, show ghost in DragOverlay instead
-    const isBeingDragged = activeDragId === entry.id;
+     // Hide the original element while dragging, show ghost in DragOverlay instead
+     const isBeingDragged = activeDragId === entry.id;
 
-    return (
-      <div
-        ref={setNodeRef}
-        style={{
-          ...getLessonBlockStyle(entry),
-          opacity: isBeingDragged ? 0 : 1,
-          visibility: isBeingDragged ? 'hidden' : 'visible',
-          pointerEvents: isBeingDragged ? 'none' : 'auto',
-        }}
-        onClick={(e) => {
-          if (!isDragging) {
-            handleEntryClick(entry, e);
-          }
-        }}
-        {...attributes}
-        {...listeners}
-        onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#ea580c'; }}
-        onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = '#fb923c'; }}
-      >
-        {children}
-      </div>
-    );
-  }
+     return (
+       <div
+         ref={setNodeRef}
+         style={{
+           ...getLessonBlockStyle(entry),
+           opacity: isBeingDragged ? 0 : 1,
+           visibility: isBeingDragged ? 'hidden' : 'visible',
+           pointerEvents: isBeingDragged ? 'none' : 'auto',
+         }}
+         onClick={(e) => {
+           if (!isDragging) {
+             handleEntryClick(entry, e);
+           }
+         }}
+         {...attributes}
+         {...listeners}
+         onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#ea580c'; }}
+         onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = '#fb923c'; }}
+       >
+         {children}
+       </div>
+     );
+   }
 
+   // Draggable unassigned card component
+   function DraggableUnassignedCard({ response }: { response: FormResponse }) {
+     const { attributes, listeners, setNodeRef } = useDraggable({
+       id: `unassigned-${response.id}`,
+       data: { ...response, isUnassigned: true },
+     });
+
+     const isBeingDragged = activeDragId === `unassigned-${response.id}`;
+
+     return (
+       <div
+         ref={setNodeRef}
+         style={{
+           padding: '0.6rem 0.75rem',
+           backgroundColor: isBeingDragged ? '#fbbf24' : '#fef3c7',
+           borderRadius: '0.5rem',
+           border: `1px solid ${isBeingDragged ? '#f59e0b' : '#fde68a'}`,
+           fontSize: '0.875rem',
+           display: 'flex',
+           alignItems: 'center',
+           justifyContent: 'space-between',
+           opacity: isBeingDragged ? 0.5 : 1,
+           cursor: 'grab',
+         }}
+         {...attributes}
+         {...listeners}
+       >
+         <div
+           onClick={() => setSelectedParticipant(response)}
+           style={{
+             cursor: 'pointer',
+             flex: 1,
+           }}
+         >
+           <div style={{ fontWeight: '600', color: '#92400e' }}>
+             {response.student_name}
+           </div>
+         </div>
+         <Trash2
+           size={16}
+           style={{ color: '#9ca3af', cursor: 'pointer' }}
+           onClick={(e) => {
+             e.stopPropagation();
+             setParticipantToDelete(response);
+           }}
+           onMouseEnter={(e) => { e.currentTarget.style.color = '#dc2626'; }}
+           onMouseLeave={(e) => { e.currentTarget.style.color = '#9ca3af'; }}
+         />
+       </div>
+     );
+   }
+   
    function DroppableSlot({ children, day, hour }: { children: React.ReactNode; day: string; hour: number }) {
      const { setNodeRef: setSlotRef, isOver } = useDroppable({
        id: `slot-${day}-${hour}`,
@@ -1174,6 +1353,30 @@ export default function SchedulePage() {
                   {Math.ceil((new Date(schedule.end_date).getTime() - new Date(schedule.start_date).getTime()) / (1000 * 60 * 60 * 24 * 7))} weeks
                 </span>
               </div>
+              
+              {schedule.status === 'collecting' && (
+                <div style={{ marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid #e5e7eb' }}>
+                  <span style={{ color: '#6b7280', display: 'block', marginBottom: '0.5rem' }}>Form Link:</span>
+                  <FormLink scheduleId={scheduleId!} />
+                  
+                  <div style={{ marginTop: '1rem' }}>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
+                      <input
+                        type="checkbox"
+                        checked={schedule.send_confirmation_email || false}
+                        onChange={(e) => {
+                          updateSchedule(scheduleId!, { send_confirmation_email: e.target.checked });
+                          setSchedule({ ...schedule, send_confirmation_email: e.target.checked });
+                        }}
+                        style={{ width: '16px', height: '16px', accentColor: '#f97316' }}
+                      />
+                      <span style={{ fontSize: '0.8rem', color: '#374151' }}>
+                        Send confirmation emails
+                      </span>
+                    </label>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
 
@@ -1228,40 +1431,7 @@ export default function SchedulePage() {
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                 {getUnassignedStudents().map((response) => (
-                  <div
-                    key={response.id}
-                    style={{
-                      padding: '0.6rem 0.75rem',
-                      backgroundColor: '#fef3c7',
-                      borderRadius: '0.5rem',
-                      border: '1px solid #fde68a',
-                      fontSize: '0.875rem',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                    }}
-                  >
-                    <div
-                      onClick={() => setSelectedParticipant(response)}
-                      style={{
-                        cursor: 'pointer',
-                        flex: 1,
-                      }}
-                      onMouseEnter={(e) => { e.currentTarget.parentElement!.style.backgroundColor = '#fde68a'; e.currentTarget.parentElement!.style.borderColor = '#fbbf24'; }}
-                      onMouseLeave={(e) => { e.currentTarget.parentElement!.style.backgroundColor = '#fef3c7'; e.currentTarget.parentElement!.style.borderColor = '#fde68a'; }}
-                    >
-                      <div style={{ fontWeight: '600', color: '#92400e' }}>
-                        {response.student_name}
-                      </div>
-                    </div>
-                    <Trash2
-                      size={16}
-                      style={{ color: '#9ca3af', cursor: 'pointer' }}
-                      onClick={() => setParticipantToDelete(response)}
-                      onMouseEnter={(e) => { e.currentTarget.style.color = '#dc2626'; }}
-                      onMouseLeave={(e) => { e.currentTarget.style.color = '#9ca3af'; }}
-                    />
-                  </div>
+                  <DraggableUnassignedCard key={response.id} response={response} />
                 ))}
               </div>
             )}
@@ -1462,6 +1632,32 @@ export default function SchedulePage() {
       {/* Drag Overlay for smooth ghost */}
       <DragOverlay>
         {activeDragId && (() => {
+          // Check if it's an unassigned card
+          if (typeof activeDragId === 'string' && activeDragId.startsWith('unassigned-')) {
+            const responseId = activeDragId.replace('unassigned-', '');
+            const response = responses.find(r => r.id === responseId);
+            if (!response) return null;
+            return (
+              <div style={{
+                padding: '0.6rem 0.75rem',
+                backgroundColor: '#fbbf24',
+                borderRadius: '0.5rem',
+                border: '1px solid #f59e0b',
+                fontSize: '0.875rem',
+                opacity: 0.7,
+                cursor: 'grabbing',
+                zIndex: 9999,
+                position: 'fixed',
+                pointerEvents: 'none',
+              }}>
+                <div style={{ fontWeight: '600', color: '#92400e' }}>
+                  {response.student_name}
+                </div>
+              </div>
+            );
+          }
+          
+          // Regular schedule entry
           const entry = entries.find(e => e.id === activeDragId);
           if (!entry) return null;
           return (
