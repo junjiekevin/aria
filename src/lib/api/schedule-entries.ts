@@ -66,42 +66,78 @@ export async function updateScheduleEntry(
     return data;
 }
 
-// Delete schedule entry - ensures ONLY this specific entry is deleted
+// Delete schedule entry - for non-recurring: just delete
+// For recurring: delete this occurrence and create new entry starting next week
 export async function deleteScheduleEntry(entryId: string): Promise<void> {
-    // Log for debugging
     console.log('Deleting entry by ID:', entryId);
     
-    // First verify the entry exists
-    const { data: verify, error: verifyError } = await supabase
+    // First get the full entry
+    const { data: entry, error: fetchError } = await supabase
         .from('schedule_entries')
-        .select('id, student_name')
+        .select('*')
         .eq('id', entryId)
         .single();
     
-    if (verifyError || !verify) {
-        console.log('Entry not found or already deleted:', entryId);
-        if (verifyError) {
-            throw new Error(`Entry not found: ${verifyError.message}`);
-        }
+    if (fetchError || !entry) {
+        console.log('Entry not found or already deleted');
         return;
     }
     
-    console.log('Found entry to delete:', verify);
+    console.log('Found entry to delete:', entry);
     
-    // Delete ONLY this entry by ID
-    const { error, count } = await supabase
-        .from('schedule_entries')
-        .delete({ count: 'exact' })
-        .eq('id', entryId);
-    
-    console.log('Delete result - count:', count, 'error:', error);
-    
-    if (error) {
-        throw new Error(`Failed to delete: ${error.message}`);
-    }
-    
-    if (count !== 1) {
-        console.warn('Unexpected: deleted', count, 'entries instead of 1');
+    // Check if this is a recurring entry
+    if (entry.recurrence_rule && entry.recurrence_rule !== '') {
+        // For recurring entries: delete this one AND create new one starting next week
+        console.log('Recurring entry detected - will create replacement starting next week');
+        
+        const entryStart = new Date(entry.start_time);
+        const entryEnd = new Date(entry.end_time);
+        
+        // Create new entry starting 7 days later (next occurrence)
+        const nextStart = new Date(entryStart);
+        nextStart.setDate(nextStart.getDate() + 7);
+        
+        const nextEnd = new Date(entryEnd);
+        nextEnd.setDate(nextEnd.getDate() + 7);
+        
+        // Delete old entry
+        const { error: deleteError } = await supabase
+            .from('schedule_entries')
+            .delete()
+            .eq('id', entryId);
+        
+        if (deleteError) {
+            throw new Error(`Failed to delete: ${deleteError.message}`);
+        }
+        
+        // Create replacement entry (next week's occurrence)
+        const { error: createError } = await supabase
+            .from('schedule_entries')
+            .insert([{
+                schedule_id: entry.schedule_id,
+                student_name: entry.student_name,
+                start_time: nextStart.toISOString(),
+                end_time: nextEnd.toISOString(),
+                recurrence_rule: entry.recurrence_rule,
+            }]);
+        
+        if (createError) {
+            throw new Error(`Failed to create replacement entry: ${createError.message}`);
+        }
+        
+        console.log('Deleted this occurrence, created replacement starting:', nextStart);
+    } else {
+        // Non-recurring: just delete
+        const { error, count } = await supabase
+            .from('schedule_entries')
+            .delete({ count: 'exact' })
+            .eq('id', entryId);
+        
+        console.log('Delete result - count:', count, 'error:', error);
+        
+        if (error) {
+            throw new Error(`Failed to delete: ${error.message}`);
+        }
     }
 }
 
