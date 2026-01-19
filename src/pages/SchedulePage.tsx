@@ -923,7 +923,7 @@ export default function SchedulePage() {
     };
 
     const getEntriesForSlot = (day: string, hour: number) => {
-      return entries.filter(entry => {
+      const result = entries.filter(entry => {
         const shouldShow = isEntryInCurrentWeek(entry);
         if (!shouldShow) {
           return false;
@@ -947,6 +947,15 @@ export default function SchedulePage() {
         console.log('Showing', entry.student_name, 'on', occurrenceDate, 'at', hour);
         return true;
       });
+      
+      if (day === 'Wednesday' && hour === 15) {
+        console.log('Wednesday 3pm slot - entries count:', result.length);
+        console.log('All entries:', entries.map(e => e.student_name + ' ' + e.start_time));
+        console.log('WeekStart:', weekStart);
+        console.log('CurrentWeekOffset:', currentWeekOffset);
+      }
+      
+      return result;
     };
 
     // Draggable lesson block component
