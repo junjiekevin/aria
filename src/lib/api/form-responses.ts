@@ -1,18 +1,50 @@
 import { supabase } from "../supabase";
 
+export interface PreferredTiming {
+    day: string;      // 'Monday', 'Tuesday', etc.
+    start: string;    // HH:MM format
+    end: string;      // HH:MM format
+    frequency: string; // 'once', 'weekly', '2weekly', 'monthly'
+}
+
 export interface FormResponse {
     id: string;
     schedule_id: string;
     student_name: string;
     email: string;
     top_choices: string[]; // Array of ISO 8601 datetime strings
+    // Preferred timings (new)
+    preferred_1_day?: string;
+    preferred_1_start?: string;
+    preferred_1_end?: string;
+    preferred_1_frequency?: string;
+    preferred_2_day?: string;
+    preferred_2_start?: string;
+    preferred_2_end?: string;
+    preferred_2_frequency?: string;
+    preferred_3_day?: string;
+    preferred_3_start?: string;
+    preferred_3_end?: string;
+    preferred_3_frequency?: string;
 }
 
 export interface CreateFormResponseInput {
     schedule_id: string;
     student_name: string;
-    email: string;
-    top_choices: string[];
+    email?: string;
+    top_choices?: string[];
+    preferred_1_day?: string;
+    preferred_1_start?: string;
+    preferred_1_end?: string;
+    preferred_1_frequency?: string;
+    preferred_2_day?: string;
+    preferred_2_start?: string;
+    preferred_2_end?: string;
+    preferred_2_frequency?: string;
+    preferred_3_day?: string;
+    preferred_3_start?: string;
+    preferred_3_end?: string;
+    preferred_3_frequency?: string;
 }
 
 // Get all form responses for a schedule
@@ -54,4 +86,38 @@ export async function deleteFormResponse(responseId: string): Promise<void> {
     if (error) {
         throw new Error(`Failed to delete form response: ${error.message}`);
     }
+}
+
+// Get preferred timings as an array for a form response
+export function getPreferredTimings(response: FormResponse): PreferredTiming[] {
+    const timings: PreferredTiming[] = [];
+    
+    if (response.preferred_1_day && response.preferred_1_start && response.preferred_1_end) {
+        timings.push({
+            day: response.preferred_1_day,
+            start: response.preferred_1_start,
+            end: response.preferred_1_end,
+            frequency: response.preferred_1_frequency || 'weekly',
+        });
+    }
+    
+    if (response.preferred_2_day && response.preferred_2_start && response.preferred_2_end) {
+        timings.push({
+            day: response.preferred_2_day,
+            start: response.preferred_2_start,
+            end: response.preferred_2_end,
+            frequency: response.preferred_2_frequency || 'weekly',
+        });
+    }
+    
+    if (response.preferred_3_day && response.preferred_3_start && response.preferred_3_end) {
+        timings.push({
+            day: response.preferred_3_day,
+            start: response.preferred_3_start,
+            end: response.preferred_3_end,
+            frequency: response.preferred_3_frequency || 'weekly',
+        });
+    }
+    
+    return timings;
 }

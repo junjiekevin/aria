@@ -11,6 +11,7 @@ interface AddEventModalProps {
   initialDay?: string; // e.g., "Monday"
   initialHour?: number; // e.g., 14 (for 2 PM)
   scheduleStartDate: string; // YYYY-MM-DD
+  currentWeekStart?: string; // ISO date for calculating entry dates from current view week
   existingEntry?: ScheduleEntry | null; // If editing existing event
 }
 
@@ -105,14 +106,17 @@ export default function AddEventModal({
   initialDay,
   initialHour,
   scheduleStartDate,
+  currentWeekStart,
   existingEntry,
 }: AddEventModalProps) {
   const isEditMode = !!existingEntry;
   
   const [studentName, setStudentName] = useState('');
   const [day, setDay] = useState(initialDay || 'Sunday');
-  const [startTime, setStartTime] = useState('');
+  const [startHour, setStartHour] = useState('09');
+  const [startMinute, setStartMinute] = useState('00');
   const [duration, setDuration] = useState('60'); // minutes
+  const [frequency, setFrequency] = useState('weekly'); // once, weekly, 2weekly, monthly
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -132,11 +136,24 @@ export default function AddEventModal({
       // Set time
       const hours = startDate.getHours().toString().padStart(2, '0');
       const minutes = startDate.getMinutes().toString().padStart(2, '0');
-      setStartTime(`${hours}:${minutes}`);
+      setStartHour(hours);
+      setStartMinute(minutes);
       
       // Calculate duration
       const durationMinutes = (endDate.getTime() - startDate.getTime()) / (1000 * 60);
       setDuration(durationMinutes.toString());
+      
+      // Set frequency based on recurrence rule
+      const rule = existingEntry.recurrence_rule || '';
+      if (!rule) {
+        setFrequency('once');
+      } else if (rule.includes('FREQ=2WEEKLY')) {
+        setFrequency('2weekly');
+      } else if (rule.includes('FREQ=MONTHLY')) {
+        setFrequency('monthly');
+      } else {
+        setFrequency('weekly');
+      }
     }
   }, [existingEntry, isOpen]);
 
@@ -144,7 +161,8 @@ export default function AddEventModal({
   useEffect(() => {
     if (initialHour !== undefined && isOpen && !existingEntry) {
       const hour = initialHour.toString().padStart(2, '0');
-      setStartTime(`${hour}:00`);
+      setStartHour(hour);
+      setStartMinute('00');
     }
   }, [initialHour, isOpen, existingEntry]);
 
@@ -161,6 +179,7 @@ export default function AddEventModal({
       if (!existingEntry) {
         setStudentName('');
         setDuration('60');
+        setFrequency('weekly');
       }
       setError(null);
     }
@@ -175,7 +194,7 @@ export default function AddEventModal({
       return;
     }
 
-    if (!startTime) {
+    if (!startHour || !startMinute) {
       setError('Please select a start time');
       return;
     }
@@ -184,17 +203,19 @@ export default function AddEventModal({
       setLoading(true);
 
       // Calculate the time range for the new/updated event
-      const scheduleStart = new Date(scheduleStartDate);
+      // Use currentWeekStart if available (for entries in current view), otherwise use schedule start
+      const baseDate = currentWeekStart ? new Date(currentWeekStart) : new Date(scheduleStartDate);
       const dayIndex = DAYS.indexOf(day);
       const dayOfWeek = dayIndex;
-      const currentDay = scheduleStart.getDay();
+      const currentDay = baseDate.getDay();
       let daysToAdd = dayOfWeek - currentDay;
       if (daysToAdd < 0) daysToAdd += 7;
       
-      const firstOccurrence = new Date(scheduleStart);
-      firstOccurrence.setDate(scheduleStart.getDate() + daysToAdd);
+      const firstOccurrence = new Date(baseDate);
+      firstOccurrence.setDate(baseDate.getDate() + daysToAdd);
 
-      const [hours, minutes] = startTime.split(':').map(Number);
+      const hours = parseInt(startHour);
+      const minutes = parseInt(startMinute);
       firstOccurrence.setHours(hours, minutes, 0, 0);
 
       const endTime = new Date(firstOccurrence);
@@ -234,7 +255,20 @@ export default function AddEventModal({
       }
 
       const dayAbbrev = ['SU', 'MO', 'TU', 'WE', 'TH', 'FR', 'SA'][dayOfWeek];
-      const recurrenceRule = `FREQ=WEEKLY;BYDAY=${dayAbbrev}`;
+      
+      // Generate recurrence rule based on frequency
+      let recurrenceRule = '';
+      if (frequency === 'once') {
+        // No recurrence - single occurrence only
+        recurrenceRule = '';
+      } else if (frequency === '2weekly') {
+        recurrenceRule = `FREQ=2WEEKLY;BYDAY=${dayAbbrev}`;
+      } else if (frequency === 'monthly') {
+        recurrenceRule = `FREQ=MONTHLY;BYDAY=${dayAbbrev}`;
+      } else {
+        // Default to weekly
+        recurrenceRule = `FREQ=WEEKLY;BYDAY=${dayAbbrev}`;
+      }
 
       if (isEditMode && existingEntry) {
         // UPDATE existing entry
@@ -333,40 +367,85 @@ export default function AddEventModal({
             <label style={styles.label}>
               Start Time <span style={styles.required}>*</span>
             </label>
-            <input
-              type="time"
-              value={startTime}
-              onChange={(e) => setStartTime(e.target.value)}
-              style={styles.input}
-              onFocus={(e) => { e.target.style.borderColor = '#f97316'; e.target.style.outline = 'none'; }}
-              onBlur={(e) => { e.target.style.borderColor = '#d1d5db'; }}
-              disabled={loading}
-            />
+            <div style={{ display: 'flex', gap: '0.5rem' }}>
+              <select
+                value={startHour}
+                onChange={(e) => setStartHour(e.target.value)}
+                style={{ ...styles.select, flex: 1 }}
+                onFocus={(e) => { e.target.style.borderColor = '#f97316'; e.target.style.outline = 'none'; }}
+                onBlur={(e) => { e.target.style.borderColor = '#d1d5db'; }}
+                disabled={loading}
+              >
+                {Array.from({ length: 14 }, (_, i) => i + 8).map((hour) => (
+                  <option key={hour} value={hour.toString().padStart(2, '0')}>
+                    {hour === 12 ? '12 PM' : hour > 12 ? `${hour - 12} PM` : `${hour} AM`}
+                  </option>
+                ))}
+              </select>
+              <select
+                value={startMinute}
+                onChange={(e) => setStartMinute(e.target.value)}
+                style={{ ...styles.select, flex: 1, minWidth: '70px' }}
+                onFocus={(e) => { e.target.style.borderColor = '#f97316'; e.target.style.outline = 'none'; }}
+                onBlur={(e) => { e.target.style.borderColor = '#d1d5db'; }}
+                disabled={loading}
+              >
+                <option value="00">00</option>
+                <option value="15">15</option>
+                <option value="30">30</option>
+                <option value="45">45</option>
+              </select>
+            </div>
           </div>
         </div>
 
-        {/* Duration */}
-        <div style={styles.formGroup}>
-          <label style={styles.label}>
-            Duration <span style={styles.required}>*</span>
-          </label>
-          <select
-            value={duration}
-            onChange={(e) => setDuration(e.target.value)}
-            style={styles.select}
-            onFocus={(e) => { e.target.style.borderColor = '#f97316'; e.target.style.outline = 'none'; }}
-            onBlur={(e) => { e.target.style.borderColor = '#d1d5db'; }}
-            disabled={loading}
-          >
-            <option value="30">30 minutes</option>
-            <option value="45">45 minutes</option>
-            <option value="60">60 minutes (1 hour)</option>
-            <option value="90">90 minutes (1.5 hours)</option>
-            <option value="120">120 minutes (2 hours)</option>
-          </select>
-          <div style={styles.hint}>
-            This event will repeat weekly on {day}s at {startTime || '--:--'}
+        {/* Duration and Frequency */}
+        <div style={styles.row}>
+          <div style={styles.formGroup}>
+            <label style={styles.label}>
+              Duration <span style={styles.required}>*</span>
+            </label>
+            <select
+              value={duration}
+              onChange={(e) => setDuration(e.target.value)}
+              style={styles.select}
+              onFocus={(e) => { e.target.style.borderColor = '#f97316'; e.target.style.outline = 'none'; }}
+              onBlur={(e) => { e.target.style.borderColor = '#d1d5db'; }}
+              disabled={loading}
+            >
+              <option value="30">30 minutes</option>
+              <option value="45">45 minutes</option>
+              <option value="60">60 minutes (1 hour)</option>
+              <option value="90">90 minutes (1.5 hours)</option>
+              <option value="120">120 minutes (2 hours)</option>
+            </select>
           </div>
+
+          <div style={styles.formGroup}>
+            <label style={styles.label}>
+              Frequency <span style={styles.required}>*</span>
+            </label>
+            <select
+              value={frequency}
+              onChange={(e) => setFrequency(e.target.value)}
+              style={styles.select}
+              onFocus={(e) => { e.target.style.borderColor = '#f97316'; e.target.style.outline = 'none'; }}
+              onBlur={(e) => { e.target.style.borderColor = '#d1d5db'; }}
+              disabled={loading}
+            >
+              <option value="once">Once</option>
+              <option value="weekly">Weekly</option>
+              <option value="2weekly">Every 2 weeks</option>
+              <option value="monthly">Monthly</option>
+            </select>
+          </div>
+        </div>
+
+        {/* Frequency hint */}
+        <div style={styles.hint}>
+          {frequency === 'once' 
+            ? `This is a single event on ${day} at ${startHour}:${startMinute}`
+            : `This event will repeat on ${day}s at ${startHour}:${startMinute}`}
         </div>
 
         {/* Error Message */}

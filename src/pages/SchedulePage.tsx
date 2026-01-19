@@ -1,11 +1,14 @@
 // src/pages/SchedulePage.tsx
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Calendar, Users, ChevronLeft, ChevronRight } from 'lucide-react';
+import { ArrowLeft, Calendar, Users, ChevronLeft, ChevronRight, Plus } from 'lucide-react';
 import { getSchedule, updateSchedule, type Schedule } from '../lib/api/schedules';
 import { getScheduleEntries, updateScheduleEntry, deleteScheduleEntry, type ScheduleEntry } from '../lib/api/schedule-entries';
 import { getFormResponses, type FormResponse } from '../lib/api/form-responses';
 import AddEventModal from '../components/AddEventModal';
+import AddParticipantModal from '../components/AddParticipantModal';
+import ParticipantDetailsModal from '../components/ParticipantDetailsModal';
+import SchedulingPreviewModal from '../components/SchedulingPreviewModal';
 import { DndContext, DragOverlay, useDraggable, useDroppable, PointerSensor, useSensor, useSensors, type DragEndEvent, type DragStartEvent } from '@dnd-kit/core';
 
 const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
@@ -74,25 +77,25 @@ const styles = {
     gridTemplateColumns: '1fr 280px',
     gap: '0.85rem',
   },
-  timetableContainer: {
-    backgroundColor: 'white',
-    borderRadius: '0.5rem',
-    boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
-    border: '1px solid #e5e7eb',
-    overflow: 'hidden',
-  },
-  timetableHeader: {
-    display: 'grid',
-    gridTemplateColumns: '55px repeat(7, 1fr)',
-    borderBottom: '2px solid #f97316',
-    backgroundColor: '#fff7ed',
-  },
-  dayHeader: {
-    padding: '0.35rem 0.5rem',
-    textAlign: 'center' as const,
-    fontWeight: '600',
-    fontSize: '0.7rem',
-    color: '#c2410c',
+   timetableContainer: {
+     backgroundColor: 'white',
+     borderRadius: '0.5rem',
+     boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
+     border: '1px solid #e5e7eb',
+     overflow: 'hidden',
+   },
+   timetableHeader: {
+     display: 'grid',
+     gridTemplateColumns: '55px repeat(7, 1fr)',
+     borderBottom: '2px solid #f97316',
+     backgroundColor: '#fff7ed',
+   },
+   dayHeader: {
+     padding: '0.35rem 0.5rem',
+     textAlign: 'center' as const,
+     fontWeight: '600',
+     fontSize: '0.7rem',
+     color: '#c2410c',
     borderRight: '1px solid #fed7aa',
     backgroundColor: '#ffedd5',
     display: 'flex',
@@ -154,29 +157,27 @@ const styles = {
     color: '#6b7280',
     fontSize: '0.7rem',
   },
-  lessonBlock: {
-    position: 'absolute' as const,
-    top: 0,
-    left: '2px',
-    right: '2px',
-    backgroundColor: '#f97316',
-    color: 'white',
-    borderRadius: '0.25rem',
-    padding: '0.25rem 0.5rem',
-    fontSize: '0.625rem',
-    fontWeight: '600',
-    overflow: 'hidden',
-    cursor: 'pointer',
-    boxShadow: '0 1px 3px rgba(0, 0, 0, 0.2)',
-    transition: 'all 0.2s',
-    display: 'flex',
-    flexDirection: 'column' as const,
-    justifyContent: 'center',
-    alignItems: 'center',
-    textAlign: 'center' as const,
-    maxHeight: '40px',
-  },
-  statusSelect: {
+   lessonBlock: {
+     position: 'absolute' as const,
+     top: 0,
+     left: '2px',
+     right: '2px',
+     backgroundColor: '#f97316',
+     color: 'white',
+     borderRadius: '0.25rem',
+     padding: '0.25rem 0.5rem',
+     fontSize: '0.625rem',
+     fontWeight: '600',
+     cursor: 'pointer',
+     boxShadow: '0 1px 3px rgba(0, 0, 0, 0.2)',
+     transition: 'all 0.2s',
+     display: 'flex',
+     flexDirection: 'column' as const,
+     justifyContent: 'center',
+     alignItems: 'center',
+     textAlign: 'center' as const,
+   },
+    statusSelect: {
     padding: '0.5rem 0.75rem',
     border: '1px solid #d1d5db',
     borderRadius: '0.375rem',
@@ -212,6 +213,13 @@ export default function SchedulePage() {
   const [isDragging, setIsDragging] = useState(false);
   const [activeDragId, setActiveDragId] = useState<string | null>(null);
   const [currentWeekOffset, setCurrentWeekOffset] = useState(0);
+   
+  // Participant modal states
+  const [showAddParticipantModal, setShowAddParticipantModal] = useState(false);
+  const [selectedParticipant, setSelectedParticipant] = useState<FormResponse | null>(null);
+  
+  // Scheduling preview modal state
+  const [showSchedulingPreview, setShowSchedulingPreview] = useState(false);
   
   // Inline editing states
   const [isEditingName, setIsEditingName] = useState(false);
@@ -285,77 +293,91 @@ export default function SchedulePage() {
     });
   };
 
-  // Check if an entry should appear in the current week based on recurrence rule
-  const isEntryInCurrentWeek = (entry: ScheduleEntry): boolean => {
-    if (!weekStart) return false;
-    
-    const entryStart = new Date(entry.start_time);
-    const entryDay = entryStart.getDay(); // 0-6
-    const dayAbbrev = ['SU', 'MO', 'TU', 'WE', 'TH', 'FR', 'SA'][entryDay];
-    
-    // Parse recurrence rule
-    const rule = entry.recurrence_rule || '';
-    const freqMatch = rule.match(/FREQ=(\w+)/);
-    const byDayMatch = rule.match(/BYDAY=([^;]+)/);
-    const bySetPosMatch = rule.match(/BYSETPOS=([^;]+)/);
-    
-    const freq = freqMatch ? freqMatch[1] : 'WEEKLY';
-    const byDay = byDayMatch ? byDayMatch[1] : dayAbbrev;
-    const bySetPos = bySetPosMatch ? parseInt(bySetPosMatch[1]) : null;
-    
-    // Check if the entry's day matches
-    if (!byDay.includes(dayAbbrev)) return false;
-    
-    // Calculate which week this entry originally falls on
-    const scheduleStart = schedule ? new Date(schedule.start_date) : weekStart;
-    const entryWeekStart = new Date(scheduleStart);
-    entryWeekStart.setDate(scheduleStart.getDate() + (currentWeekOffset * 7));
-    
-    // Get the day index for this entry
-    const entryDayIndex = ['SU', 'MO', 'TU', 'WE', 'TH', 'FR', 'SA'].indexOf(dayAbbrev);
-    
-    // Find the first occurrence of this day in the current view week
-    const viewWeekFirstDay = weekStart.getDay();
-    let daysToAdd = entryDayIndex - viewWeekFirstDay;
-    if (daysToAdd < 0) daysToAdd += 7;
-    
-    const occurrenceDate = new Date(weekStart);
-    occurrenceDate.setDate(weekStart.getDate() + daysToAdd);
-    
-    // Calculate the week number of this occurrence relative to schedule start
-    const scheduleFirstDay = new Date(scheduleStart);
-    scheduleFirstDay.setDate(scheduleStart.getDate() - scheduleStart.getDay()); // Start of first week
-    
-    const weeksSinceStart = Math.floor((occurrenceDate.getTime() - scheduleFirstDay.getTime()) / (7 * 24 * 60 * 60 * 1000));
-    
-    // Apply frequency rules
-    if (freq === 'WEEKLY') {
-      return true; // Show every week
-    } else if (freq === '2WEEKLY') {
-      return weeksSinceStart % 2 === 0; // Show every other week (even weeks)
-    } else if (freq === 'MONTHLY') {
-      // For monthly, check if this is the Nth occurrence of the day in the month
-      if (bySetPos) {
-        const monthStart = new Date(occurrenceDate.getFullYear(), occurrenceDate.getMonth(), 1);
-        const monthEnd = new Date(occurrenceDate.getFullYear(), occurrenceDate.getMonth() + 1, 0);
-        
-        // Find all occurrences of this day in the month
-        let occurrenceCount = 0;
-        for (let d = new Date(monthStart); d <= monthEnd; d.setDate(d.getDate() + 1)) {
-          if (d.getDay() === entryDayIndex) {
-            occurrenceCount++;
-            if (d.getTime() === occurrenceDate.getTime()) {
-              break;
-            }
-          }
-        }
-        return occurrenceCount === bySetPos;
-      }
-      return true;
-    }
-    
-    return true;
-  };
+   // Check if an entry should appear in the current week based on recurrence rule
+   const isEntryInCurrentWeek = (entry: ScheduleEntry): boolean => {
+     if (!weekStart) return false;
+     
+     const entryStart = new Date(entry.start_time);
+     const entryDay = entryStart.getDay(); // 0-6
+     const dayAbbrev = ['SU', 'MO', 'TU', 'WE', 'TH', 'FR', 'SA'][entryDay];
+     
+     // Parse recurrence rule
+     const rule = entry.recurrence_rule || '';
+     const freqMatch = rule.match(/FREQ=(\w+)/);
+     const byDayMatch = rule.match(/BYDAY=([^;]+)/);
+     const bySetPosMatch = rule.match(/BYSETPOS=([^;]+)/);
+     
+     const freq = freqMatch ? freqMatch[1] : 'WEEKLY';
+     const byDay = byDayMatch ? byDayMatch[1] : dayAbbrev;
+     const bySetPos = bySetPosMatch ? parseInt(bySetPosMatch[1]) : null;
+     
+     // Check if the entry's day matches
+     if (!byDay.includes(dayAbbrev)) return false;
+     
+     // "Once" frequency (empty rule) - only show in the week containing the original date
+     if (!rule) {
+       // Get the entry's actual week start (Sunday)
+       const entryWeekStart = new Date(entryStart);
+       entryWeekStart.setDate(entryStart.getDate() - entryStart.getDay());
+       entryWeekStart.setHours(0, 0, 0, 0);
+       
+       // Get the current view's week start (Sunday)
+       const currentViewWeekStart = new Date(weekStart);
+       currentViewWeekStart.setHours(0, 0, 0, 0);
+       
+       return entryWeekStart.getTime() === currentViewWeekStart.getTime();
+     }
+     
+     // Calculate which week this entry originally falls on
+     const scheduleStart = schedule ? new Date(schedule.start_date) : weekStart;
+     const entryWeekStart = new Date(scheduleStart);
+     entryWeekStart.setDate(scheduleStart.getDate() + (currentWeekOffset * 7));
+     
+     // Get the day index for this entry
+     const entryDayIndex = ['SU', 'MO', 'TU', 'WE', 'TH', 'FR', 'SA'].indexOf(dayAbbrev);
+     
+     // Find the first occurrence of this day in the current view week
+     const viewWeekFirstDay = weekStart.getDay();
+     let daysToAdd = entryDayIndex - viewWeekFirstDay;
+     if (daysToAdd < 0) daysToAdd += 7;
+     
+     const occurrenceDate = new Date(weekStart);
+     occurrenceDate.setDate(weekStart.getDate() + daysToAdd);
+     
+     // Calculate the week number of this occurrence relative to schedule start
+     const scheduleFirstDay = new Date(scheduleStart);
+     scheduleFirstDay.setDate(scheduleStart.getDate() - scheduleStart.getDay()); // Start of first week
+     
+     const weeksSinceStart = Math.floor((occurrenceDate.getTime() - scheduleFirstDay.getTime()) / (7 * 24 * 60 * 60 * 1000));
+     
+     // Apply frequency rules
+     if (freq === 'WEEKLY') {
+       return true; // Show every week
+     } else if (freq === '2WEEKLY') {
+       return weeksSinceStart % 2 === 0; // Show every other week (even weeks)
+     } else if (freq === 'MONTHLY') {
+       // For monthly, check if this is the Nth occurrence of the day in the month
+       if (bySetPos) {
+         const monthStart = new Date(occurrenceDate.getFullYear(), occurrenceDate.getMonth(), 1);
+         const monthEnd = new Date(occurrenceDate.getFullYear(), occurrenceDate.getMonth() + 1, 0);
+         
+         // Find all occurrences of this day in the month
+         let occurrenceCount = 0;
+         for (let d = new Date(monthStart); d <= monthEnd; d.setDate(d.getDate() + 1)) {
+           if (d.getDay() === entryDayIndex) {
+             occurrenceCount++;
+             if (d.getTime() === occurrenceDate.getTime()) {
+               break;
+             }
+           }
+         }
+         return occurrenceCount === bySetPos;
+       }
+       return true;
+     }
+     
+     return true;
+   };
 
   // Navigate weeks
   const goToPreviousWeek = () => {
@@ -751,40 +773,40 @@ export default function SchedulePage() {
         loadScheduleData(); // Reload on error
       }
     }
-  };
+   };
 
-  const getEntriesForSlot = (day: string, hour: number) => {
-    return entries.filter(entry => {
-      // First check if entry should appear in current week based on recurrence
-      if (!isEntryInCurrentWeek(entry)) return false;
-      
-      const startTime = new Date(entry.start_time);
-      const dayOfWeek = startTime.getDay(); // 0 = Sunday, 1 = Monday, ...
-      const dayIndex = DAYS.indexOf(day); // 0 = Sunday, 1 = Monday, ...
-      
-      return dayOfWeek === dayIndex && startTime.getHours() === hour;
-    });
-  };
-
-  // Helper to calculate lesson block height and position
-  const getLessonBlockStyle = (entry: ScheduleEntry) => {
-    const startTime = new Date(entry.start_time);
-    const endTime = new Date(entry.end_time);
-    
-    const startMinutes = startTime.getMinutes();
-    const durationMinutes = (endTime.getTime() - startTime.getTime()) / (1000 * 60);
-    
-    const topOffset = (startMinutes / 60) * 40; // 40px per hour
-    const height = (durationMinutes / 60) * 40;
-    
-    return {
-      ...styles.lessonBlock,
-      top: `${topOffset}px`,
-      height: `${height}px`,
+   // Helper to calculate lesson block height and position
+   const getLessonBlockStyle = (entry: ScheduleEntry) => {
+     const startTime = new Date(entry.start_time);
+     const endTime = new Date(entry.end_time);
+     
+     const startMinutes = startTime.getMinutes();
+     const durationMinutes = (endTime.getTime() - startTime.getTime()) / (1000 * 60);
+     
+     const topOffset = (startMinutes / 60) * 40; // 40px per hour
+     const height = (durationMinutes / 60) * 40;
+     
+     return {
+       ...styles.lessonBlock,
+       top: `${topOffset}px`,
+       height: `${height}px`,
+     };
     };
-  };
 
-  // Draggable lesson block component
+   const getEntriesForSlot = (day: string, hour: number) => {
+     return entries.filter(entry => {
+       // First check if entry should appear in current week based on recurrence
+       if (!isEntryInCurrentWeek(entry)) return false;
+       
+       const startTime = new Date(entry.start_time);
+       const dayOfWeek = startTime.getDay(); // 0 = Sunday, 1 = Monday, ...
+       const dayIndex = DAYS.indexOf(day); // 0 = Sunday, 1 = Monday, ...
+       
+       return dayOfWeek === dayIndex && startTime.getHours() === hour;
+     });
+   };
+
+   // Draggable lesson block component
   function DraggableLessonBlock({ entry, children }: { entry: ScheduleEntry; children: React.ReactNode }) {
     const { attributes, listeners, setNodeRef } = useDraggable({
       id: entry.id,
@@ -818,26 +840,26 @@ export default function SchedulePage() {
     );
   }
 
-  function DroppableSlot({ children, day, hour }: { children: React.ReactNode; day: string; hour: number }) {
-    const { setNodeRef: setSlotRef, isOver } = useDroppable({
-      id: `slot-${day}-${hour}`,
-    });
-    
-    return (
-      <div
-        ref={setSlotRef}
-        style={{
-          ...styles.timeSlot,
-          backgroundColor: isOver ? '#ffedd5' : 'white',
-        }}
-        onClick={() => handleSlotClick(day, hour)}
-        onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#ffedd5'; e.currentTarget.style.cursor = 'pointer'; }}
-        onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'white'; }}
-      >
-        {children}
-      </div>
-    );
-  }
+   function DroppableSlot({ children, day, hour }: { children: React.ReactNode; day: string; hour: number }) {
+     const { setNodeRef: setSlotRef, isOver } = useDroppable({
+       id: `slot-${day}-${hour}`,
+     });
+     
+     return (
+       <div
+         ref={setSlotRef}
+         style={{
+           ...styles.timeSlot,
+           backgroundColor: isOver ? '#ffedd5' : 'white',
+         }}
+         onClick={() => handleSlotClick(day, hour)}
+         onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#ffedd5'; e.currentTarget.style.cursor = 'pointer'; }}
+         onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'white'; }}
+       >
+         {children}
+       </div>
+     );
+   }
 
   function TrashDroppable() {
     const { setNodeRef, isOver } = useDroppable({
@@ -1102,7 +1124,7 @@ export default function SchedulePage() {
             })}
           </div>
 
-          {/* Time Grid */}
+           {/* Time Grid */}
           {HOURS.map((hour) => (
             <div key={hour} style={styles.timetableGrid}>
               <div style={styles.timeLabel}>
@@ -1163,47 +1185,73 @@ export default function SchedulePage() {
             </div>
           </div>
 
-          {/* Unassigned Students */}
+          {/* Unassigned Events */}
           <div style={styles.panel}>
-            <h3 style={styles.panelTitle}>
-              <Users size={20} />
-              Unassigned Students
-              {getUnassignedStudents().length > 0 && (
-                <span style={{
+            <div style={{ display: 'flex', alignItems: 'center', marginBottom: '0.6rem' }}>
+              <h3 style={{ ...styles.panelTitle, margin: 0 }}>
+                <Users size={20} />
+                Unassigned Events
+                {getUnassignedStudents().length > 0 && (
+                  <span style={{
+                    marginLeft: '0.5rem',
+                    backgroundColor: '#f97316',
+                    color: 'white',
+                    padding: '0.25rem 0.5rem',
+                    borderRadius: '9999px',
+                    fontSize: '0.75rem',
+                    fontWeight: '600',
+                  }}>
+                    {getUnassignedStudents().length}
+                  </span>
+                )}
+              </h3>
+              <button
+                onClick={() => setShowAddParticipantModal(true)}
+                style={{
                   marginLeft: 'auto',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.25rem',
+                  padding: '0.35rem 0.6rem',
                   backgroundColor: '#f97316',
                   color: 'white',
-                  padding: '0.25rem 0.5rem',
-                  borderRadius: '9999px',
+                  border: 'none',
+                  borderRadius: '0.375rem',
+                  cursor: 'pointer',
                   fontSize: '0.75rem',
-                  fontWeight: '600',
-                }}>
-                  {getUnassignedStudents().length}
-                </span>
-              )}
-            </h3>
+                  fontWeight: '500',
+                }}
+                onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#ea580c'; }}
+                onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = '#f97316'; }}
+              >
+                <Plus size={14} />
+                Add
+              </button>
+            </div>
             {getUnassignedStudents().length === 0 ? (
               <div style={styles.emptyState}>
                 No student responses yet
               </div>
             ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                 {getUnassignedStudents().map((response) => (
                   <div
                     key={response.id}
+                    onClick={() => setSelectedParticipant(response)}
                     style={{
-                      padding: '0.75rem',
+                      padding: '0.6rem 0.75rem',
                       backgroundColor: '#fef3c7',
                       borderRadius: '0.5rem',
                       border: '1px solid #fde68a',
                       fontSize: '0.875rem',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s',
                     }}
+                    onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#fde68a'; e.currentTarget.style.borderColor = '#fbbf24'; }}
+                    onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = '#fef3c7'; e.currentTarget.style.borderColor = '#fde68a'; }}
                   >
-                    <div style={{ fontWeight: '600', color: '#92400e', marginBottom: '0.25rem' }}>
+                    <div style={{ fontWeight: '600', color: '#92400e' }}>
                       {response.student_name}
-                    </div>
-                    <div style={{ fontSize: '0.75rem', color: '#78350f' }}>
-                      {response.email}
                     </div>
                   </div>
                 ))}
@@ -1219,8 +1267,6 @@ export default function SchedulePage() {
       </main>
 
       {/* Add/Edit Event Modal */}
-
-      {/* Add/Edit Event Modal */}
       <AddEventModal
         isOpen={showAddModal}
         onClose={() => {
@@ -1233,7 +1279,44 @@ export default function SchedulePage() {
         initialDay={selectedSlot?.day}
         initialHour={selectedSlot?.hour}
         scheduleStartDate={schedule.start_date}
-         existingEntry={selectedEntry}
+        currentWeekStart={weekStart ? weekStart.toISOString() : undefined}
+        existingEntry={selectedEntry}
+      />
+
+      {/* Add Participant Modal */}
+      <AddParticipantModal
+        isOpen={showAddParticipantModal}
+        onClose={() => setShowAddParticipantModal(false)}
+        onSuccess={(participant) => {
+          setResponses([...responses, participant]);
+        }}
+        scheduleId={scheduleId!}
+      />
+
+      {/* Participant Details Modal */}
+      {selectedParticipant && (
+        <ParticipantDetailsModal
+          isOpen={!!selectedParticipant}
+          onClose={() => setSelectedParticipant(null)}
+          participant={selectedParticipant}
+          onScheduleWithAria={() => {
+            setSelectedParticipant(null);
+            setShowSchedulingPreview(true);
+          }}
+        />
+      )}
+
+      {/* Scheduling Preview Modal */}
+      <SchedulingPreviewModal
+        isOpen={showSchedulingPreview}
+        onClose={() => setShowSchedulingPreview(false)}
+        students={getUnassignedStudents()}
+        existingEntries={entries}
+        scheduleStart={weekStart || new Date()}
+        scheduleId={scheduleId!}
+        onScheduled={() => {
+          loadScheduleData();
+        }}
       />
 
       {/* Drag Overlay for smooth ghost */}
