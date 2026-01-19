@@ -1,5 +1,5 @@
 // src/pages/SchedulePage.tsx
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Calendar, Users, ChevronLeft, ChevronRight } from 'lucide-react';
 import { getSchedule, updateSchedule, type Schedule } from '../lib/api/schedules';
@@ -212,6 +212,17 @@ export default function SchedulePage() {
   const [isDragging, setIsDragging] = useState(false);
   const [activeDragId, setActiveDragId] = useState<string | null>(null);
   const [currentWeekOffset, setCurrentWeekOffset] = useState(0);
+  
+  // Inline editing states
+  const [isEditingName, setIsEditingName] = useState(false);
+  const [editingName, setEditingName] = useState('');
+  const [isEditingDates, setIsEditingDates] = useState(false);
+  const [editingStartDate, setEditingStartDate] = useState('');
+  const [editingEndDate, setEditingEndDate] = useState('');
+  const [dateError, setDateError] = useState<string | null>(null);
+  const nameInputRef = useRef<HTMLInputElement>(null);
+  const startDateInputRef = useRef<HTMLInputElement>(null);
+  const endDateInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (scheduleId) {
@@ -353,6 +364,114 @@ export default function SchedulePage() {
 
   const goToNextWeek = () => {
     setCurrentWeekOffset(prev => Math.min(totalWeeks - 1, prev + 1));
+  };
+
+  // Name editing handlers
+  const handleNameClick = () => {
+    if (!schedule) return;
+    setIsEditingName(true);
+    setEditingName(schedule.label);
+    setTimeout(() => nameInputRef.current?.focus(), 50);
+  };
+
+  const handleNameBlur = async () => {
+    setIsEditingName(false);
+    if (!schedule) return;
+    
+    const trimmedName = editingName.trim();
+    if (trimmedName && trimmedName !== schedule.label) {
+      try {
+        await updateSchedule(schedule.id, { label: trimmedName });
+        setSchedule({ ...schedule, label: trimmedName });
+      } catch (err) {
+        console.error('Failed to rename schedule:', err);
+        setEditingName(schedule.label);
+      }
+    } else {
+      setEditingName(schedule.label);
+    }
+  };
+
+  const handleNameKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      handleNameBlur();
+    } else if (e.key === 'Escape') {
+      setIsEditingName(false);
+      setEditingName(schedule?.label || '');
+    }
+  };
+
+  // Date editing handlers
+  const handleDatesClick = () => {
+    if (!schedule) return;
+    setIsEditingDates(true);
+    setEditingStartDate(schedule.start_date);
+    setEditingEndDate(schedule.end_date);
+    setDateError(null);
+    setTimeout(() => startDateInputRef.current?.focus(), 50);
+  };
+
+  const handleStartDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setEditingStartDate(e.target.value);
+    setDateError(null);
+    
+    // Check if end date is before start date
+    if (editingEndDate && e.target.value > editingEndDate) {
+      setDateError('End date must be after start date');
+    }
+  };
+
+  const handleEndDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setEditingEndDate(e.target.value);
+    setDateError(null);
+    
+    // Check if end date is before start date
+    if (editingStartDate && e.target.value < editingStartDate) {
+      setDateError('End date must be after start date');
+    }
+  };
+
+  const handleDatesBlur = async () => {
+    if (!schedule) return;
+    
+    if (dateError) {
+      setIsEditingDates(false);
+      setEditingStartDate(schedule.start_date);
+      setEditingEndDate(schedule.end_date);
+      setDateError(null);
+      return;
+    }
+    
+    if (editingStartDate && editingEndDate && 
+        (editingStartDate !== schedule.start_date || editingEndDate !== schedule.end_date)) {
+      try {
+        await updateSchedule(schedule.id, { 
+          start_date: editingStartDate, 
+          end_date: editingEndDate 
+        });
+        setSchedule({ 
+          ...schedule, 
+          start_date: editingStartDate, 
+          end_date: editingEndDate 
+        });
+      } catch (err) {
+        console.error('Failed to update dates:', err);
+        setEditingStartDate(schedule.start_date);
+        setEditingEndDate(schedule.end_date);
+      }
+    }
+    
+    setIsEditingDates(false);
+    setDateError(null);
+  };
+
+  const handleDatesKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      handleDatesBlur();
+    } else if (e.key === 'Escape') {
+      setIsEditingDates(false);
+      setDateError(null);
+    }
   };
 
   const loadScheduleData = async () => {
@@ -793,8 +912,8 @@ export default function SchedulePage() {
       {/* Header */}
       <header style={styles.header}>
         <div style={styles.headerContent}>
-          {/* Left: Back button + Schedule name */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+          {/* Left: Back button + Editable schedule name + Overall date range */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
             <button
               onClick={() => navigate('/dashboard')}
               style={styles.backButton}
@@ -804,7 +923,90 @@ export default function SchedulePage() {
               <ArrowLeft size={18} />
               Back
             </button>
-            <h1 style={styles.title}>{schedule.label}</h1>
+            
+            {isEditingName ? (
+              <input
+                ref={nameInputRef}
+                type="text"
+                value={editingName}
+                onChange={(e) => setEditingName(e.target.value)}
+                onBlur={handleNameBlur}
+                onKeyDown={handleNameKeyDown}
+                style={{
+                  fontSize: '1.1rem',
+                  fontWeight: '600',
+                  color: '#111827',
+                  padding: '0.25rem 0.5rem',
+                  border: '1px solid #f97316',
+                  borderRadius: '0.375rem',
+                  outline: 'none',
+                  maxWidth: '200px',
+                }}
+              />
+            ) : (
+              <h1 
+                style={{ ...styles.title, cursor: 'pointer', marginRight: '0.5rem' }}
+                onClick={handleNameClick}
+                onMouseEnter={(e) => { e.currentTarget.style.color = '#f97316'; }}
+                onMouseLeave={(e) => { e.currentTarget.style.color = '#111827'; }}
+              >
+                {schedule.label}
+              </h1>
+            )}
+            
+            {/* Overall date range - editable */}
+            <span style={{ color: '#6b7280', fontSize: '0.95rem' }}>
+              {isEditingDates ? (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <input
+                    ref={startDateInputRef}
+                    type="date"
+                    value={editingStartDate}
+                    onChange={handleStartDateChange}
+                    onBlur={handleDatesBlur}
+                    onKeyDown={handleDatesKeyDown}
+                    style={{
+                      fontSize: '0.85rem',
+                      padding: '0.2rem 0.4rem',
+                      border: dateError ? '1px solid #dc2626' : '1px solid #d1d5db',
+                      borderRadius: '0.375rem',
+                      outline: 'none',
+                    }}
+                  />
+                  <span style={{ color: '#6b7280' }}>-</span>
+                  <input
+                    ref={endDateInputRef}
+                    type="date"
+                    value={editingEndDate}
+                    onChange={handleEndDateChange}
+                    onBlur={handleDatesBlur}
+                    onKeyDown={handleDatesKeyDown}
+                    style={{
+                      fontSize: '0.85rem',
+                      padding: '0.2rem 0.4rem',
+                      border: dateError ? '1px solid #dc2626' : '1px solid #d1d5db',
+                      borderRadius: '0.375rem',
+                      outline: 'none',
+                    }}
+                  />
+                  {dateError && (
+                    <span style={{ color: '#dc2626', fontSize: '0.75rem' }}>{dateError}</span>
+                  )}
+                </div>
+              ) : (
+                <span 
+                  style={{ cursor: 'pointer', color: '#6b7280' }}
+                  onClick={handleDatesClick}
+                  onMouseEnter={(e) => { e.currentTarget.style.color = '#f97316'; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.color = '#6b7280'; }}
+                >
+                  {schedule ? `${formatLocalDate(new Date(schedule.start_date))} - ${formatLocalDate(new Date(schedule.end_date))}` : ''}
+                  <span style={{ marginLeft: '0.5rem', color: '#9ca3af', fontSize: '0.8rem' }}>
+                    ({userTimezoneAbbrev})
+                  </span>
+                </span>
+              )}
+            </span>
           </div>
           
           {/* Center: Navigation + Date Range + Week */}
@@ -831,17 +1033,16 @@ export default function SchedulePage() {
               </button>
               
               <div style={{ textAlign: 'center' }}>
-                <p style={{ 
-                  fontSize: '1.1rem', 
-                  fontWeight: '600', 
-                  color: '#111827',
-                  margin: 0,
-                  whiteSpace: 'nowrap' as const,
-                }}>
+                <p 
+                  style={{ 
+                    fontSize: '1.1rem', 
+                    fontWeight: '600', 
+                    color: '#111827',
+                    margin: 0,
+                    whiteSpace: 'nowrap' as const,
+                  }}
+                >
                   {weekStart && weekEnd ? `${formatLocalDate(weekStart)} - ${formatLocalDate(weekEnd)}` : ''}
-                  <span style={{ marginLeft: '0.5rem', color: '#9ca3af', fontWeight: '400' }}>
-                    ({userTimezoneAbbrev})
-                  </span>
                 </p>
               </div>
               
