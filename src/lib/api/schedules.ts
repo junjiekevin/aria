@@ -234,31 +234,36 @@ export async function deleteSchedule(scheduleId: string) {
         throw error;
     }
 
-    // Get current schedule to preserve previous_status
-    const currentSchedule = await getSchedule(scheduleId);
+    // First check if schedule exists and belongs to user
+    const { data: existingSchedule, error: fetchError } = await supabase
+        .from('schedules')
+        .select('id, status, previous_status')
+        .eq('id', scheduleId)
+        .eq('user_id', user.id)
+        .single();
 
-    const { data, error } = await supabase
+    if (fetchError || !existingSchedule) {
+        const notFoundError = new Error('Schedule not found') as ScheduleValidationError;
+        notFoundError.code = 'SCHEDULE_NOT_FOUND';
+        throw notFoundError;
+    }
+
+    // Update to trashed status
+    const { error } = await supabase
         .from('schedules')
         .update({
             status: 'trashed',
             deleted_at: new Date().toISOString(),
-            previous_status: currentSchedule.status
+            previous_status: existingSchedule.status
         })
         .eq('id', scheduleId)
-        .eq('user_id', user.id)
-        .select()
-        .single();
+        .eq('user_id', user.id);
     
     if (error) {
-        if (error.code === 'PGRST116') {
-            const notFoundError = new Error('Schedule not found') as ScheduleValidationError;
-            notFoundError.code = 'SCHEDULE_NOT_FOUND';
-            throw notFoundError;
-        }
         throw new Error(`Failed to delete schedule: ${error.message}`);
     }
 
-    return data;
+    return { success: true };
 }
 
 // Restore from trash (restore to previous_status, or draft if not available)
