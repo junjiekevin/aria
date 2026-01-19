@@ -924,89 +924,92 @@ export default function SchedulePage() {
               Back
             </button>
             
-            {isEditingName ? (
-              <input
-                ref={nameInputRef}
-                type="text"
-                value={editingName}
-                onChange={(e) => setEditingName(e.target.value)}
-                onBlur={handleNameBlur}
-                onKeyDown={handleNameKeyDown}
-                style={{
-                  fontSize: '1.1rem',
-                  fontWeight: '600',
-                  color: '#111827',
-                  padding: '0.25rem 0.5rem',
-                  border: '1px solid #f97316',
-                  borderRadius: '0.375rem',
-                  outline: 'none',
-                  maxWidth: '200px',
-                }}
-              />
-            ) : (
-              <h1 
-                style={{ ...styles.title, cursor: 'pointer', marginRight: '0.5rem' }}
-                onClick={handleNameClick}
-                onMouseEnter={(e) => { e.currentTarget.style.color = '#f97316'; }}
-                onMouseLeave={(e) => { e.currentTarget.style.color = '#111827'; }}
-              >
-                {schedule.label}
-              </h1>
-            )}
-            
-            {/* Overall date range - editable */}
-            <span style={{ color: '#6b7280', fontSize: '0.95rem' }}>
-              {isEditingDates ? (
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                  <input
-                    ref={startDateInputRef}
-                    type="date"
-                    value={editingStartDate}
-                    onChange={handleStartDateChange}
-                    onBlur={handleDatesBlur}
-                    onKeyDown={handleDatesKeyDown}
-                    style={{
-                      fontSize: '0.85rem',
-                      padding: '0.2rem 0.4rem',
-                      border: dateError ? '1px solid #dc2626' : '1px solid #d1d5db',
-                      borderRadius: '0.375rem',
-                      outline: 'none',
-                    }}
-                  />
-                  <span style={{ color: '#6b7280' }}>-</span>
-                  <input
-                    ref={endDateInputRef}
-                    type="date"
-                    value={editingEndDate}
-                    onChange={handleEndDateChange}
-                    onBlur={handleDatesBlur}
-                    onKeyDown={handleDatesKeyDown}
-                    style={{
-                      fontSize: '0.85rem',
-                      padding: '0.2rem 0.4rem',
-                      border: dateError ? '1px solid #dc2626' : '1px solid #d1d5db',
-                      borderRadius: '0.375rem',
-                      outline: 'none',
-                    }}
-                  />
-                  {dateError && (
-                    <span style={{ color: '#dc2626', fontSize: '0.75rem' }}>{dateError}</span>
-                  )}
-                </div>
+             {/* Name and date stacked vertically */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.15rem' }}>
+              {isEditingName ? (
+                <input
+                  ref={nameInputRef}
+                  type="text"
+                  value={editingName}
+                  onChange={(e) => setEditingName(e.target.value)}
+                  onBlur={handleNameBlur}
+                  onKeyDown={handleNameKeyDown}
+                  style={{
+                    fontSize: '1.1rem',
+                    fontWeight: '600',
+                    color: '#111827',
+                    padding: '0.25rem 0.5rem',
+                    border: '1px solid #f97316',
+                    borderRadius: '0.375rem',
+                    outline: 'none',
+                    maxWidth: '200px',
+                  }}
+                />
               ) : (
-                <span 
-                  style={{ cursor: 'pointer', color: '#6b7280' }}
-                  onClick={handleDatesClick}
+                <h1 
+                  style={{ ...styles.title, cursor: 'pointer', margin: 0 }}
+                  onClick={handleNameClick}
                   onMouseEnter={(e) => { e.currentTarget.style.color = '#f97316'; }}
-                  onMouseLeave={(e) => { e.currentTarget.style.color = '#6b7280'; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.color = '#111827'; }}
                 >
-                  {schedule ? `${formatLocalDate(new Date(schedule.start_date))} - ${formatLocalDate(new Date(schedule.end_date))}` : ''}
-                  <span style={{ marginLeft: '0.5rem', color: '#9ca3af', fontSize: '0.8rem' }}>
-                    ({userTimezoneAbbrev})
-                  </span>
-                </span>
+                  {schedule.label}
+                </h1>
               )}
-            </span>
+              
+              {/* Overall date range - below the name */}
+              <span style={{ color: '#6b7280', fontSize: '0.8rem' }}>
+                {isEditingDates ? (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <input
+                      ref={startDateInputRef}
+                      type="date"
+                      value={editingStartDate}
+                      onChange={handleStartDateChange}
+                      onBlur={handleDatesBlur}
+                      onKeyDown={handleDatesKeyDown}
+                      style={{
+                        fontSize: '0.75rem',
+                        padding: '0.15rem 0.35rem',
+                        border: dateError ? '1px solid #dc2626' : '1px solid #d1d5db',
+                        borderRadius: '0.375rem',
+                        outline: 'none',
+                      }}
+                    />
+                    <span style={{ color: '#9ca3af' }}>-</span>
+                    <input
+                      ref={endDateInputRef}
+                      type="date"
+                      value={editingEndDate}
+                      onChange={handleEndDateChange}
+                      onBlur={handleDatesBlur}
+                      onKeyDown={handleDatesKeyDown}
+                      style={{
+                        fontSize: '0.75rem',
+                        padding: '0.15rem 0.35rem',
+                        border: dateError ? '1px solid #dc2626' : '1px solid #d1d5db',
+                        borderRadius: '0.375rem',
+                        outline: 'none',
+                      }}
+                    />
+                    {dateError && (
+                      <span style={{ color: '#dc2626', fontSize: '0.7rem' }}>{dateError}</span>
+                    )}
+                  </div>
+                ) : (
+                  <span 
+                    style={{ cursor: 'pointer', color: '#6b7280' }}
+                    onClick={handleDatesClick}
+                    onMouseEnter={(e) => { e.currentTarget.style.color = '#f97316'; }}
+                    onMouseLeave={(e) => { e.currentTarget.style.color = '#6b7280'; }}
+                  >
+                    {schedule ? `${formatLocalDate(new Date(schedule.start_date))} - ${formatLocalDate(new Date(schedule.end_date))}` : ''}
+                    <span style={{ marginLeft: '0.5rem', color: '#9ca3af', fontSize: '0.75rem' }}>
+                      ({userTimezoneAbbrev})
+                    </span>
+                  </span>
+                )}
+              </span>
+            </div>
           </div>
           
           {/* Center: Navigation + Date Range + Week */}
