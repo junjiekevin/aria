@@ -279,12 +279,6 @@ export default function SchedulePage() {
     }
   }, [scheduleId]);
 
-  const userTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-  const userTimezoneAbbrev = new Date().toLocaleString('en-US', { 
-    timeZone: userTimezone,
-    timeZoneName: 'short' 
-  }).split(' ').pop() || userTimezone;
-
   // Helper to parse YYYY-MM-DD in local timezone (not UTC)
   const parseLocalDate = (dateStr: string): Date => {
     const [year, month, day] = dateStr.split('-').map(Number);
@@ -297,21 +291,30 @@ export default function SchedulePage() {
     const start = parseLocalDate(schedule.start_date);
     const end = parseLocalDate(schedule.end_date);
     
-    const totalMs = end.getTime() - start.getTime();
+    // Find the Sunday that starts the week containing schedule.start_date (for timetable headers)
+    const startDayOfWeek = start.getDay();
+    const timetableWeekStart = new Date(start);
+    timetableWeekStart.setDate(start.getDate() - startDayOfWeek); // Go back to Sunday
+    
+    // Calculate total weeks from timetable start (Sunday) to end
+    const totalMs = end.getTime() - timetableWeekStart.getTime();
     const totalDays = Math.ceil(totalMs / (1000 * 60 * 60 * 24));
     const total = Math.ceil(totalDays / 7);
     
-    const weekStartDate = new Date(start);
-    weekStartDate.setDate(start.getDate() + (currentWeekOffset * 7));
+    // Current week (for navigation)
+    const currentWeekStart = new Date(timetableWeekStart);
+    currentWeekStart.setDate(timetableWeekStart.getDate() + (currentWeekOffset * 7));
     
-    const weekEndDate = new Date(weekStartDate);
-    weekEndDate.setDate(weekStartDate.getDate() + 6);
+    const currentWeekEnd = new Date(currentWeekStart);
+    currentWeekEnd.setDate(currentWeekStart.getDate() + 6);
     
     return {
-      weekStart: weekStartDate,
-      weekEnd: weekEndDate,
+      weekStart: currentWeekStart,
+      weekEnd: currentWeekEnd,
       weekNumber: currentWeekOffset + 1,
-      totalWeeks: total
+      totalWeeks: total,
+      displayStartDate: schedule.start_date,
+      displayEndDate: schedule.end_date
     };
   }, [schedule, currentWeekOffset]);
 
@@ -331,59 +334,36 @@ export default function SchedulePage() {
     });
   };
 
-  const parseRecurrenceRule = (rule: string) => {
-    if (!rule) return null;
-    
-    const freqMatch = rule.match(/FREQ=(\w+)/);
-    const intervalMatch = rule.match(/INTERVAL=(\d+)/);
-    const byDayMatch = rule.match(/BYDAY=(\w+)/);
-    
-    const freq = freqMatch ? freqMatch[1] : 'WEEKLY';
-    const interval = intervalMatch ? parseInt(intervalMatch[1]) : 1;
-    
-    const byDayStr = byDayMatch ? byDayMatch[1] : '';
-    const dayAbbrevs = ['SU', 'MO', 'TU', 'WE', 'TH', 'FR', 'SA'];
-    const dayIndex = dayAbbrevs.indexOf(byDayStr);
-    
-    return { freq, interval, dayIndex: dayIndex >= 0 ? dayIndex : null };
-  };
-
   const isEntryInCurrentWeek = (entry: ScheduleEntry): boolean => {
     if (!weekStart || !schedule) return false;
     
-    const entryStart = new Date(entry.start_time);
-    const rule = parseRecurrenceRule(entry.recurrence_rule);
+    // Extract just the date part (YYYY-MM-DD) from entry
+    const entryDateStr = entry.start_time.split('T')[0];
+    const weekStartStr = weekStart.toISOString().split('T')[0];
+    const weekEndStr = weekEnd.toISOString().split('T')[0];
     
-    if (!rule || !rule.dayIndex) {
-      return entryStart >= weekStart && entryStart <= weekEnd;
-    }
+    return entryDateStr >= weekStartStr && entryDateStr <= weekEndStr;
+  };
+
+  const getEntriesForSlot = (day: string, hour: number) => {
+    const dayIndex = DAYS.indexOf(day);
     
-    const scheduleStart = parseLocalDate(schedule.start_date);
-    const scheduleFirstDay = new Date(scheduleStart);
-    scheduleFirstDay.setDate(scheduleStart.getDate() - scheduleStart.getDay());
-    
-    const daysFromFirst = Math.floor((entryStart.getTime() - scheduleFirstDay.getTime()) / (1000 * 60 * 60 * 24));
-    const entryWeekOffset = Math.floor(daysFromFirst / 7);
-    
-    const currentWeekFirstDay = new Date(weekStart);
-    const daysFromCurrentFirst = Math.floor((currentWeekFirstDay.getTime() - scheduleFirstDay.getTime()) / (1000 * 60 * 60 * 24));
-    const currentWeekOffset = Math.floor(daysFromCurrentFirst / 7);
-    
-    if (rule.freq === 'WEEKLY' || rule.freq === '2WEEKLY') {
-      const weekDiff = Math.abs(entryWeekOffset - currentWeekOffset);
-      const interval = rule.freq === '2WEEKLY' ? 2 : 1;
-      return weekDiff % interval === 0;
-    }
-    
-    if (rule.freq === 'MONTHLY') {
-      const entryMonth = entryStart.getMonth();
-      const entryYear = entryStart.getFullYear();
-      const currentWeekMonth = weekStart.getMonth();
-      const currentWeekYear = weekStart.getFullYear();
-      return entryMonth === currentWeekMonth && entryYear === currentWeekYear;
-    }
-    
-    return entryWeekOffset === currentWeekOffset;
+    return entries.filter(entry => {
+      if (!isEntryInCurrentWeek(entry)) return false;
+      
+      // Get the date of this entry
+      const entryDateStr = entry.start_time.split('T')[0];
+      const [year, month, dayNum] = entryDateStr.split('-').map(Number);
+      const entryDate = new Date(year, month - 1, dayNum);
+      
+      // What day of week is this date?
+      const entryDayIndex = entryDate.getDay();
+      
+      // Get the hour from the entry
+      const entryHour = new Date(entry.start_time).getHours();
+      
+      return entryDayIndex === dayIndex && entryHour === hour;
+    });
   };
 
   const goToPreviousWeek = () => {
@@ -772,18 +752,47 @@ export default function SchedulePage() {
       if (!confirmSwap) return;
 
       try {
-        const updatedDraggedEntry = {
-          ...draggedEntry,
-          start_time: targetEntry.start_time,
-          end_time: targetEntry.end_time,
-          recurrence_rule: targetEntry.recurrence_rule,
+        // Calculate original durations (from each entry's own start/end)
+        const draggedStart = new Date(draggedEntry.start_time);
+        const draggedEnd = new Date(draggedEntry.end_time);
+        const draggedDurationMs = draggedEnd.getTime() - draggedStart.getTime();
+
+        const targetStart = new Date(targetEntry.start_time);
+        const targetEnd = new Date(targetEntry.end_time);
+        const targetDurationMs = targetEnd.getTime() - targetStart.getTime();
+
+        // Helper to update BYDAY in recurrence rule
+        const updateRecurrenceDay = (rule: string, newDate: Date): string => {
+          if (!rule) return ''; // "Once" stays empty
+          
+          const dayAbbrevs = ['SU', 'MO', 'TU', 'WE', 'TH', 'FR', 'SA'];
+          const newDayAbbrev = dayAbbrevs[newDate.getDay()];
+          
+          // Replace BYDAY in the rule
+          if (rule.includes('BYDAY=')) {
+            return rule.replace(/BYDAY=\w+/, `BYDAY=${newDayAbbrev}`);
+          } else {
+            // Add BYDAY if missing
+            return `${rule};BYDAY=${newDayAbbrev}`;
+          }
         };
 
+        // Update dragged entry: new start + original duration + updated recurrence
+        const updatedDraggedRecurrence = updateRecurrenceDay(draggedEntry.recurrence_rule, targetStart);
+        const updatedDraggedEntry = {
+          ...draggedEntry,
+          start_time: targetStart.toISOString(),
+          end_time: new Date(targetStart.getTime() + draggedDurationMs).toISOString(),
+          recurrence_rule: updatedDraggedRecurrence,
+        };
+
+        // Update target entry: new start + original duration + updated recurrence
+        const updatedTargetRecurrence = updateRecurrenceDay(targetEntry.recurrence_rule, draggedStart);
         const updatedTargetEntry = {
           ...targetEntry,
-          start_time: draggedEntry.start_time,
-          end_time: draggedEntry.end_time,
-          recurrence_rule: draggedEntry.recurrence_rule,
+          start_time: draggedStart.toISOString(),
+          end_time: new Date(draggedStart.getTime() + targetDurationMs).toISOString(),
+          recurrence_rule: updatedTargetRecurrence,
         };
 
         setEntries(entries.map(e => {
@@ -793,15 +802,15 @@ export default function SchedulePage() {
         }));
 
         await updateScheduleEntry(draggedEntry.id, {
-          start_time: targetEntry.start_time,
-          end_time: targetEntry.end_time,
-          recurrence_rule: targetEntry.recurrence_rule,
+          start_time: targetStart.toISOString(),
+          end_time: new Date(targetStart.getTime() + draggedDurationMs).toISOString(),
+          recurrence_rule: updatedDraggedRecurrence,
         });
 
         await updateScheduleEntry(targetEntry.id, {
-          start_time: draggedEntry.start_time,
-          end_time: draggedEntry.end_time,
-          recurrence_rule: draggedEntry.recurrence_rule,
+          start_time: draggedStart.toISOString(),
+          end_time: new Date(draggedStart.getTime() + targetDurationMs).toISOString(),
+          recurrence_rule: updatedTargetRecurrence,
         });
       } catch (err) {
         console.error('Failed to swap events:', err);
@@ -825,20 +834,7 @@ export default function SchedulePage() {
         top: `${topOffset}px`,
         height: `${height}px`,
       };
-     };
-
-     const getEntriesForSlot = (day: string, hour: number) => {
-       return entries.filter(entry => {
-         const shouldShow = isEntryInCurrentWeek(entry);
-         if (!shouldShow) return false;
-         
-         const startTime = new Date(entry.start_time);
-         const dayOfWeek = startTime.getDay();
-         const dayIndex = DAYS.indexOf(day);
-         
-         return dayOfWeek === dayIndex && startTime.getHours() === hour;
-       });
-     };
+      };
 
     function DraggableLessonBlock({ entry, children }: { entry: ScheduleEntry; children: React.ReactNode }) {
       const { attributes, listeners, setNodeRef } = useDraggable({
@@ -1084,10 +1080,7 @@ export default function SchedulePage() {
                     style={{ cursor: 'pointer' }}
                     onClick={handleDatesClick}
                   >
-                    {formatLocalDate(new Date(schedule.start_date))} - {formatLocalDate(new Date(schedule.end_date))}
-                    <span style={{ marginLeft: '0.5rem', color: '#9ca3af', fontSize: '0.75rem' }}>
-                      ({userTimezoneAbbrev})
-                    </span>
+                    {formatLocalDate(parseLocalDate(schedule.start_date))} - {formatLocalDate(parseLocalDate(schedule.end_date))}
                   </span>
                 )}
               </span>
