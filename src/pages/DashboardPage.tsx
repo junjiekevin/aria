@@ -9,7 +9,7 @@ import EditScheduleModal from '../components/EditScheduleModal';
 import ProfileDropdown from '../components/ProfileDropdown';
 import logo from '../assets/images/aria-logo.png';
 
-const styles: Record<string, React.CSSProperties> = {
+	const styles: Record<string, React.CSSProperties> = {
 	page: {
 		minHeight: '100vh',
 		background: 'linear-gradient(180deg, #fff7ed 0%, #ffffff 50%, #fff7ed 100%)',
@@ -27,35 +27,34 @@ const styles: Record<string, React.CSSProperties> = {
 	headerContent: {
 		maxWidth: '1100px',
 		margin: '0 auto',
-		padding: '1.25rem 1.5rem',
+		padding: '1rem',
 		display: 'grid',
 		gridTemplateColumns: 'auto 1fr auto',
 		alignItems: 'center',
-		gap: '2rem',
+		gap: '1rem',
 	},
 	logoSection: {
 		display: 'flex',
 		alignItems: 'center',
-		gap: '0.75rem',
+		gap: '0.5rem',
 	},
 	logo: {
-		height: '40px',
+		height: '32px',
 		width: 'auto',
 	},
 	greetingSection: {
-		flex: 1,
 		textAlign: 'center' as const,
 	},
 	greeting: {
-		fontSize: '1.125rem',
+		fontSize: '1rem',
 		fontWeight: '600',
 		color: '#111827',
 		margin: 0,
 	},
 	greetingSubtext: {
-		fontSize: '0.8125rem',
+		fontSize: '0.75rem',
 		color: '#6b7280',
-		margin: '0.25rem 0 0 0',
+		margin: '0.125rem 0 0 0',
 	},
 	button: {
 		backgroundColor: '#f97316',
@@ -68,23 +67,25 @@ const styles: Record<string, React.CSSProperties> = {
 		alignItems: 'center',
 		gap: '0.5rem',
 		transition: 'all 0.2s ease',
-		padding: '0.75rem 1.5rem',
-		fontSize: '0.9375rem',
+		padding: '0.625rem 1.25rem',
+		fontSize: '0.875rem',
 		boxShadow: '0 2px 8px rgba(249, 115, 22, 0.3)',
+		whiteSpace: 'nowrap' as const,
 	},
 	main: {
 		maxWidth: '1100px',
 		margin: '0 auto',
-		padding: '2.5rem 1.5rem',
+		padding: '1.5rem 1rem',
 	},
 	sectionHeader: {
 		display: 'flex',
-		alignItems: 'center',
-		justifyContent: 'space-between',
+		flexDirection: 'column' as const,
+		alignItems: 'stretch',
+		gap: '1rem',
 		marginBottom: '1.5rem',
 	},
 	sectionTitle: {
-		fontSize: '1.25rem',
+		fontSize: '1.125rem',
 		fontWeight: '600',
 		color: '#111827',
 		margin: 0,
@@ -96,20 +97,29 @@ const styles: Record<string, React.CSSProperties> = {
 		padding: '0.25rem',
 		borderRadius: '9999px',
 		boxShadow: '0 1px 3px rgba(0, 0, 0, 0.08)',
+		overflowX: 'auto' as const,
+		msOverflowStyle: 'none' as const,
+		scrollbarWidth: 'none' as const,
+	},
+	filterTabsMobile: {
+		padding: '0.25rem 0.5rem',
+		gap: '0.125rem',
 	},
 	tab: {
-		padding: '0.5rem 1rem',
+		padding: '0.5rem 0.75rem',
 		background: 'transparent',
 		border: 'none',
 		borderRadius: '9999px',
-		fontSize: '0.875rem',
+		fontSize: '0.8125rem',
 		fontWeight: '500',
 		color: '#6b7280',
 		cursor: 'pointer',
 		transition: 'all 0.2s ease',
 		display: 'flex',
 		alignItems: 'center',
-		gap: '0.5rem',
+		gap: '0.375rem',
+		whiteSpace: 'nowrap' as const,
+		flexShrink: 0 as const,
 	},
 	tabActive: {
 		background: '#fff7ed',
@@ -117,7 +127,7 @@ const styles: Record<string, React.CSSProperties> = {
 	},
 	card: {
 		backgroundColor: 'white',
-		padding: '1.5rem',
+		padding: '1.25rem',
 		borderRadius: '16px',
 		boxShadow: '0 2px 8px rgba(0, 0, 0, 0.06)',
 		border: '1px solid rgba(0, 0, 0, 0.04)',
@@ -128,9 +138,9 @@ const styles: Record<string, React.CSSProperties> = {
 		display: 'inline-flex',
 		alignItems: 'center',
 		gap: '0.375rem',
-		padding: '0.375rem 0.75rem',
+		padding: '0.25rem 0.625rem',
 		borderRadius: '9999px',
-		fontSize: '0.8125rem',
+		fontSize: '0.75rem',
 		fontWeight: '500',
 		border: '1px solid',
 	},
@@ -139,54 +149,55 @@ const styles: Record<string, React.CSSProperties> = {
 		flexDirection: 'column' as const,
 		alignItems: 'center',
 		justifyContent: 'center',
-		padding: '5rem 2rem',
+		padding: '4rem 1.5rem',
 		textAlign: 'center' as const,
 	},
 	emptyIcon: {
-		width: '80px',
-		height: '80px',
+		width: '64px',
+		height: '64px',
 		borderRadius: '50%',
 		background: 'linear-gradient(135deg, #fb923c, #fdba74)',
 		display: 'flex',
 		alignItems: 'center',
 		justifyContent: 'center',
-		marginBottom: '1.5rem',
+		marginBottom: '1.25rem',
 		boxShadow: '0 4px 16px rgba(249, 115, 22, 0.25)',
 	},
 	emptyTitle: {
-		fontSize: '1.375rem',
+		fontSize: '1.25rem',
 		fontWeight: '600',
 		color: '#111827',
-		margin: '0 0 0.75rem 0',
+		margin: '0 0 0.5rem 0',
 	},
 	emptyText: {
-		fontSize: '1rem',
+		fontSize: '0.9375rem',
 		color: '#6b7280',
-		maxWidth: '360px',
-		margin: '0 0 2rem 0',
-		lineHeight: 1.6,
+		maxWidth: '320px',
+		margin: '0 0 1.5rem 0',
+		lineHeight: 1.5,
 	},
 	trashedEmptyIcon: {
-		width: '80px',
-		height: '80px',
+		width: '64px',
+		height: '64px',
 		borderRadius: '50%',
 		background: '#fef3c7',
 		display: 'flex',
 		alignItems: 'center',
 		justifyContent: 'center',
-		marginBottom: '1.5rem',
+		marginBottom: '1.25rem',
 	},
 	toast: {
 		position: 'fixed' as const,
-		bottom: '2rem',
-		left: '50%',
-		transform: 'translateX(-50%)',
-		padding: '0.875rem 1.5rem',
+		bottom: '1.5rem',
+		left: '1rem',
+		right: '1rem',
+		padding: '0.75rem 1.25rem',
 		borderRadius: '9999px',
 		fontWeight: '500',
 		boxShadow: '0 4px 20px rgba(0, 0, 0, 0.15)',
 		zIndex: 1000,
 		animation: 'slideUp 0.3s ease',
+		textAlign: 'center' as const,
 	},
 	toastSuccess: {
 		background: '#10b981',
@@ -195,6 +206,47 @@ const styles: Record<string, React.CSSProperties> = {
 	toastError: {
 		background: '#ef4444',
 		color: 'white',
+	},
+	headerContentMobile: {
+		gridTemplateColumns: 'auto 1fr',
+		gridTemplateRows: 'auto auto',
+		gap: '0.5rem',
+		padding: '0.75rem',
+	},
+	logoMobile: {
+		height: '28px',
+	},
+	greetingSectionMobile: {
+		gridColumn: '1 / -1',
+		order: 3,
+		textAlign: 'left' as const,
+		paddingTop: '0.5rem',
+		borderTop: '1px solid rgba(249, 115, 22, 0.1)',
+		marginTop: '0.25rem',
+	},
+	headerActionsMobile: {
+		display: 'flex',
+		alignItems: 'center',
+		gap: '0.5rem',
+	},
+	buttonMobile: {
+		padding: '0.5rem 0.875rem',
+		fontSize: '0.8125rem',
+	},
+	mainMobile: {
+		padding: '1rem 0.75rem',
+	},
+	cardMobile: {
+		padding: '1rem',
+		borderRadius: '12px',
+	},
+	emptyIconMobile: {
+		width: '56px',
+		height: '56px',
+	},
+	emptyIconMobileSvg: {
+		width: '32px',
+		height: '32px',
 	},
 };
 
@@ -296,6 +348,7 @@ function ScheduleCard({
 
 	return (
 		<div 
+			className="card"
 			style={{
 				...styles.card,
 				opacity: isTrashed ? 0.65 : 1,
@@ -418,7 +471,7 @@ function ScheduleCard({
 function EmptyState({ onCreateSchedule }: { onCreateSchedule: () => void }) {
 	return (
 		<div style={styles.emptyState}>
-			<div style={styles.emptyIcon}>
+			<div className="emptyIcon" style={styles.emptyIcon}>
 				<Calendar size={40} color='white' />
 			</div>
 			<h2 style={styles.emptyTitle}>Welcome to Aria!</h2>
@@ -644,21 +697,44 @@ export default function DashboardPage() {
 					}
 					.tab:hover:not(.active) { background: #f3f4f6 !important; }
 					.tab.active { background: #fff7ed !important; color: #f97316 !important; }
+					.filterTabs::-webkit-scrollbar { display: none; }
+					.filterTabs { -ms-overflow-style: none; scrollbar-width: none; }
+					
+					@media (max-width: 640px) {
+						.headerContent { grid-template-columns: auto 1fr !important; grid-template-rows: auto auto !important; gap: 0.5rem !important; padding: 0.75rem !important; }
+						.logo { height: 28px !important; }
+						.greetingSection { grid-column: 1 / -1 !important; order: 3 !important; text-align: left !important; padding-top: 0.5rem !important; border-top: 1px solid rgba(249, 115, 22, 0.1) !important; margin-top: 0.25rem !important; }
+						.headerActions { display: flex !important; align-items: center !important; gap: 0.5rem !important; }
+						.createButton { padding: 0.5rem 0.875rem !important; font-size: 0.8125rem !important; }
+						.main { padding: 1rem 0.75rem !important; }
+						.card { padding: 1rem !important; border-radius: 12px !important; }
+						.emptyIcon { width: 56px !important; height: 56px !important; }
+						.emptyIcon svg { width: 32px !important; height: 32px !important; }
+						.toast { left: 0.75rem !important; right: 0.75rem !important; bottom: 1rem !important; }
+						.sectionTitle { font-size: 1rem !important; }
+						.tab { padding: 0.375rem 0.625rem !important; font-size: 0.75rem !important; }
+					}
+					
+					@media (min-width: 641px) and (max-width: 1024px) {
+						.headerContent { padding: 1rem 1.25rem !important; }
+						.main { padding: 1.25rem 1.25rem !important; }
+						.card { padding: 1.125rem !important; }
+					}
 				`}
 			</style>
 
 			{/* Header */}
 			<header style={styles.header}>
-				<div style={styles.headerContent}>
+				<div className="headerContent" style={styles.headerContent}>
 					<div style={styles.logoSection}>
-						<img src={logo} alt='Aria' style={styles.logo} />
+						<img src={logo} alt='Aria' className="logo" style={styles.logo} />
 					</div>
-					<div style={styles.greetingSection}>
+					<div className="greetingSection" style={styles.greetingSection}>
 						<p style={styles.greeting}>{getTimeBasedGreeting()}, {getUserFirstName()}!</p>
 						<p style={styles.greetingSubtext}>Ready to organize your day?</p>
 					</div>
-					<div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-						<button onClick={handleCreateSchedule} style={styles.button}>
+					<div className="headerActions" style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+						<button className="createButton" onClick={handleCreateSchedule} style={styles.button}>
 							<Plus size={18} />
 							New Schedule
 						</button>
@@ -668,7 +744,7 @@ export default function DashboardPage() {
 			</header>
 
 			{/* Main Content */}
-			<main style={styles.main}>
+			<main className="main" style={styles.main}>
 				{/* Filter Tabs */}
 				<div style={styles.sectionHeader}>
 					<div style={styles.filterTabs}>
