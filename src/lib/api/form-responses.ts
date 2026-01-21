@@ -13,6 +13,7 @@ export interface FormResponse {
     student_name: string;
     email: string;
     top_choices: string[]; // Array of ISO 8601 datetime strings
+    assigned: boolean; // Whether the participant has been assigned to a schedule slot
     // Preferred timings (new)
     preferred_1_day?: string;
     preferred_1_start?: string;
@@ -86,6 +87,22 @@ export async function deleteFormResponse(responseId: string): Promise<void> {
     if (error) {
         throw new Error(`Failed to delete form response: ${error.message}`);
     }
+}
+
+// Update form response assigned status
+export async function updateFormResponseAssigned(responseId: string, assigned: boolean): Promise<FormResponse> {
+    const { data, error } = await supabase
+        .from('form_responses')
+        .update({ assigned })
+        .eq('id', responseId)
+        .select()
+        .single();
+    
+    if (error) {
+        throw new Error(`Failed to update form response: ${error.message}`);
+    }
+
+    return data;
 }
 
 // Get preferred timings as an array for a form response

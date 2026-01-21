@@ -4,7 +4,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { ArrowLeft, ChevronLeft, ChevronRight, Trash2, Copy, Check } from 'lucide-react';
 import { getSchedule, updateSchedule, type Schedule } from '../lib/api/schedules';
 import { getScheduleEntries, createScheduleEntry, updateScheduleEntry, deleteScheduleEntry, type ScheduleEntry } from '../lib/api/schedule-entries';
-import { getFormResponses, deleteFormResponse, type FormResponse } from '../lib/api/form-responses';
+import { getFormResponses, deleteFormResponse, updateFormResponseAssigned, type FormResponse } from '../lib/api/form-responses';
 import AddEventModal from '../components/AddEventModal';
 import Modal from '../components/Modal';
 import SchedulingPreviewModal from '../components/SchedulingPreviewModal';
@@ -118,7 +118,7 @@ const styles = {
     gridTemplateColumns: '55px repeat(7, 1fr)',
   },
   timeSlot: {
-    minHeight: '40px',
+    height: '40px',
     borderRight: '1px solid #fed7aa',
     borderBottom: '1px solid #ffedd5',
     position: 'relative' as const,
@@ -546,8 +546,7 @@ export default function SchedulePage() {
   };
 
   const getUnassignedStudents = () => {
-    const assignedNames = entries.map(e => e.student_name.toLowerCase());
-    return responses.filter(r => !assignedNames.includes(r.student_name.toLowerCase()));
+    return responses.filter(r => r.assigned === false);
   };
 
   const handleSlotClick = (day: string, hour: number) => {
@@ -601,15 +600,12 @@ export default function SchedulePage() {
       
       const [, day, hourStr] = dropId.split('-');
       const hour = parseInt(hourStr);
-      
-      const scheduleStart = new Date(schedule.start_date);
+
       const dayIndex = DAYS.indexOf(day);
-      const currentDay = scheduleStart.getDay();
-      let daysToAdd = dayIndex - currentDay;
-      if (daysToAdd < 0) daysToAdd += 7;
-      
-      const firstOccurrence = new Date(scheduleStart);
-      firstOccurrence.setDate(scheduleStart.getDate() + daysToAdd);
+
+      // Use the current week being viewed for the date
+      const firstOccurrence = new Date(weekStart!);
+      firstOccurrence.setDate(weekStart!.getDate() + dayIndex);
       firstOccurrence.setHours(hour, 0, 0, 0);
       
       const preferredStart = response.preferred_1_start;
@@ -650,6 +646,7 @@ export default function SchedulePage() {
             recurrence_rule: recurrenceRule,
           });
           
+          await updateFormResponseAssigned(responseId, true);
           setResponses(responses.filter(r => r.id !== responseId));
           setEntries([...entries, newEntry]);
         } catch (err) {
@@ -667,14 +664,11 @@ export default function SchedulePage() {
       const [, day, hourStr] = dropId.split('-');
       const hour = parseInt(hourStr);
 
-      const scheduleStart = new Date(schedule.start_date);
       const dayIndex = DAYS.indexOf(day);
-      const currentDay = scheduleStart.getDay();
-      let daysToAdd = dayIndex - currentDay;
-      if (daysToAdd < 0) daysToAdd += 7;
-      
-      const firstOccurrence = new Date(scheduleStart);
-      firstOccurrence.setDate(scheduleStart.getDate() + daysToAdd);
+
+      // Use the current week being viewed for the date
+      const firstOccurrence = new Date(weekStart!);
+      firstOccurrence.setDate(weekStart!.getDate() + dayIndex);
       firstOccurrence.setHours(hour, 0, 0, 0);
 
       const oldStart = new Date(draggedEntry.start_time);
@@ -699,29 +693,60 @@ export default function SchedulePage() {
         if (!confirmSwap) return;
         
         const dayAbbrev = ['SU', 'MO', 'TU', 'WE', 'TH', 'FR', 'SA'][dayIndex];
-        
+
+        // Get the original day of the dragged entry for the swap
+        const draggedOriginalDay = new Date(draggedEntry.start_time).getDay();
+        const draggedOriginalDayAbbrev = ['SU', 'MO', 'TU', 'WE', 'TH', 'FR', 'SA'][draggedOriginalDay];
+
+        // Helper to get frequency type from recurrence rule
+        const getFrequency = (rule: string): 'once' | 'weekly' | '2weekly' | 'monthly' => {
+          if (!rule) return 'once';
+          if (rule.includes('FREQ=2WEEKLY')) return '2weekly';
+          if (rule.includes('FREQ=MONTHLY')) return 'monthly';
+          return 'weekly';
+        };
+
+        // Helper to update just the BYDAY in recurrence rule while preserving frequency
+        const updateRecurrenceDay = (rule: string, newDayAbbrev: string): string => {
+          const freq = getFrequency(rule);
+          if (freq === 'once') return '';
+          if (freq === '2weekly') return `FREQ=2WEEKLY;BYDAY=${newDayAbbrev}`;
+          if (freq === 'monthly') return `FREQ=WEEKLY;INTERVAL=4;BYDAY=${newDayAbbrev}`;
+          return `FREQ=WEEKLY;BYDAY=${newDayAbbrev}`;
+        };
+
         try {
+          // Preserve the overlapping entry's original duration
+          const overlappingDuration = new Date(overlappingEntry.end_time).getTime() - new Date(overlappingEntry.start_time).getTime();
+          const draggedNewStart = new Date(draggedEntry.start_time);
+          const overlappingNewEnd = new Date(draggedNewStart.getTime() + overlappingDuration);
+
+          const newDraggedRecurrence = updateRecurrenceDay(draggedEntry.recurrence_rule, dayAbbrev);
+          const newOverlappingRecurrence = updateRecurrenceDay(overlappingEntry.recurrence_rule, draggedOriginalDayAbbrev);
+
           setEntries(entries.map(e => {
             if (e.id === draggedEntry.id) {
-              return { ...e, start_time: firstOccurrence.toISOString(), end_time: newEnd.toISOString(), recurrence_rule: `FREQ=WEEKLY;BYDAY=${dayAbbrev}` };
+              return { ...e, start_time: firstOccurrence.toISOString(), end_time: newEnd.toISOString(), recurrence_rule: newDraggedRecurrence };
             }
             if (e.id === overlappingEntry.id) {
-              return { ...e, start_time: draggedEntry.start_time, end_time: draggedEntry.end_time, recurrence_rule: draggedEntry.recurrence_rule };
+              return { ...e, start_time: draggedEntry.start_time, end_time: overlappingNewEnd.toISOString(), recurrence_rule: newOverlappingRecurrence };
             }
             return e;
           }));
-          
+
           await updateScheduleEntry(draggedEntry.id, {
             start_time: firstOccurrence.toISOString(),
             end_time: newEnd.toISOString(),
-            recurrence_rule: `FREQ=WEEKLY;BYDAY=${dayAbbrev}`,
+            recurrence_rule: newDraggedRecurrence,
           });
-          
+
           await updateScheduleEntry(overlappingEntry.id, {
             start_time: draggedEntry.start_time,
-            end_time: draggedEntry.end_time,
-            recurrence_rule: draggedEntry.recurrence_rule,
+            end_time: overlappingNewEnd.toISOString(),
+            recurrence_rule: newOverlappingRecurrence,
           });
+          
+          loadScheduleData();
         } catch (err) {
           console.error('Failed to swap events:', err);
           loadScheduleData();
@@ -757,21 +782,14 @@ export default function SchedulePage() {
         recurrenceRule = `FREQ=WEEKLY;BYDAY=${dayAbbrev}`;
       }
 
-      const updatedEntry = {
-        ...draggedEntry,
-        start_time: firstOccurrence.toISOString(),
-        end_time: newEnd.toISOString(),
-        recurrence_rule: recurrenceRule,
-      };
-
-      setEntries(entries.map(e => e.id === draggedEntry.id ? updatedEntry : e));
-
       try {
         await updateScheduleEntry(draggedEntry.id, {
           start_time: firstOccurrence.toISOString(),
           end_time: newEnd.toISOString(),
           recurrence_rule: recurrenceRule,
         });
+
+        await loadScheduleData();
       } catch (err) {
         console.error('Failed to move event:', err);
         loadScheduleData();
@@ -800,60 +818,68 @@ export default function SchedulePage() {
         const targetEnd = new Date(targetEntry.end_time);
         const targetDurationMs = targetEnd.getTime() - targetStart.getTime();
 
-        // Helper to update BYDAY in recurrence rule
+        // Helper to get frequency type from recurrence rule
+        const getFrequency = (rule: string): 'once' | 'weekly' | '2weekly' | 'monthly' => {
+          if (!rule) return 'once';
+          if (rule.includes('FREQ=2WEEKLY')) return '2weekly';
+          if (rule.includes('FREQ=MONTHLY')) return 'monthly';
+          return 'weekly';
+        };
+
+        // Helper to update just the BYDAY in recurrence rule while preserving frequency
         const updateRecurrenceDay = (rule: string, newDate: Date): string => {
-          if (!rule) return ''; // "Once" stays empty
-          
           const dayAbbrevs = ['SU', 'MO', 'TU', 'WE', 'TH', 'FR', 'SA'];
           const newDayAbbrev = dayAbbrevs[newDate.getDay()];
           
-          // Replace BYDAY in the rule
-          if (rule.includes('BYDAY=')) {
-            return rule.replace(/BYDAY=\w+/, `BYDAY=${newDayAbbrev}`);
-          } else {
-            // Add BYDAY if missing
-            return `${rule};BYDAY=${newDayAbbrev}`;
-          }
+          // Extract frequency and rebuild rule
+          const freq = getFrequency(rule);
+          
+          if (freq === 'once') return '';
+          if (freq === '2weekly') return `FREQ=2WEEKLY;BYDAY=${newDayAbbrev}`;
+          if (freq === 'monthly') return `FREQ=WEEKLY;INTERVAL=4;BYDAY=${newDayAbbrev}`;
+          return `FREQ=WEEKLY;BYDAY=${newDayAbbrev}`;
         };
 
-        // Update dragged entry: new start + original duration + updated recurrence
-        const updatedDraggedRecurrence = updateRecurrenceDay(draggedEntry.recurrence_rule, targetStart);
-        const updatedDraggedEntry = {
-          ...draggedEntry,
-          start_time: targetStart.toISOString(),
-          end_time: new Date(targetStart.getTime() + draggedDurationMs).toISOString(),
-          recurrence_rule: updatedDraggedRecurrence,
-        };
+        // Calculate new recurrence rules - each entry keeps its own frequency
+        const newDraggedRecurrence = updateRecurrenceDay(draggedEntry.recurrence_rule, targetStart);
+        const newTargetRecurrence = updateRecurrenceDay(targetEntry.recurrence_rule, draggedStart);
 
-        // Update target entry: new start + original duration + updated recurrence
-        const updatedTargetRecurrence = updateRecurrenceDay(targetEntry.recurrence_rule, draggedStart);
-        const updatedTargetEntry = {
-          ...targetEntry,
-          start_time: draggedStart.toISOString(),
-          end_time: new Date(draggedStart.getTime() + targetDurationMs).toISOString(),
-          recurrence_rule: updatedTargetRecurrence,
-        };
-
-        setEntries(entries.map(e => {
-          if (e.id === draggedEntry.id) return updatedDraggedEntry;
-          if (e.id === targetEntry.id) return updatedTargetEntry;
-          return e;
-        }));
-
+        // Update entries one at a time to avoid race conditions
         await updateScheduleEntry(draggedEntry.id, {
           start_time: targetStart.toISOString(),
           end_time: new Date(targetStart.getTime() + draggedDurationMs).toISOString(),
-          recurrence_rule: updatedDraggedRecurrence,
+          recurrence_rule: newDraggedRecurrence,
         });
 
         await updateScheduleEntry(targetEntry.id, {
           start_time: draggedStart.toISOString(),
           end_time: new Date(draggedStart.getTime() + targetDurationMs).toISOString(),
-          recurrence_rule: updatedTargetRecurrence,
+          recurrence_rule: newTargetRecurrence,
         });
+
+        // Update local state with the new values
+        setEntries(entries.map(e => {
+          if (e.id === draggedEntry.id) {
+            return {
+              ...e,
+              start_time: targetStart.toISOString(),
+              end_time: new Date(targetStart.getTime() + draggedDurationMs).toISOString(),
+              recurrence_rule: newDraggedRecurrence,
+            };
+          }
+          if (e.id === targetEntry.id) {
+            return {
+              ...e,
+              start_time: draggedStart.toISOString(),
+              end_time: new Date(draggedStart.getTime() + targetDurationMs).toISOString(),
+              recurrence_rule: newTargetRecurrence,
+            };
+          }
+          return e;
+        }));
       } catch (err) {
         console.error('Failed to swap events:', err);
-        loadScheduleData();
+        alert('Failed to swap events. Please try again.');
       }
     }
    };
@@ -1337,6 +1363,7 @@ export default function SchedulePage() {
                   await deleteScheduleEntry(entryToDelete.id);
                   setEntries(entries.filter(e => e.id !== entryToDelete.id));
                   setEntryToDelete(null);
+                  loadScheduleData();
                 } catch (err) {
                   console.error('Failed to delete event:', err);
                 }
