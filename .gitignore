@@ -38,7 +38,7 @@ supabase/config.json
 *.sln
 *.sw?
 
-# Aria logs folder (contains docs)
+# Aria logs folder (contains docs - NOT tracked in git)
 Aria logs/
 
 # OS files
