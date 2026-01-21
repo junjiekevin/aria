@@ -146,7 +146,23 @@ const faqData: FAQItem[] = [
   },
   {
     question: "How does the AI scheduling assistant work?",
-    answer: "Our AI assistant (powered by Gemini) can help you create optimized schedules based on your constraints. Just describe what you need in the chat, and it will generate schedule suggestions that you can customize."
+    answer: "Our AI assistant (powered by OpenRouter/Gemini) can help you create optimized schedules based on your constraints. Just describe what you need in the chat, and it will generate schedule suggestions that you can customize."
+  },
+  {
+    question: "How do I add lessons or events to a schedule?",
+    answer: "Open a schedule and click the 'Add Event' button. Fill in the student name, day, time, duration, and frequency. You can also ask the AI assistant to add events for you."
+  },
+  {
+    question: "What frequency options are available for events?",
+    answer: "• Once: Single occurrence on the selected date\n• Weekly: Repeats every week on the selected day\n• 2Weekly: Repeats every 2 weeks on the selected day\n• Monthly: Repeats every 4 weeks on the selected day"
+  },
+  {
+    question: "Can I move or swap events on the timetable?",
+    answer: "Yes! Drag any event card and drop it onto another time slot to move it. You can also drag one event onto another to swap their positions. The frequency and duration are preserved when swapping."
+  },
+  {
+    question: "How do I manage my students?",
+    answer: "Visit the Students page to view all your students. You can add new students with their contact information, edit existing details, or remove students from your list."
   },
   {
     question: "Can I share my schedules with others?",
@@ -155,6 +171,14 @@ const faqData: FAQItem[] = [
   {
     question: "How do I delete a schedule?",
     answer: "Click 'Edit' on a schedule, then use the trash icon or change the status to 'Trashed'. Trashed schedules are kept for 30 days before permanent deletion."
+  },
+  {
+    question: "How do I view or edit a specific event?",
+    answer: "Click on any event card in the timetable to open the Event Details modal. From there you can view all details, edit the event, or delete it."
+  },
+  {
+    question: "How do I navigate between weeks?",
+    answer: "Use the Previous Week and Next Week buttons at the top of the timetable view to navigate through the schedule. You can also click on the date range to jump to a specific week."
   }
 ];
 
