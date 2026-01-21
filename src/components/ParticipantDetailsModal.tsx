@@ -87,13 +87,15 @@ const styles = {
     },
 };
 
-function TimingDisplay({ timing, rank }: { timing: { day: string; start: string; end: string; frequency: string }; rank: number }) {
+function TimingDisplay({ timing, rank }: { timing: { day: string; start: string; end: string; frequency: string; duration?: number }; rank: number }) {
     const frequencyLabels: Record<string, string> = {
         once: 'Once',
         weekly: 'Weekly',
         '2weekly': 'Every 2 weeks',
         monthly: 'Monthly',
     };
+    
+    const durationLabel = timing.duration ? ` (${timing.duration} min)` : '';
     
     return (
         <div style={styles.timingCard}>
@@ -102,7 +104,7 @@ function TimingDisplay({ timing, rank }: { timing: { day: string; start: string;
             </div>
             <div style={styles.timingDetails}>
                 <div><strong>Day:</strong> {timing.day}</div>
-                <div><strong>Time:</strong> {formatTime(timing.start)} - {formatTime(timing.end)}</div>
+                <div><strong>Time:</strong> {formatTime(timing.start)} - {formatTime(timing.end)}{durationLabel}</div>
                 <div><strong>Frequency:</strong> {frequencyLabels[timing.frequency] || timing.frequency}</div>
             </div>
         </div>

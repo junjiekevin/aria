@@ -5,6 +5,7 @@ export interface PreferredTiming {
     start: string;    // HH:MM format
     end: string;      // HH:MM format
     frequency: string; // 'once', 'weekly', '2weekly', 'monthly'
+    duration?: number; // Calculated duration in minutes
 }
 
 export interface FormResponse {
@@ -27,6 +28,13 @@ export interface FormResponse {
     preferred_3_start?: string;
     preferred_3_end?: string;
     preferred_3_frequency?: string;
+}
+
+export function calculateDurationMinutes(start: string, end: string): number {
+    if (!start || !end) return 0;
+    const [startHours, startMinutes] = start.split(':').map(Number);
+    const [endHours, endMinutes] = end.split(':').map(Number);
+    return (endHours * 60 + endMinutes) - (startHours * 60 + startMinutes);
 }
 
 export interface CreateFormResponseInput {
@@ -110,29 +118,35 @@ export function getPreferredTimings(response: FormResponse): PreferredTiming[] {
     const timings: PreferredTiming[] = [];
     
     if (response.preferred_1_day && response.preferred_1_start && response.preferred_1_end) {
+        const duration = calculateDurationMinutes(response.preferred_1_start, response.preferred_1_end);
         timings.push({
             day: response.preferred_1_day,
             start: response.preferred_1_start,
             end: response.preferred_1_end,
             frequency: response.preferred_1_frequency || 'weekly',
+            duration,
         });
     }
     
     if (response.preferred_2_day && response.preferred_2_start && response.preferred_2_end) {
+        const duration = calculateDurationMinutes(response.preferred_2_start, response.preferred_2_end);
         timings.push({
             day: response.preferred_2_day,
             start: response.preferred_2_start,
             end: response.preferred_2_end,
             frequency: response.preferred_2_frequency || 'weekly',
+            duration,
         });
     }
     
     if (response.preferred_3_day && response.preferred_3_start && response.preferred_3_end) {
+        const duration = calculateDurationMinutes(response.preferred_3_start, response.preferred_3_end);
         timings.push({
             day: response.preferred_3_day,
             start: response.preferred_3_start,
             end: response.preferred_3_end,
             frequency: response.preferred_3_frequency || 'weekly',
+            duration,
         });
     }
     

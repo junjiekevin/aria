@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import Modal from './Modal';
-import { scheduleStudents, createEntryFromAssignment, type SchedulingResult, type ScheduledAssignment } from '../lib/scheduling';
+import { scheduleStudents, dayToIndex, type SchedulingResult, type ScheduledAssignment } from '../lib/scheduling';
     import { createScheduleEntry, type ScheduleEntry } from '../lib/api/schedule-entries';
     import { updateFormResponseAssigned, type FormResponse } from '../lib/api/form-responses';
 
@@ -189,31 +189,45 @@ export default function SchedulingPreviewModal({
         setCreating(true);
         const scheduledAssignments = result.assignments.filter(a => a.isScheduled);
         
-        // Calculate total weeks from actual schedule dates
-        const scheduleEnd = new Date(scheduleStart);
-        scheduleEnd.setMonth(scheduleEnd.getMonth() + 3);
-        const totalWeeks = Math.ceil((scheduleEnd.getTime() - scheduleStart.getTime()) / (7 * 24 * 60 * 60 * 1000));
-        
         let created = 0;
         
         for (const assignment of scheduledAssignments) {
             try {
-                // Create entries for all weeks in the schedule
-                for (let week = 0; week < totalWeeks; week++) {
-                    // Skip weeks based on frequency
-                    const frequency = assignment.timing.frequency;
-                    if (frequency === '2weekly' && week % 2 !== 0) continue;
-                    if (frequency === 'monthly' && week % 4 !== 0) continue;
-                    
-                    const entryData = createEntryFromAssignment(assignment, scheduleStart, week);
-                    await createScheduleEntry({
-                        schedule_id: scheduleId,
-                        student_name: assignment.student.student_name,
-                        ...entryData,
-                    });
-                    created++;
-                    setCreatedCount(created);
-                }
+                // Build proper recurrence rule
+                const frequency = assignment.timing.frequency;
+                const interval = frequency === '2weekly' ? 2 : frequency === 'monthly' ? 4 : 1;
+                const dayAbbrev = ['SU', 'MO', 'TU', 'WE', 'TH', 'FR', 'SA'][dayToIndex(assignment.timing.day)];
+                
+                const recurrenceRule = frequency === 'once' 
+                    ? '' 
+                    : `FREQ=WEEKLY${interval > 1 ? `;INTERVAL=${interval}` : ''};BYDAY=${dayAbbrev}`;
+
+                // Create first occurrence date/time
+                const scheduleStartDate = new Date(scheduleStart);
+                const currentDay = scheduleStartDate.getDay();
+                const dayIndex = dayToIndex(assignment.timing.day);
+                let daysToAdd = dayIndex - currentDay;
+                if (daysToAdd < 0) daysToAdd += 7;
+                
+                const occurrence = new Date(scheduleStartDate);
+                occurrence.setDate(scheduleStartDate.getDate() + daysToAdd);
+                occurrence.setHours(assignment.timing.startHour, assignment.timing.startMinute, 0, 0);
+                
+                const endTime = new Date(occurrence);
+                endTime.setHours(assignment.timing.endHour, assignment.timing.endMinute, 0, 0);
+
+                // Create single entry with recurrence rule
+                await createScheduleEntry({
+                    schedule_id: scheduleId,
+                    student_name: assignment.student.student_name,
+                    start_time: occurrence.toISOString(),
+                    end_time: endTime.toISOString(),
+                    recurrence_rule: recurrenceRule,
+                });
+                
+                created++;
+                setCreatedCount(created);
+                
                 // Mark form response as assigned instead of deleting (preserves audit trail)
                 await updateFormResponseAssigned(assignment.student.id, true);
             } catch (err) {

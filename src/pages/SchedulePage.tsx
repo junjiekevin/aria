@@ -4,7 +4,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { ArrowLeft, ChevronLeft, ChevronRight, Trash2, Copy, Check, Sparkles } from 'lucide-react';
 import { getSchedule, updateSchedule, type Schedule } from '../lib/api/schedules';
 import { getScheduleEntries, createScheduleEntry, updateScheduleEntry, deleteScheduleEntry, type ScheduleEntry } from '../lib/api/schedule-entries';
-import { getFormResponses, deleteFormResponse, updateFormResponseAssigned, type FormResponse } from '../lib/api/form-responses';
+import { getFormResponses, deleteFormResponse, updateFormResponseAssigned, getPreferredTimings, type FormResponse } from '../lib/api/form-responses';
 import AddEventModal from '../components/AddEventModal';
 import Modal from '../components/Modal';
 import SchedulingPreviewModal from '../components/SchedulingPreviewModal';
@@ -768,26 +768,10 @@ export default function SchedulePage() {
     return labels[freq] || freq;
   };
 
-  const getPreferredChoices = (response: FormResponse) => {
-    const choices: Array<{ rank: number; day?: string; start?: string; end?: string; frequency?: string }> = [];
-    
-    if (response.preferred_1_day && response.preferred_1_start && response.preferred_1_end) {
-      choices.push({ rank: 1, day: response.preferred_1_day, start: response.preferred_1_start, end: response.preferred_1_end, frequency: response.preferred_1_frequency });
-    }
-    if (response.preferred_2_day && response.preferred_2_start && response.preferred_2_end) {
-      choices.push({ rank: 2, day: response.preferred_2_day, start: response.preferred_2_start, end: response.preferred_2_end, frequency: response.preferred_2_frequency });
-    }
-    if (response.preferred_3_day && response.preferred_3_start && response.preferred_3_end) {
-      choices.push({ rank: 3, day: response.preferred_3_day, start: response.preferred_3_start, end: response.preferred_3_end, frequency: response.preferred_3_frequency });
-    }
-    
-    return choices;
-  };
-
   const getFirstPreference = (response: FormResponse) => {
-    const choices = getPreferredChoices(response);
-    if (choices.length === 0) return null;
-    return choices[0];
+    const timings = getPreferredTimings(response);
+    if (timings.length === 0) return null;
+    return timings[0];
   };
 
   const toggleResponseExpanded = (responseId: string) => {
@@ -1247,6 +1231,7 @@ export default function SchedulePage() {
             {firstPref && (
               <div style={styles.unassignedCardPreferred}>
                 {firstPref.day} {formatTime(firstPref.start!)} - {formatTime(firstPref.end!)}
+                {firstPref.duration && ` (${firstPref.duration} min)`}
               </div>
             )}
           </div>
@@ -1711,13 +1696,16 @@ export default function SchedulePage() {
                 )}
               </div>
               <div style={{ padding: '1rem' }}>
-                {getPreferredChoices(responseToView).map((choice) => (
-                  <div key={choice.rank} style={styles.detailModalPreferenceCard}>
+                {getPreferredTimings(responseToView).map((timing, index) => (
+                  <div key={index} style={styles.detailModalPreferenceCard}>
                     <div style={styles.detailModalPreferenceLabel}>
-                      {choice.rank === 1 ? '1st Choice' : choice.rank === 2 ? '2nd Choice' : '3rd Choice'}
+                      {index === 0 ? '1st Choice' : index === 1 ? '2nd Choice' : '3rd Choice'}
                     </div>
                     <div style={styles.detailModalPreferenceValue}>
-                      {choice.day} {formatTime(choice.start!)} - {formatTime(choice.end!)} ({formatFrequency(choice.frequency!)})
+                      {timing.day} {formatTime(timing.start)} - {formatTime(timing.end)}
+                      {timing.duration && ` (${timing.duration} min)`}
+                      <br />
+                      <span style={{ fontSize: '0.75rem', color: '#6b7280' }}>{formatFrequency(timing.frequency)}</span>
                     </div>
                   </div>
                 ))}
@@ -1759,7 +1747,7 @@ export default function SchedulePage() {
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
               {getUnassignedStudents().map((response) => {
                 const isExpanded = expandedResponseIds.has(response.id);
-                const choices = getPreferredChoices(response);
+                const timings = getPreferredTimings(response);
                 
                 return (
                   <div key={response.id} style={styles.detailModalCard}>
@@ -1769,9 +1757,10 @@ export default function SchedulePage() {
                     >
                       <div>
                         <div style={styles.detailModalCardName}>{response.student_name}</div>
-                        {choices[0] && (
+                        {timings[0] && (
                           <div style={{ fontSize: '0.8125rem', color: '#a16207', marginTop: '0.125rem' }}>
-                            {choices[0].day} {formatTime(choices[0].start!)} - {formatTime(choices[0].end!)}
+                            {timings[0].day} {formatTime(timings[0].start)} - {formatTime(timings[0].end)}
+                            {timings[0].duration && ` (${timings[0].duration} min)`}
                           </div>
                         )}
                       </div>
@@ -1804,13 +1793,16 @@ export default function SchedulePage() {
                         )}
                         <div style={styles.detailModalField}>
                           <span style={styles.detailModalFieldLabel}>Preferences</span>
-                          {choices.map((choice) => (
-                            <div key={choice.rank} style={styles.detailModalPreferenceCard}>
+                          {timings.map((timing, index) => (
+                            <div key={index} style={styles.detailModalPreferenceCard}>
                               <div style={styles.detailModalPreferenceLabel}>
-                                {choice.rank === 1 ? '1st Choice' : choice.rank === 2 ? '2nd Choice' : '3rd Choice'}
+                                {index === 0 ? '1st Choice' : index === 1 ? '2nd Choice' : '3rd Choice'}
                               </div>
                               <div style={styles.detailModalPreferenceValue}>
-                                {choice.day} {formatTime(choice.start!)} - {formatTime(choice.end!)} ({formatFrequency(choice.frequency!)})
+                                {timing.day} {formatTime(timing.start)} - {formatTime(timing.end)}
+                                {timing.duration && ` (${timing.duration} min)`}
+                                <br />
+                                <span style={{ fontSize: '0.75rem', color: '#6b7280' }}>{formatFrequency(timing.frequency)}</span>
                               </div>
                             </div>
                           ))}
