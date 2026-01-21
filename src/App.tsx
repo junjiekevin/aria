@@ -1,7 +1,9 @@
-import React from 'react'
-import { Routes, Route, Navigate } from 'react-router-dom'
+import React, { useState, useEffect } from 'react'
+import { Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import AuthPage from './pages/AuthPage.tsx'
 import ProtectedRoute from './components/ProtectedRoute.tsx'
+import FloatingChat from './components/FloatingChat.tsx'
+import { supabase } from './lib/supabase'
 
 const StudentFormPage = React.lazy(() => import('./pages/StudentFormPage.tsx'))
 const DashboardPage = React.lazy(() => import('./pages/DashboardPage.tsx'))
@@ -11,6 +13,28 @@ const HelpPage = React.lazy(() => import('./pages/HelpPage.tsx'))
 const AboutPage = React.lazy(() => import('./pages/AboutPage.tsx'))
 
 const App = () => {
+    const location = useLocation();
+    const [isAuthenticated, setIsAuthenticated] = useState(false);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        const checkAuth = async () => {
+            const { data: { session } } = await supabase.auth.getSession();
+            setIsAuthenticated(!!session);
+            setLoading(false);
+        };
+        checkAuth();
+
+        const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+            setIsAuthenticated(!!session);
+        });
+
+        return () => subscription.unsubscribe();
+    }, []);
+
+    // Show chat on all pages except auth page
+    const showChat = !loading && isAuthenticated && location.pathname !== '/';
+
     return (
         <React.Suspense fallback={<div>Loading...</div>}>
             <Routes>
@@ -23,6 +47,7 @@ const App = () => {
                 <Route path="/about" element={<ProtectedRoute><AboutPage /></ProtectedRoute>} />
                 <Route path="*" element={<Navigate to="/" />} />
             </Routes>
+            {showChat && <FloatingChat />}
         </React.Suspense>
     )
 }

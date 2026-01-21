@@ -591,10 +591,12 @@ export default function SchedulePage() {
 
   const handleDragEnd = async (event: DragEndEvent) => {
     const { active, over } = event;
-    setActiveDragId(null);
     setIsDragging(false);
 
-    if (!over || !schedule) return;
+    if (!over || !schedule) {
+      setActiveDragId(null);
+      return;
+    }
 
     const dropId = over.id as string;
     
@@ -754,9 +756,10 @@ export default function SchedulePage() {
             recurrence_rule: newOverlappingRecurrence,
           });
           
-          loadScheduleData();
+          setActiveDragId(null);
         } catch (err) {
           console.error('Failed to swap events:', err);
+          setActiveDragId(null);
           loadScheduleData();
         }
         return;
@@ -797,9 +800,23 @@ export default function SchedulePage() {
           recurrence_rule: recurrenceRule,
         });
 
-        await loadScheduleData();
+        // Update local state for instant feedback
+        setEntries(entries.map(e => {
+          if (e.id === draggedEntry.id) {
+            return {
+              ...e,
+              start_time: firstOccurrence.toISOString(),
+              end_time: newEnd.toISOString(),
+              recurrence_rule: recurrenceRule,
+            };
+          }
+          return e;
+        }));
+        
+        setActiveDragId(null);
       } catch (err) {
         console.error('Failed to move event:', err);
+        setActiveDragId(null);
         loadScheduleData();
       }
     } else if (dropId === 'trash') {
@@ -887,8 +904,11 @@ export default function SchedulePage() {
           }
           return e;
         }));
+        
+        setActiveDragId(null);
       } catch (err) {
         console.error('Failed to swap events:', err);
+        setActiveDragId(null);
         alert('Failed to swap events. Please try again.');
       }
     }
@@ -1373,7 +1393,6 @@ export default function SchedulePage() {
                   await deleteScheduleEntry(entryToDelete.id);
                   setEntries(entries.filter(e => e.id !== entryToDelete.id));
                   setEntryToDelete(null);
-                  loadScheduleData();
                 } catch (err) {
                   console.error('Failed to delete event:', err);
                 }
