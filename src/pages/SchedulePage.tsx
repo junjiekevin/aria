@@ -341,8 +341,14 @@ export default function SchedulePage() {
     const intervalMatch = rule.match(/INTERVAL=(\d+)/);
     const byDayMatch = rule.match(/BYDAY=(\w+)/);
 
-    const freq = freqMatch ? freqMatch[1] : 'WEEKLY';
-    const interval = intervalMatch ? parseInt(intervalMatch[1]) : 1;
+    let freq = freqMatch ? freqMatch[1] : 'WEEKLY';
+    let interval = intervalMatch ? parseInt(intervalMatch[1]) : 1;
+
+    // Handle INTERVAL=4 as "monthly" frequency
+    if (freq === 'WEEKLY' && interval === 4) {
+      freq = 'MONTHLY';
+      // Keep interval as 4 for monthly calculation (shows every 4 weeks)
+    }
 
     const byDayStr = byDayMatch ? byDayMatch[1] : '';
     const dayAbbrevs = ['SU', 'MO', 'TU', 'WE', 'TH', 'FR', 'SA'];
@@ -703,6 +709,8 @@ export default function SchedulePage() {
           if (!rule) return 'once';
           if (rule.includes('FREQ=2WEEKLY')) return '2weekly';
           if (rule.includes('FREQ=MONTHLY')) return 'monthly';
+          // Check for INTERVAL=4 (which represents "monthly" in our system)
+          if (rule.includes('INTERVAL=4')) return 'monthly';
           return 'weekly';
         };
 
@@ -823,6 +831,8 @@ export default function SchedulePage() {
           if (!rule) return 'once';
           if (rule.includes('FREQ=2WEEKLY')) return '2weekly';
           if (rule.includes('FREQ=MONTHLY')) return 'monthly';
+          // Check for INTERVAL=4 (which represents "monthly" in our system)
+          if (rule.includes('INTERVAL=4')) return 'monthly';
           return 'weekly';
         };
 

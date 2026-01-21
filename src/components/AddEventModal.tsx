@@ -140,7 +140,7 @@ export default function AddEventModal({
         setFrequency('once');
       } else if (rule.includes('FREQ=2WEEKLY')) {
         setFrequency('2weekly');
-      } else if (rule.includes('FREQ=MONTHLY')) {
+      } else if (rule.includes('FREQ=MONTHLY') || rule.includes('INTERVAL=4')) {
         setFrequency('monthly');
       } else {
         setFrequency('weekly');
