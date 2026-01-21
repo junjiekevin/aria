@@ -25,13 +25,13 @@ const styles: Record<string, React.CSSProperties> = {
 		zIndex: 100,
 	},
 	headerContent: {
-		maxWidth: '900px',
+		maxWidth: '1100px',
 		margin: '0 auto',
 		padding: '1.25rem 1.5rem',
-		display: 'flex',
+		display: 'grid',
+		gridTemplateColumns: 'auto 1fr auto',
 		alignItems: 'center',
-		justifyContent: 'space-between',
-		gap: '1rem',
+		gap: '2rem',
 	},
 	logoSection: {
 		display: 'flex',
@@ -73,7 +73,7 @@ const styles: Record<string, React.CSSProperties> = {
 		boxShadow: '0 2px 8px rgba(249, 115, 22, 0.3)',
 	},
 	main: {
-		maxWidth: '900px',
+		maxWidth: '1100px',
 		margin: '0 auto',
 		padding: '2.5rem 1.5rem',
 	},
