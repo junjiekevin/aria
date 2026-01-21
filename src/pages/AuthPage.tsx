@@ -14,20 +14,16 @@ const styles = {
         background: 'linear-gradient(180deg, #fff7ed 0%, #ffffff 50%, #fff7ed 100%)',
         fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
     },
-    logoSection: {
+    headerSection: {
         textAlign: 'center' as const,
         marginBottom: '2.5rem',
     },
-    logo: {
-        fontSize: '4rem',
-        marginBottom: '0.5rem',
-    },
     title: {
-        fontSize: '2.5rem',
+        fontSize: '3rem',
         fontWeight: '700',
         color: '#111827',
         margin: '0 0 0.5rem 0',
-        letterSpacing: '-0.02em',
+        letterSpacing: '-0.03em',
     },
     tagline: {
         fontSize: '1.125rem',
@@ -151,8 +147,7 @@ export default function AuthPage() {
                 }`}
             </style>
             
-            <div style={styles.logoSection}>
-                <div style={styles.logo}>📅</div>
+            <div style={styles.headerSection}>
                 <h1 style={styles.title}>Aria</h1>
                 <p style={styles.tagline}>
                     Smart scheduling for teams, clinics, studios, and organizations
