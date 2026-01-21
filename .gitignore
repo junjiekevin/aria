@@ -17,6 +17,7 @@ dist-ssr/
 # Env files
 .env
 .env.local
+.env.*.local
 
 # Vercel deployment
 .vercel/
@@ -24,6 +25,7 @@ dist-ssr/
 # Supabase (local dev folders if used)
 .supabase/
 supabase/.temp/
+supabase/config.json
 
 # Editor
 .vscode/*
@@ -35,4 +37,18 @@ supabase/.temp/
 *.njsproj
 *.sln
 *.sw?
+
+# Aria logs folder (contains docs)
 Aria logs/
+
+# OS files
+Thumbs.db
+*.bak
+*.tmp
+*.temp
+
+# Test/coverage
+coverage/
+
+# TypeScript
+*.tsbuildinfo
