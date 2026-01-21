@@ -183,6 +183,197 @@ const styles = {
     transition: 'all 0.2s',
     color: '#111827',
   },
+  unassignedPanel: {
+    backgroundColor: 'white',
+    borderRadius: '0.5rem',
+    boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
+    border: '1px solid #e5e7eb',
+    padding: '0.85rem',
+    display: 'flex',
+    flexDirection: 'column' as const,
+  },
+  unassignedPanelHeader: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: '0.75rem',
+    flexShrink: 0 as const,
+  },
+  unassignedPanelTitle: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '0.5rem',
+  },
+  unassignedPanelTitleText: {
+    fontSize: '0.8rem',
+    fontWeight: '600',
+    color: '#111827',
+    margin: 0,
+  },
+  unassignedBadge: {
+    backgroundColor: '#f97316',
+    color: 'white',
+    padding: '0.25rem 0.5rem',
+    borderRadius: '9999px',
+    fontSize: '0.75rem',
+    fontWeight: '600',
+    cursor: 'pointer',
+    transition: 'all 0.2s',
+  },
+  unassignedBadgeHover: {
+    backgroundColor: '#ea580c',
+  },
+  scheduleButton: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '0.375rem',
+    padding: '0.375rem 0.75rem',
+    backgroundColor: '#22c55e',
+    color: 'white',
+    border: 'none',
+    borderRadius: '0.375rem',
+    fontSize: '0.75rem',
+    fontWeight: '600',
+    cursor: 'pointer',
+    boxShadow: '0 1px 3px rgba(34, 197, 94, 0.3)',
+    transition: 'all 0.2s ease',
+  },
+  scheduleButtonDisabled: {
+    backgroundColor: '#9ca3af',
+    cursor: 'not-allowed',
+    boxShadow: 'none',
+  },
+  scheduleButtonHover: {
+    backgroundColor: '#16a34a',
+  },
+  unassignedCardList: {
+    display: 'flex',
+    flexDirection: 'column' as const,
+    gap: '0.5rem',
+    overflowY: 'auto' as const,
+    maxHeight: '280px',
+  },
+  unassignedCardListScrollbar: {
+    '&::-webkit-scrollbar': {
+      width: '4px',
+    },
+    '&::-webkit-scrollbar-track': {
+      background: '#f1f1f1',
+      borderRadius: '2px',
+    },
+    '&::-webkit-scrollbar-thumb': {
+      background: '#d1d5db',
+      borderRadius: '2px',
+    },
+  },
+  unassignedCard: {
+    padding: '0.6rem 0.75rem',
+    backgroundColor: '#fef3c7',
+    borderRadius: '0.5rem',
+    border: '1px solid #fde68a',
+    fontSize: '0.875rem',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    cursor: 'grab',
+    transition: 'all 0.2s',
+  },
+  unassignedCardHover: {
+    backgroundColor: '#fde68a',
+    borderColor: '#f59e0b',
+  },
+  unassignedCardDragging: {
+    backgroundColor: '#fbbf24',
+    borderColor: '#f59e0b',
+    opacity: 0.5,
+  },
+  unassignedCardName: {
+    fontWeight: '600',
+    color: '#92400e',
+  },
+  unassignedCardPreferred: {
+    fontSize: '0.75rem',
+    color: '#a16207',
+    marginTop: '0.125rem',
+  },
+  unassignedCardActions: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '0.5rem',
+  },
+  unassignedCardIcon: {
+    color: '#9ca3af',
+    cursor: 'pointer',
+    transition: 'color 0.2s',
+  },
+  unassignedCardIconHover: {
+    color: '#dc2626',
+  },
+  detailModalCard: {
+    backgroundColor: '#fffbeb',
+    borderRadius: '0.5rem',
+    border: '1px solid #fde68a',
+    overflow: 'hidden',
+  },
+  detailModalCardHeader: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: '0.75rem 1rem',
+    backgroundColor: '#fef3c7',
+    borderBottom: '1px solid #fde68a',
+    cursor: 'pointer',
+  },
+  detailModalCardHeaderExpanded: {
+    borderBottom: '1px solid #fde68a',
+  },
+  detailModalCardName: {
+    fontWeight: '600',
+    color: '#92400e',
+    fontSize: '0.9375rem',
+  },
+  detailModalCardActions: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '0.5rem',
+  },
+  detailModalCardBody: {
+    padding: '1rem',
+  },
+  detailModalField: {
+    display: 'flex',
+    flexDirection: 'column' as const,
+    gap: '0.25rem',
+    marginBottom: '0.75rem',
+  },
+  detailModalFieldLabel: {
+    fontSize: '0.75rem',
+    fontWeight: '600',
+    color: '#a16207',
+    textTransform: 'uppercase' as const,
+    letterSpacing: '0.025em',
+  },
+  detailModalFieldValue: {
+    fontSize: '0.875rem',
+    color: '#111827',
+  },
+  detailModalPreferenceCard: {
+    backgroundColor: 'white',
+    borderRadius: '0.375rem',
+    border: '1px solid #e5e7eb',
+    padding: '0.625rem 0.75rem',
+    marginTop: '0.5rem',
+  },
+  detailModalPreferenceLabel: {
+    fontSize: '0.7rem',
+    fontWeight: '600',
+    color: '#f97316',
+    marginBottom: '0.25rem',
+  },
+  detailModalPreferenceValue: {
+    fontSize: '0.8125rem',
+    color: '#374151',
+  },
 };
 
 function FormLink({ scheduleId }: { scheduleId: string }) {
@@ -262,6 +453,11 @@ export default function SchedulePage() {
   const [entryToDelete, setEntryToDelete] = useState<ScheduleEntry | null>(null);
   
   const [showSchedulingPreview, setShowSchedulingPreview] = useState(false);
+  
+  const [responseToView, setResponseToView] = useState<FormResponse | null>(null);
+  const [expandedResponseIds, setExpandedResponseIds] = useState<Set<string>>(new Set());
+  
+  const [showUnassignedModal, setShowUnassignedModal] = useState(false);
   
   const [isEditingName, setIsEditingName] = useState(false);
   const [editingName, setEditingName] = useState('');
@@ -553,6 +749,57 @@ export default function SchedulePage() {
 
   const getUnassignedStudents = () => {
     return responses.filter(r => r.assigned === false);
+  };
+
+  const formatTime = (timeStr: string) => {
+    const [hours, minutes] = timeStr.split(':').map(Number);
+    const period = hours >= 12 ? 'PM' : 'AM';
+    const displayHour = hours > 12 ? hours - 12 : hours === 0 ? 12 : hours;
+    return `${displayHour}:${minutes.toString().padStart(2, '0')} ${period}`;
+  };
+
+  const formatFrequency = (freq: string) => {
+    const labels: Record<string, string> = {
+      'once': 'Once',
+      'weekly': 'Weekly',
+      '2weekly': 'Every 2 Weeks',
+      'monthly': 'Monthly',
+    };
+    return labels[freq] || freq;
+  };
+
+  const getPreferredChoices = (response: FormResponse) => {
+    const choices: Array<{ rank: number; day?: string; start?: string; end?: string; frequency?: string }> = [];
+    
+    if (response.preferred_1_day && response.preferred_1_start && response.preferred_1_end) {
+      choices.push({ rank: 1, day: response.preferred_1_day, start: response.preferred_1_start, end: response.preferred_1_end, frequency: response.preferred_1_frequency });
+    }
+    if (response.preferred_2_day && response.preferred_2_start && response.preferred_2_end) {
+      choices.push({ rank: 2, day: response.preferred_2_day, start: response.preferred_2_start, end: response.preferred_2_end, frequency: response.preferred_2_frequency });
+    }
+    if (response.preferred_3_day && response.preferred_3_start && response.preferred_3_end) {
+      choices.push({ rank: 3, day: response.preferred_3_day, start: response.preferred_3_start, end: response.preferred_3_end, frequency: response.preferred_3_frequency });
+    }
+    
+    return choices;
+  };
+
+  const getFirstPreference = (response: FormResponse) => {
+    const choices = getPreferredChoices(response);
+    if (choices.length === 0) return null;
+    return choices[0];
+  };
+
+  const toggleResponseExpanded = (responseId: string) => {
+    setExpandedResponseIds(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(responseId)) {
+        newSet.delete(responseId);
+      } else {
+        newSet.add(responseId);
+      }
+      return newSet;
+    });
   };
 
   const handleSlotClick = (day: string, hour: number) => {
@@ -970,40 +1217,51 @@ export default function SchedulePage() {
       });
 
       const isBeingDragged = activeDragId === `unassigned-${response.id}`;
+      const firstPref = getFirstPreference(response);
 
       return (
         <div
           ref={setNodeRef}
           style={{
-            padding: '0.6rem 0.75rem',
-            backgroundColor: isBeingDragged ? '#fbbf24' : '#fef3c7',
-            borderRadius: '0.5rem',
-            border: `1px solid ${isBeingDragged ? '#f59e0b' : '#fde68a'}`,
-            fontSize: '0.875rem',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            opacity: isBeingDragged ? 0.5 : 1,
-            cursor: 'grab',
+            ...styles.unassignedCard,
+            ...(isBeingDragged ? styles.unassignedCardDragging : {}),
           }}
           {...attributes}
           {...listeners}
+          onClick={() => setResponseToView(response)}
+          onMouseEnter={(e) => {
+            if (!isBeingDragged) {
+              e.currentTarget.style.backgroundColor = '#fde68a';
+              e.currentTarget.style.borderColor = '#f59e0b';
+            }
+          }}
+          onMouseLeave={(e) => {
+            if (!isBeingDragged) {
+              e.currentTarget.style.backgroundColor = '#fef3c7';
+              e.currentTarget.style.borderColor = '#fde68a';
+            }
+          }}
         >
-          <div style={{ cursor: 'pointer', flex: 1 }}>
-            <div style={{ fontWeight: '600', color: '#92400e' }}>
-              {response.student_name}
-            </div>
+          <div style={{ flex: 1 }}>
+            <div style={styles.unassignedCardName}>{response.student_name}</div>
+            {firstPref && (
+              <div style={styles.unassignedCardPreferred}>
+                {firstPref.day} {formatTime(firstPref.start!)} - {formatTime(firstPref.end!)}
+              </div>
+            )}
           </div>
-          <Trash2
-            size={16}
-            style={{ color: '#9ca3af', cursor: 'pointer' }}
-            onClick={(e: React.MouseEvent) => {
-              e.stopPropagation();
-              setParticipantToDelete(response);
-            }}
-            onMouseEnter={(e: React.MouseEvent) => { (e.target as HTMLElement).style.color = '#dc2626'; }}
-            onMouseLeave={(e: React.MouseEvent) => { (e.target as HTMLElement).style.color = '#9ca3af'; }}
-          />
+          <div style={styles.unassignedCardActions}>
+            <Trash2
+              size={16}
+              style={styles.unassignedCardIcon}
+              onClick={(e: React.MouseEvent) => {
+                e.stopPropagation();
+                setParticipantToDelete(response);
+              }}
+              onMouseEnter={(e: React.MouseEvent) => { (e.target as HTMLElement).style.color = '#dc2626'; }}
+              onMouseLeave={(e: React.MouseEvent) => { (e.target as HTMLElement).style.color = '#9ca3af'; }}
+            />
+          </div>
         </div>
       );
     }
@@ -1298,54 +1556,40 @@ export default function SchedulePage() {
             </div>
           </div>
 
-          <div style={styles.panel}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.6rem' }}>
-              <div style={{ display: 'flex', alignItems: 'center' }}>
-                <h3 style={{ ...styles.panelTitle, margin: 0 }}>Unassigned Events</h3>
+          <div style={styles.unassignedPanel}>
+            <div style={styles.unassignedPanelHeader}>
+              <div style={styles.unassignedPanelTitle}>
+                <h3 style={styles.unassignedPanelTitleText}>Unassigned Events</h3>
                 {getUnassignedStudents().length > 0 && (
-                  <span style={{ marginLeft: '0.5rem', backgroundColor: '#f97316', color: 'white', padding: '0.25rem 0.5rem', borderRadius: '9999px', fontSize: '0.75rem', fontWeight: '600' }}>
+                  <span 
+                    style={styles.unassignedBadge}
+                    onClick={() => setShowUnassignedModal(true)}
+                    onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#ea580c'; }}
+                    onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = '#f97316'; }}
+                  >
                     {getUnassignedStudents().length}
                   </span>
                 )}
               </div>
+              <button
+                onClick={() => getUnassignedStudents().length > 0 && setShowSchedulingPreview(true)}
+                disabled={getUnassignedStudents().length === 0}
+                style={{
+                  ...styles.scheduleButton,
+                  ...(getUnassignedStudents().length === 0 ? styles.scheduleButtonDisabled : {}),
+                }}
+                onMouseEnter={(e) => { if (getUnassignedStudents().length > 0) { e.currentTarget.style.backgroundColor = '#16a34a'; } }}
+                onMouseLeave={(e) => { if (getUnassignedStudents().length > 0) { e.currentTarget.style.backgroundColor = '#22c55e'; } }}
+              >
+                <Sparkles size={14} />
+                Schedule All
+              </button>
             </div>
-            {getUnassignedStudents().length === 0 ? (
-              <div style={styles.emptyState}>No unassigned events</div>
-            ) : (
-              <>
-                <button
-                  onClick={() => setShowSchedulingPreview(true)}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: '0.5rem',
-                    width: '100%',
-                    padding: '0.75rem 1rem',
-                    backgroundColor: '#f97316',
-                    color: 'white',
-                    border: 'none',
-                    borderRadius: '0.5rem',
-                    fontSize: '0.875rem',
-                    fontWeight: '600',
-                    cursor: 'pointer',
-                    marginBottom: '0.75rem',
-                    boxShadow: '0 2px 8px rgba(249, 115, 22, 0.3)',
-                    transition: 'all 0.2s ease',
-                  }}
-                  onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#ea580c'; e.currentTarget.style.boxShadow = '0 4px 12px rgba(249, 115, 22, 0.4)'; }}
-                  onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = '#f97316'; e.currentTarget.style.boxShadow = '0 2px 8px rgba(249, 115, 22, 0.3)'; }}
-                >
-                  <Sparkles size={18} />
-                  Schedule All
-                </button>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                  {getUnassignedStudents().map((response) => (
-                    <DraggableUnassignedCard key={response.id} response={response} />
-                  ))}
-                </div>
-              </>
-            )}
+            <div style={styles.unassignedCardList}>
+              {getUnassignedStudents().map((response) => (
+                <DraggableUnassignedCard key={response.id} response={response} />
+              ))}
+            </div>
           </div>
           
           <div style={styles.panel}>
@@ -1450,6 +1694,145 @@ export default function SchedulePage() {
         scheduleId={scheduleId!}
         onScheduled={loadScheduleData}
       />
+
+      <Modal
+        isOpen={!!responseToView}
+        onClose={() => setResponseToView(null)}
+        title="Event Details"
+        maxWidth="35rem"
+      >
+        {responseToView && (
+          <div style={{ padding: '0.25rem 0' }}>
+            <div style={styles.detailModalCard}>
+              <div style={{ padding: '1rem', backgroundColor: '#fef3c7', borderBottom: '1px solid #fde68a' }}>
+                <div style={{ fontWeight: '600', fontSize: '1.125rem', color: '#92400e' }}>{responseToView.student_name}</div>
+                {responseToView.email && (
+                  <div style={{ fontSize: '0.875rem', color: '#a16207', marginTop: '0.25rem' }}>{responseToView.email}</div>
+                )}
+              </div>
+              <div style={{ padding: '1rem' }}>
+                {getPreferredChoices(responseToView).map((choice) => (
+                  <div key={choice.rank} style={styles.detailModalPreferenceCard}>
+                    <div style={styles.detailModalPreferenceLabel}>
+                      {choice.rank === 1 ? '1st Choice' : choice.rank === 2 ? '2nd Choice' : '3rd Choice'}
+                    </div>
+                    <div style={styles.detailModalPreferenceValue}>
+                      {choice.day} {formatTime(choice.start!)} - {formatTime(choice.end!)} ({formatFrequency(choice.frequency!)})
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div style={{ display: 'flex', gap: '0.75rem', marginTop: '1.25rem' }}>
+              <button
+                onClick={() => {
+                  setResponseToView(null);
+                  setParticipantToDelete(responseToView);
+                }}
+                style={{ flex: 1, padding: '0.75rem', backgroundColor: '#dc2626', color: 'white', border: 'none', borderRadius: '0.5rem', cursor: 'pointer', fontWeight: '500' }}
+              >
+                Delete
+              </button>
+              <button
+                onClick={() => setResponseToView(null)}
+                style={{ flex: 1, padding: '0.75rem', backgroundColor: 'white', color: '#374151', border: '1px solid #d1d5db', borderRadius: '0.5rem', cursor: 'pointer', fontWeight: '500' }}
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        )}
+      </Modal>
+
+      <Modal
+        isOpen={showUnassignedModal}
+        onClose={() => setShowUnassignedModal(false)}
+        title="Unassigned Events"
+        maxWidth="40rem"
+      >
+        <div style={{ maxHeight: '60vh', overflowY: 'auto' }}>
+          {getUnassignedStudents().length === 0 ? (
+            <div style={{ textAlign: 'center', padding: '2rem', color: '#6b7280' }}>
+              No unassigned events
+            </div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+              {getUnassignedStudents().map((response) => {
+                const isExpanded = expandedResponseIds.has(response.id);
+                const choices = getPreferredChoices(response);
+                
+                return (
+                  <div key={response.id} style={styles.detailModalCard}>
+                    <div 
+                      style={styles.detailModalCardHeader}
+                      onClick={() => toggleResponseExpanded(response.id)}
+                    >
+                      <div>
+                        <div style={styles.detailModalCardName}>{response.student_name}</div>
+                        {choices[0] && (
+                          <div style={{ fontSize: '0.8125rem', color: '#a16207', marginTop: '0.125rem' }}>
+                            {choices[0].day} {formatTime(choices[0].start!)} - {formatTime(choices[0].end!)}
+                          </div>
+                        )}
+                      </div>
+                      <div style={styles.detailModalCardActions}>
+                        {isExpanded ? (
+                          <span style={{ fontSize: '0.875rem', color: '#f97316', fontWeight: '500' }}>Hide</span>
+                        ) : (
+                          <span style={{ fontSize: '0.875rem', color: '#f97316', fontWeight: '500' }}>Show</span>
+                        )}
+                        <Trash2
+                          size={16}
+                          style={{ color: '#9ca3af', cursor: 'pointer' }}
+                          onClick={(e: React.MouseEvent) => {
+                            e.stopPropagation();
+                            setShowUnassignedModal(false);
+                            setParticipantToDelete(response);
+                          }}
+                          onMouseEnter={(e: React.MouseEvent) => { (e.target as HTMLElement).style.color = '#dc2626'; }}
+                          onMouseLeave={(e: React.MouseEvent) => { (e.target as HTMLElement).style.color = '#9ca3af'; }}
+                        />
+                      </div>
+                    </div>
+                    {isExpanded && (
+                      <div style={styles.detailModalCardBody}>
+                        {response.email && (
+                          <div style={styles.detailModalField}>
+                            <span style={styles.detailModalFieldLabel}>Email</span>
+                            <span style={styles.detailModalFieldValue}>{response.email}</span>
+                          </div>
+                        )}
+                        <div style={styles.detailModalField}>
+                          <span style={styles.detailModalFieldLabel}>Preferences</span>
+                          {choices.map((choice) => (
+                            <div key={choice.rank} style={styles.detailModalPreferenceCard}>
+                              <div style={styles.detailModalPreferenceLabel}>
+                                {choice.rank === 1 ? '1st Choice' : choice.rank === 2 ? '2nd Choice' : '3rd Choice'}
+                              </div>
+                              <div style={styles.detailModalPreferenceValue}>
+                                {choice.day} {formatTime(choice.start!)} - {formatTime(choice.end!)} ({formatFrequency(choice.frequency!)})
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                        <button
+                          onClick={() => {
+                            setShowUnassignedModal(false);
+                            setResponseToView(response);
+                          }}
+                          style={{ marginTop: '1rem', width: '100%', padding: '0.625rem', backgroundColor: '#f97316', color: 'white', border: 'none', borderRadius: '0.375rem', cursor: 'pointer', fontWeight: '500' }}
+                        >
+                          View Full Details
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      </Modal>
 
       <DragOverlay>
         {activeDragId && (() => {
