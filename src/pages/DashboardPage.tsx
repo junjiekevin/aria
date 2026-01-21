@@ -4,7 +4,6 @@ import { useNavigate } from 'react-router-dom';
 import { getAllSchedules, type Schedule, deleteSchedule, restoreSchedule, permanentDeleteAllTrashed, updateSchedule, permanentDeleteSchedule } from '../lib/api/schedules';
 import { supabase } from '../lib/supabase';
 import { Plus, Calendar, Clock, Archive, Trash2, FileText, RotateCcw, XCircle } from 'lucide-react';
-import Chat from '../components/Chat';
 import CreateScheduleModal from '../components/CreateScheduleModal';
 import EditScheduleModal from '../components/EditScheduleModal';
 import ProfileDropdown from '../components/ProfileDropdown';
@@ -799,11 +798,6 @@ export default function DashboardPage() {
 							)}
 						</div>
 					)}
-				</div>
-
-				{/* Right column: Chat */}
-				<div style={{ position: 'sticky', top: '100px' }}>
-					<Chat onScheduleChange={loadSchedules} />
 				</div>
 			</div>
 		</main>
