@@ -30,11 +30,6 @@ const styles = {
         margin: '0 0 0.5rem 0',
         color: '#111827',
     },
-    subtitle: {
-        fontSize: '0.875rem',
-        color: '#6b7280',
-        margin: 0,
-    },
     loading: {
         minHeight: '100vh',
         display: 'grid',
@@ -102,8 +97,7 @@ export default function AuthPage() {
         <div style={styles.container}>
             <div style={styles.card}>
                 <div style={styles.header}>
-                    <h1 style={styles.title}>Sign in to Aria</h1>
-                    <p style={styles.subtitle}>Teacher login via Google</p>
+                    <h1 style={styles.title}>Your personal scheduling assistant</h1>
                 </div>
 
                 <SupabaseAuth
@@ -128,6 +122,13 @@ export default function AuthPage() {
                     onlyThirdPartyProviders
                     socialLayout="vertical"
                     redirectTo={window.location.origin + "/dashboard"}
+                    localization={{
+                        variables: {
+                            sign_in: {
+                                button_label: "Sign in",
+                            },
+                        },
+                    }}
                 />
             </div>
         </div>

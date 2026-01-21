@@ -28,12 +28,6 @@ const styles = {
         color: '#111827',
         margin: '0 0 0.5rem 0'
     },
-    subtitle: {
-        marginTop: '0.5rem',
-        fontSize: '0.875rem',
-        color: '#6b7280',
-        margin: 0
-    },
     buttonContainer: {
         display: 'flex',
         flexDirection: 'column' as const,
@@ -49,18 +43,9 @@ const styles = {
         boxShadow: '0 1px 2px rgba(0, 0, 0, 0.05)',
         fontSize: '0.875rem',
         fontWeight: '500',
-        color: 'white',
-        backgroundColor: '#111827',
+        cursor: 'pointer',
         textDecoration: 'none',
-        transition: 'background-color 0.2s ease'
-    },
-    studentNote: {
-        textAlign: 'center' as const,
-        marginTop: '1rem'
-    },
-    studentText: {
-        fontSize: '0.75rem',
-        color: '#6b7280'
+        transition: 'background-color 0.2s'
     }
 };
 
@@ -72,9 +57,6 @@ const LandingPage = () => {
                     <h1 style={styles.title}>
                         Welcome to Aria
                     </h1>
-                    <p style={styles.subtitle}>
-                        Intelligent scheduling assistant for teachers
-                    </p>
                 </div>
                 
                 <div style={styles.buttonContainer}>
@@ -84,14 +66,8 @@ const LandingPage = () => {
                         onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#1f2937'; }}
                         onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = '#111827'; }}
                     >
-                        Sign in as Teacher
+                        Sign in
                     </Link>
-                    
-                    <div style={styles.studentNote}>
-                        <span style={styles.studentText}>
-                            Student? Access your schedule form directly.
-                        </span>
-                    </div>
                 </div>
             </div>
         </div>
