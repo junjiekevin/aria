@@ -285,11 +285,17 @@ export default function SchedulePage() {
     timeZoneName: 'short' 
   }).split(' ').pop() || userTimezone;
 
+  // Helper to parse YYYY-MM-DD in local timezone (not UTC)
+  const parseLocalDate = (dateStr: string): Date => {
+    const [year, month, day] = dateStr.split('-').map(Number);
+    return new Date(year, month - 1, day);
+  };
+
   const { weekStart, weekEnd, weekNumber, totalWeeks } = useMemo(() => {
     if (!schedule) return { weekStart: null, weekEnd: null, weekNumber: 0, totalWeeks: 0 };
     
-    const start = new Date(schedule.start_date);
-    const end = new Date(schedule.end_date);
+    const start = parseLocalDate(schedule.start_date);
+    const end = parseLocalDate(schedule.end_date);
     
     const totalMs = end.getTime() - start.getTime();
     const totalDays = Math.ceil(totalMs / (1000 * 60 * 60 * 24));
@@ -314,7 +320,6 @@ export default function SchedulePage() {
       month: 'short', 
       day: 'numeric',
       year: 'numeric',
-      timeZone: userTimezone 
     });
   };
 
@@ -323,7 +328,6 @@ export default function SchedulePage() {
     return date.toLocaleTimeString(undefined, { 
       hour: '2-digit', 
       minute: '2-digit',
-      timeZone: userTimezone 
     });
   };
 
@@ -354,7 +358,7 @@ export default function SchedulePage() {
       return entryStart >= weekStart && entryStart <= weekEnd;
     }
     
-    const scheduleStart = new Date(schedule.start_date);
+    const scheduleStart = parseLocalDate(schedule.start_date);
     const scheduleFirstDay = new Date(scheduleStart);
     scheduleFirstDay.setDate(scheduleStart.getDate() - scheduleStart.getDay());
     
