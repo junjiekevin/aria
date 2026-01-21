@@ -711,7 +711,30 @@ export default function SchedulePage() {
       }
 
       const dayAbbrev = ['SU', 'MO', 'TU', 'WE', 'TH', 'FR', 'SA'][dayIndex];
-      const recurrenceRule = `FREQ=WEEKLY;BYDAY=${dayAbbrev}`;
+      
+      // Preserve original frequency, just update the day
+      const originalRule = draggedEntry.recurrence_rule || '';
+      let recurrenceRule = originalRule;
+      
+      // Update BYDAY in the recurrence rule
+      if (originalRule.includes('FREQ=2WEEKLY')) {
+        recurrenceRule = `FREQ=2WEEKLY;BYDAY=${dayAbbrev}`;
+      } else if (originalRule.includes('FREQ=MONTHLY')) {
+        // Extract INTERVAL if present
+        const intervalMatch = originalRule.match(/INTERVAL=(\d+)/);
+        const interval = intervalMatch ? intervalMatch[1] : '4';
+        recurrenceRule = `FREQ=WEEKLY;INTERVAL=${interval};BYDAY=${dayAbbrev}`;
+      } else if (originalRule.includes('FREQ=WEEKLY')) {
+        // Check for INTERVAL
+        const intervalMatch = originalRule.match(/INTERVAL=(\d+)/);
+        const interval = intervalMatch ? intervalMatch[1] : '';
+        recurrenceRule = interval 
+          ? `FREQ=WEEKLY;INTERVAL=${interval};BYDAY=${dayAbbrev}`
+          : `FREQ=WEEKLY;BYDAY=${dayAbbrev}`;
+      } else {
+        // No original rule or unknown - default to weekly
+        recurrenceRule = `FREQ=WEEKLY;BYDAY=${dayAbbrev}`;
+      }
 
       const updatedEntry = {
         ...draggedEntry,
