@@ -1,7 +1,7 @@
 // src/pages/SchedulePage.tsx
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, ChevronLeft, ChevronRight, Trash2, Copy, Check } from 'lucide-react';
+import { ArrowLeft, ChevronLeft, ChevronRight, Trash2, Copy, Check, Sparkles } from 'lucide-react';
 import { getSchedule, updateSchedule, type Schedule } from '../lib/api/schedules';
 import { getScheduleEntries, createScheduleEntry, updateScheduleEntry, deleteScheduleEntry, type ScheduleEntry } from '../lib/api/schedule-entries';
 import { getFormResponses, deleteFormResponse, updateFormResponseAssigned, type FormResponse } from '../lib/api/form-responses';
@@ -1299,22 +1299,52 @@ export default function SchedulePage() {
           </div>
 
           <div style={styles.panel}>
-            <div style={{ display: 'flex', alignItems: 'center', marginBottom: '0.6rem' }}>
-              <h3 style={{ ...styles.panelTitle, margin: 0 }}>Unassigned Events</h3>
-              {getUnassignedStudents().length > 0 && (
-                <span style={{ marginLeft: '0.5rem', backgroundColor: '#f97316', color: 'white', padding: '0.25rem 0.5rem', borderRadius: '9999px', fontSize: '0.75rem', fontWeight: '600' }}>
-                  {getUnassignedStudents().length}
-                </span>
-              )}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.6rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center' }}>
+                <h3 style={{ ...styles.panelTitle, margin: 0 }}>Unassigned Events</h3>
+                {getUnassignedStudents().length > 0 && (
+                  <span style={{ marginLeft: '0.5rem', backgroundColor: '#f97316', color: 'white', padding: '0.25rem 0.5rem', borderRadius: '9999px', fontSize: '0.75rem', fontWeight: '600' }}>
+                    {getUnassignedStudents().length}
+                  </span>
+                )}
+              </div>
             </div>
             {getUnassignedStudents().length === 0 ? (
               <div style={styles.emptyState}>No unassigned events</div>
             ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                {getUnassignedStudents().map((response) => (
-                  <DraggableUnassignedCard key={response.id} response={response} />
-                ))}
-              </div>
+              <>
+                <button
+                  onClick={() => setShowSchedulingPreview(true)}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '0.5rem',
+                    width: '100%',
+                    padding: '0.75rem 1rem',
+                    backgroundColor: '#f97316',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '0.5rem',
+                    fontSize: '0.875rem',
+                    fontWeight: '600',
+                    cursor: 'pointer',
+                    marginBottom: '0.75rem',
+                    boxShadow: '0 2px 8px rgba(249, 115, 22, 0.3)',
+                    transition: 'all 0.2s ease',
+                  }}
+                  onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#ea580c'; e.currentTarget.style.boxShadow = '0 4px 12px rgba(249, 115, 22, 0.4)'; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = '#f97316'; e.currentTarget.style.boxShadow = '0 2px 8px rgba(249, 115, 22, 0.3)'; }}
+                >
+                  <Sparkles size={18} />
+                  Schedule All
+                </button>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                  {getUnassignedStudents().map((response) => (
+                    <DraggableUnassignedCard key={response.id} response={response} />
+                  ))}
+                </div>
+              </>
             )}
           </div>
           

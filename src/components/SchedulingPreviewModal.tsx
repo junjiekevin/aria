@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
 import Modal from './Modal';
 import { scheduleStudents, createEntryFromAssignment, type SchedulingResult, type ScheduledAssignment } from '../lib/scheduling';
-import { createScheduleEntry, type ScheduleEntry } from '../lib/api/schedule-entries';
-import { deleteFormResponse, type FormResponse } from '../lib/api/form-responses';
+    import { createScheduleEntry, type ScheduleEntry } from '../lib/api/schedule-entries';
+    import { updateFormResponseAssigned, type FormResponse } from '../lib/api/form-responses';
 
 function formatTime(hour: number, minute: number): string {
     const period = hour >= 12 ? 'PM' : 'AM';
@@ -170,11 +170,11 @@ export default function SchedulingPreviewModal({
 
     // Run scheduling algorithm when modal opens
     useEffect(() => {
-        if (isOpen && students.length > 0) {
+        if (isOpen && students.length > 0 && scheduleStart) {
             setLoading(true);
-            // Calculate total weeks from schedule
+            // Calculate total weeks from actual schedule dates
             const scheduleEnd = new Date(scheduleStart);
-            scheduleEnd.setMonth(scheduleEnd.getMonth() + 3); // Assume 3 months
+            scheduleEnd.setMonth(scheduleEnd.getMonth() + 3); // Default fallback to 3 months
             const totalWeeks = Math.ceil((scheduleEnd.getTime() - scheduleStart.getTime()) / (7 * 24 * 60 * 60 * 1000));
             
             const schedulingResult = scheduleStudents(students, existingEntries, scheduleStart, totalWeeks);
@@ -189,7 +189,7 @@ export default function SchedulingPreviewModal({
         setCreating(true);
         const scheduledAssignments = result.assignments.filter(a => a.isScheduled);
         
-        // Calculate total weeks from schedule
+        // Calculate total weeks from actual schedule dates
         const scheduleEnd = new Date(scheduleStart);
         scheduleEnd.setMonth(scheduleEnd.getMonth() + 3);
         const totalWeeks = Math.ceil((scheduleEnd.getTime() - scheduleStart.getTime()) / (7 * 24 * 60 * 60 * 1000));
@@ -214,8 +214,8 @@ export default function SchedulingPreviewModal({
                     created++;
                     setCreatedCount(created);
                 }
-                // Delete the form response after successfully scheduling all entries
-                await deleteFormResponse(assignment.student.id);
+                // Mark form response as assigned instead of deleting (preserves audit trail)
+                await updateFormResponseAssigned(assignment.student.id, true);
             } catch (err) {
                 console.error('Failed to create entries:', err);
             }
