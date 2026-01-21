@@ -245,7 +245,7 @@ export default function AddEventModal({
       } else if (frequency === '2weekly') {
         recurrenceRule = `FREQ=2WEEKLY;BYDAY=${dayAbbrev}`;
       } else if (frequency === 'monthly') {
-        recurrenceRule = `FREQ=WEEKLY;INTERVAL=4;BYDAY=${dayAbbrev}`;
+        recurrenceRule = `FREQ=MONTHLY;INTERVAL=4;BYDAY=${dayAbbrev}`;
       } else {
         recurrenceRule = `FREQ=WEEKLY;BYDAY=${dayAbbrev}`;
       }
