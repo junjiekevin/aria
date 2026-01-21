@@ -1,106 +1,201 @@
 // src/pages/DashboardPage.tsx
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { getAllSchedules, type Schedule, deleteSchedule, restoreSchedule, permanentDeleteAllTrashed, updateSchedule, permanentDeleteSchedule } from '../lib/api/schedules';
+import { getAllSchedules, type Schedule, restoreSchedule, permanentDeleteAllTrashed, updateSchedule, permanentDeleteSchedule } from '../lib/api/schedules';
 import { supabase } from '../lib/supabase';
-import { Plus, Calendar, Clock, Archive, Trash2, FileText, RotateCcw, XCircle } from 'lucide-react';
+import { Plus, Calendar, Clock, Archive, Trash2, FileText, RotateCcw, XCircle, Sparkles } from 'lucide-react';
 import CreateScheduleModal from '../components/CreateScheduleModal';
 import EditScheduleModal from '../components/EditScheduleModal';
 import ProfileDropdown from '../components/ProfileDropdown';
 import logo from '../assets/images/aria-logo.png';
 
-// Inline styles inspired by the LLM design
-const styles = {
-	dashboard: {
+const styles: Record<string, React.CSSProperties> = {
+	page: {
 		minHeight: '100vh',
-		background: 'linear-gradient(135deg, #fff7ed 0%, #ffffff 50%, #fff7ed 100%)',
-		fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto", sans-serif'
+		background: 'linear-gradient(180deg, #fff7ed 0%, #ffffff 50%, #fff7ed 100%)',
+		fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+		paddingBottom: '4rem',
 	},
 	header: {
-		borderBottom: '1px solid #e5e7eb',
-		background: 'rgba(255, 255, 255, 0.8)',
-		backdropFilter: 'blur(4px)',
+		background: 'rgba(255, 255, 255, 0.9)',
+		backdropFilter: 'blur(8px)',
+		borderBottom: '1px solid rgba(249, 115, 22, 0.1)',
 		position: 'sticky' as const,
 		top: 0,
-		zIndex: 10,
-		boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)'
+		zIndex: 100,
 	},
 	headerContent: {
-		maxWidth: '1280px',
+		maxWidth: '900px',
 		margin: '0 auto',
-		padding: '1.5rem',
+		padding: '1.25rem 1.5rem',
 		display: 'flex',
-		justifyContent: 'space-between',
 		alignItems: 'center',
-		gap: '1rem'
+		justifyContent: 'space-between',
+		gap: '1rem',
 	},
-	title: {
-		fontSize: '2rem',
-		fontWeight: 'bold',
-		color: '#111827',
-		margin: 0,
+	logoSection: {
 		display: 'flex',
 		alignItems: 'center',
 		gap: '0.75rem',
 	},
-	subtitle: {
+	logo: {
+		height: '40px',
+		width: 'auto',
+	},
+	greetingSection: {
+		flex: 1,
+		textAlign: 'center' as const,
+	},
+	greeting: {
+		fontSize: '1.125rem',
+		fontWeight: '600',
+		color: '#111827',
+		margin: 0,
+	},
+	greetingSubtext: {
+		fontSize: '0.8125rem',
 		color: '#6b7280',
 		margin: '0.25rem 0 0 0',
-		fontSize: '1rem'
-	},
-	logo: {
-		height: '48px',
-		width: 'auto',
-		marginTop: '-4px',
 	},
 	button: {
 		backgroundColor: '#f97316',
 		color: 'white',
 		border: 'none',
-		borderRadius: '0.5rem',
-		fontWeight: '500',
+		borderRadius: '9999px',
+		fontWeight: '600',
 		cursor: 'pointer',
 		display: 'inline-flex',
 		alignItems: 'center',
 		gap: '0.5rem',
 		transition: 'all 0.2s ease',
-		padding: '0.75rem 1rem',
-		fontSize: '1rem'
+		padding: '0.75rem 1.5rem',
+		fontSize: '0.9375rem',
+		boxShadow: '0 2px 8px rgba(249, 115, 22, 0.3)',
+	},
+	main: {
+		maxWidth: '900px',
+		margin: '0 auto',
+		padding: '2.5rem 1.5rem',
+	},
+	sectionHeader: {
+		display: 'flex',
+		alignItems: 'center',
+		justifyContent: 'space-between',
+		marginBottom: '1.5rem',
+	},
+	sectionTitle: {
+		fontSize: '1.25rem',
+		fontWeight: '600',
+		color: '#111827',
+		margin: 0,
+	},
+	filterTabs: {
+		display: 'flex',
+		gap: '0.25rem',
+		background: 'white',
+		padding: '0.25rem',
+		borderRadius: '9999px',
+		boxShadow: '0 1px 3px rgba(0, 0, 0, 0.08)',
+	},
+	tab: {
+		padding: '0.5rem 1rem',
+		background: 'transparent',
+		border: 'none',
+		borderRadius: '9999px',
+		fontSize: '0.875rem',
+		fontWeight: '500',
+		color: '#6b7280',
+		cursor: 'pointer',
+		transition: 'all 0.2s ease',
+		display: 'flex',
+		alignItems: 'center',
+		gap: '0.5rem',
+	},
+	tabActive: {
+		background: '#fff7ed',
+		color: '#f97316',
 	},
 	card: {
 		backgroundColor: 'white',
 		padding: '1.5rem',
-		borderRadius: '0.75rem',
-		boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
-		border: '1px solid #e5e7eb',
-		transition: 'box-shadow 0.2s ease'
+		borderRadius: '16px',
+		boxShadow: '0 2px 8px rgba(0, 0, 0, 0.06)',
+		border: '1px solid rgba(0, 0, 0, 0.04)',
+		transition: 'all 0.25s ease',
+		cursor: 'pointer',
 	},
 	statusBadge: {
 		display: 'inline-flex',
 		alignItems: 'center',
-		gap: '0.5rem',
+		gap: '0.375rem',
 		padding: '0.375rem 0.75rem',
 		borderRadius: '9999px',
-		fontSize: '0.875rem',
+		fontSize: '0.8125rem',
 		fontWeight: '500',
-		border: '1px solid'
+		border: '1px solid',
 	},
-	main: {
-		maxWidth: '1280px',
-		margin: '0 auto',
-		padding: '2rem 1.5rem'
-	},
-	list: {
+	emptyState: {
 		display: 'flex',
 		flexDirection: 'column' as const,
-		gap: '1rem'
+		alignItems: 'center',
+		justifyContent: 'center',
+		padding: '5rem 2rem',
+		textAlign: 'center' as const,
 	},
-	twoColumnLayout: {
-		display: 'grid',
-		gridTemplateColumns: '1fr 500px',
-		gap: '2rem',
-		alignItems: 'start'
-	}
+	emptyIcon: {
+		width: '80px',
+		height: '80px',
+		borderRadius: '50%',
+		background: 'linear-gradient(135deg, #fb923c, #fdba74)',
+		display: 'flex',
+		alignItems: 'center',
+		justifyContent: 'center',
+		marginBottom: '1.5rem',
+		boxShadow: '0 4px 16px rgba(249, 115, 22, 0.25)',
+	},
+	emptyTitle: {
+		fontSize: '1.375rem',
+		fontWeight: '600',
+		color: '#111827',
+		margin: '0 0 0.75rem 0',
+	},
+	emptyText: {
+		fontSize: '1rem',
+		color: '#6b7280',
+		maxWidth: '360px',
+		margin: '0 0 2rem 0',
+		lineHeight: 1.6,
+	},
+	trashedEmptyIcon: {
+		width: '80px',
+		height: '80px',
+		borderRadius: '50%',
+		background: '#fef3c7',
+		display: 'flex',
+		alignItems: 'center',
+		justifyContent: 'center',
+		marginBottom: '1.5rem',
+	},
+	toast: {
+		position: 'fixed' as const,
+		bottom: '2rem',
+		left: '50%',
+		transform: 'translateX(-50%)',
+		padding: '0.875rem 1.5rem',
+		borderRadius: '9999px',
+		fontWeight: '500',
+		boxShadow: '0 4px 20px rgba(0, 0, 0, 0.15)',
+		zIndex: 1000,
+		animation: 'slideUp 0.3s ease',
+	},
+	toastSuccess: {
+		background: '#10b981',
+		color: 'white',
+	},
+	toastError: {
+		background: '#ef4444',
+		color: 'white',
+	},
 };
 
 interface StatusBadgeProps {
@@ -110,24 +205,24 @@ interface StatusBadgeProps {
 function StatusBadge({ status }: StatusBadgeProps) {
 	const statusConfig = {
 		draft: {
-			label: "Draft",
+			label: 'Draft',
 			icon: FileText,
-			style: { ...styles.statusBadge, backgroundColor: '#fef3c7', color: '#92400e', borderColor: '#f3e8a8' }
+			style: { ...styles.statusBadge, backgroundColor: '#fef3c7', color: '#92400e', borderColor: '#fed7aa' }
 		},
 		collecting: {
-			label: "Active", 
+			label: 'Active', 
 			icon: Clock,
 			style: { ...styles.statusBadge, backgroundColor: '#d1fae5', color: '#065f46', borderColor: '#a7f3d0' }
 		},
 		archived: {
-			label: "Archived",
+			label: 'Archived',
 			icon: Archive,
-			style: { ...styles.statusBadge, backgroundColor: '#f1f5f9', color: '#475569', borderColor: '#cbd5e1' }
+			style: { ...styles.statusBadge, backgroundColor: '#f1f5f9', color: '#475569', borderColor: '#e2e8f0' }
 		},
 		trashed: {
-			label: "Trashed",
+			label: 'Trashed',
 			icon: Trash2,
-			style: { ...styles.statusBadge, backgroundColor: '#fce7e7', color: '#991b1b', borderColor: '#fca5a5' }
+			style: { ...styles.statusBadge, backgroundColor: '#fee2e2', color: '#991b1b', borderColor: '#fecaca' }
 		}
 	};
 
@@ -136,7 +231,7 @@ function StatusBadge({ status }: StatusBadgeProps) {
 
 	return (
 		<div style={config.style}>
-			<Icon size={16} />
+			<Icon size={14} />
 			{config.label}
 		</div>
 	);
@@ -160,7 +255,7 @@ function ScheduleCard({
 	onRename?: (schedule: Schedule, newLabel: string) => void;
 	onHardDelete?: (schedule: Schedule) => void;
 	isTrashed?: boolean;
- }) {
+}) {
 	const [isEditingName, setIsEditingName] = useState(false);
 	const [editingName, setEditingName] = useState(schedule.label);
 	const nameInputRef = useRef<HTMLInputElement>(null);
@@ -168,11 +263,7 @@ function ScheduleCard({
 	const formatDate = (dateString: string) => {
 		const [year, month, day] = dateString.split('-').map(Number);
 		const date = new Date(year, month - 1, day);
-		return date.toLocaleDateString("en-US", {
-			month: "short",
-			day: "numeric", 
-			year: "numeric",
-		});
+		return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 	};
 
 	const handleNameClick = () => {
@@ -196,9 +287,8 @@ function ScheduleCard({
 	};
 
 	const handleNameKeyDown = (e: React.KeyboardEvent) => {
-		if (e.key === 'Enter') {
-			handleNameBlur();
-		} else if (e.key === 'Escape') {
+		if (e.key === 'Enter') handleNameBlur();
+		else if (e.key === 'Escape') {
 			setIsEditingName(false);
 			setEditingName(schedule.label);
 		}
@@ -208,17 +298,20 @@ function ScheduleCard({
 		<div 
 			style={{
 				...styles.card,
-				opacity: isTrashed ? 0.6 : 1,
-				backgroundColor: isTrashed ? '#f9fafb' : 'white',
+				opacity: isTrashed ? 0.65 : 1,
+				backgroundColor: isTrashed ? '#fafafa' : 'white',
+				transform: isTrashed ? 'none' : 'translateY(0)',
 			}}
 			onMouseEnter={(e) => {
 				if (!isTrashed) {
-					e.currentTarget.style.boxShadow = '0 10px 25px rgba(0, 0, 0, 0.1)';
+					e.currentTarget.style.transform = 'translateY(-2px)';
+					e.currentTarget.style.boxShadow = '0 8px 24px rgba(0, 0, 0, 0.1)';
 				}
 			}}
 			onMouseLeave={(e) => {
 				if (!isTrashed) {
-					e.currentTarget.style.boxShadow = '0 1px 3px rgba(0, 0, 0, 0.1)';
+					e.currentTarget.style.transform = 'translateY(0)';
+					e.currentTarget.style.boxShadow = '0 2px 8px rgba(0, 0, 0, 0.06)';
 				}
 			}}
 		>
@@ -228,21 +321,21 @@ function ScheduleCard({
 						{isEditingName ? (
 							<input
 								ref={nameInputRef}
-								type="text"
+								type='text'
 								value={editingName}
 								onChange={(e) => setEditingName(e.target.value)}
 								onBlur={handleNameBlur}
 								onKeyDown={handleNameKeyDown}
 								style={{
-									fontSize: '1.25rem',
+									fontSize: '1.125rem',
 									fontWeight: '600',
 									color: '#111827',
 									margin: '0 0 0.5rem 0',
-									padding: '0.25rem 0.5rem',
-									border: '1px solid #f97316',
-									borderRadius: '0.375rem',
+									padding: '0.5rem 0.75rem',
+									border: '2px solid #f97316',
+									borderRadius: '8px',
 									width: '100%',
-									maxWidth: '300px',
+									maxWidth: '320px',
 									outline: 'none',
 								}}
 							/>
@@ -250,64 +343,46 @@ function ScheduleCard({
 							<h3
 								onClick={handleNameClick}
 								style={{
-									fontSize: '1.25rem',
+									fontSize: '1.125rem',
 									fontWeight: '600',
 									color: isTrashed ? '#6b7280' : '#111827',
 									margin: '0 0 0.5rem 0',
 									cursor: isTrashed ? 'default' : 'pointer',
 									transition: 'color 0.2s',
+									display: 'flex',
+									alignItems: 'center',
+									gap: '0.5rem',
 								}}
-								onMouseEnter={(e) => {
-									if (!isTrashed) {
-										e.currentTarget.style.color = '#f97316';
-									}
-								}}
-								onMouseLeave={(e) => {
-									if (!isTrashed) {
-										e.currentTarget.style.color = '#111827';
-									}
-								}}
+								onMouseEnter={(e) => { if (!isTrashed) e.currentTarget.style.color = '#f97316'; }}
+								onMouseLeave={(e) => { if (!isTrashed) e.currentTarget.style.color = '#111827'; }}
 							>
 								{schedule.label}
-								{isTrashed && <span style={{ fontSize: '0.75rem', fontWeight: 'normal', marginLeft: '0.5rem', color: '#9ca3af' }}>(Trashed)</span>}
-								{!isTrashed && onRename && (
-									<span style={{ fontSize: '0.75rem', fontWeight: 'normal', marginLeft: '0.5rem', color: '#9ca3af', opacity: 0 }}>(rename)</span>
-								)}
+								{isTrashed && <span style={{ fontSize: '0.75rem', fontWeight: 'normal', color: '#9ca3af' }}>(Trashed)</span>}
 							</h3>
 						)}
-						<div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: isTrashed ? '#9ca3af' : '#6b7280' }}>
-							<Calendar size={20} />
+						<div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: isTrashed ? '#9ca3af' : '#6b7280', fontSize: '0.875rem' }}>
+							<Calendar size={16} />
 							<span>{formatDate(schedule.start_date)} – {formatDate(schedule.end_date)}</span>
 						</div>
 					</div>
 					<StatusBadge status={schedule.status} />
 				</div>
 
-				<div style={{ display: 'flex', gap: '0.75rem', paddingTop: '0.5rem' }}>
+				<div style={{ display: 'flex', gap: '0.5rem', paddingTop: '0.25rem' }}>
 					{isTrashed ? (
 						<>
 							<button 
 								onClick={() => onRecover?.(schedule)}
-								style={{ ...styles.button, flex: 1, backgroundColor: '#10b981' }}
-								onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#059669'; }}
-								onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = '#10b981'; }}
+								style={{ ...styles.button, flex: 1, backgroundColor: '#10b981', borderRadius: '12px' }}
 							>
-								<RotateCcw size={18} />
+								<RotateCcw size={16} />
 								Recover
 							</button>
 							<button 
 								onClick={() => onHardDelete?.(schedule)}
-								style={{ 
-									...styles.button, 
-									backgroundColor: 'white', 
-									color: '#dc2626', 
-									border: '1px solid #fecaca',
-									flex: 1 
-								}}
-								onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#fef2f2'; }}
-								onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'white'; }}
+								style={{ ...styles.button, flex: 1, backgroundColor: 'white', color: '#dc2626', border: '1px solid #fecaca', borderRadius: '12px' }}
 							>
-								<XCircle size={18} />
+								<XCircle size={16} />
 								Delete
 							</button>
 						</>
@@ -315,40 +390,22 @@ function ScheduleCard({
 						<>
 							<button 
 								onClick={onView}
-								style={{ ...styles.button, flex: 1 }}
-								onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#ea580c'; }}
-								onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = '#f97316'; }}
+								style={{ ...styles.button, flex: 1, borderRadius: '12px' }}
 							>
-								View Schedule
+								<Sparkles size={16} />
+								View
 							</button>
 							<button 
 								onClick={onEdit}
-								style={{ 
-									...styles.button, 
-									backgroundColor: 'white', 
-									color: '#374151', 
-									border: '1px solid #d1d5db',
-									flex: 1 
-								}}
-								onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#f9fafb'; }}
-								onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'white'; }}
+								style={{ ...styles.button, flex: 1, backgroundColor: 'white', color: '#374151', border: '1px solid #e5e7eb', boxShadow: 'none', borderRadius: '12px' }}
 							>
 								Edit
 							</button>
 							<button 
 								onClick={() => onTrash?.(schedule)}
-								style={{ 
-									...styles.button, 
-									backgroundColor: 'white', 
-									color: '#6b7280', 
-									border: '1px solid #d1d5db',
-									padding: '0.75rem',
-								}}
-								onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#fef2f2'; e.currentTarget.style.borderColor = '#fca5a5'; e.currentTarget.style.color = '#dc2626'; }}
-								onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'white'; e.currentTarget.style.borderColor = '#d1d5db'; e.currentTarget.style.color = '#6b7280'; }}
-								title="Move to trash"
+								style={{ ...styles.button, backgroundColor: 'transparent', color: '#9ca3af', border: '1px solid #e5e7eb', boxShadow: 'none', padding: '0.75rem', borderRadius: '12px' }}
 							>
-								<Trash2 size={18} />
+								<Trash2 size={16} />
 							</button>
 						</>
 					)}
@@ -360,44 +417,41 @@ function ScheduleCard({
 
 function EmptyState({ onCreateSchedule }: { onCreateSchedule: () => void }) {
 	return (
-		<div style={{ 
-			display: 'flex', 
-			flexDirection: 'column', 
-			alignItems: 'center', 
-			justifyContent: 'center', 
-			padding: '4rem 1.5rem',
-			textAlign: 'center' 
-		}}>
-			<div style={{ 
-				width: '6rem', 
-				height: '6rem', 
-				borderRadius: '50%', 
-				background: 'linear-gradient(135deg, #fb923c, #fdba74)',
-				display: 'flex',
-				alignItems: 'center',
-				justifyContent: 'center',
-				marginBottom: '1.5rem'
-			}}>
-				<Calendar size={48} color="white" />
+		<div style={styles.emptyState}>
+			<div style={styles.emptyIcon}>
+				<Calendar size={40} color='white' />
 			</div>
-			<h2 style={{ fontSize: '1.5rem', fontWeight: '600', color: '#111827', margin: '0 0 0.75rem 0' }}>
-				Welcome to Aria!
-			</h2>
-			<p style={{ fontSize: '1.125rem', color: '#6b7280', maxWidth: '28rem', margin: '0 0 2rem 0', lineHeight: 1.5 }}>
-				Let's create your first schedule. It's easy – just click the button below to get started!
+			<h2 style={styles.emptyTitle}>Welcome to Aria!</h2>
+			<p style={styles.emptyText}>
+				Let's create your first schedule. It only takes a moment to get started.
 			</p>
 			<button 
 				onClick={onCreateSchedule}
-				style={{ 
-					...styles.button, 
-					padding: '1rem 2rem', 
-					fontSize: '1.125rem' 
-				}}
-				onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#ea580c'; }}
-				onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = '#f97316'; }}
+				style={styles.button}
 			>
-				<Plus size={24} />
-				Create Your First Schedule
+				<Plus size={20} />
+				Create Schedule
+			</button>
+		</div>
+	);
+}
+
+function TrashedEmptyState({ count, onViewTrash }: { count: number; onViewTrash: () => void }) {
+	return (
+		<div style={styles.emptyState}>
+			<div style={styles.trashedEmptyIcon}>
+				<Trash2 size={40} color='#f59e0b' />
+			</div>
+			<h2 style={styles.emptyTitle}>All caught up!</h2>
+			<p style={styles.emptyText}>
+				You have {count} schedule{count > 1 ? 's' : ''} in trash. They will be permanently deleted after 30 days.
+			</p>
+			<button 
+				onClick={onViewTrash}
+				style={styles.button}
+			>
+				<Trash2 size={18} />
+				View Trash
 			</button>
 		</div>
 	);
@@ -405,7 +459,7 @@ function EmptyState({ onCreateSchedule }: { onCreateSchedule: () => void }) {
 
 export default function DashboardPage() {
 	const navigate = useNavigate();
-	const [user, setUser] = useState<any>(null);
+	const [user, setUser] = useState<{ email?: string; user_metadata?: { full_name?: string } } | null>(null);
 	const [schedules, setSchedules] = useState<Schedule[]>([]);
 	const [loading, setLoading] = useState(true);
 	const [error, setError] = useState<string | null>(null);
@@ -446,8 +500,11 @@ export default function DashboardPage() {
 		setTimeout(() => setToast(null), 4000);
 	};
 
-	const handleCreateSchedule = () => {
-		setShowCreateModal(true);
+	const handleCreateSchedule = () => setShowCreateModal(true);
+
+	const handleScheduleCreated = () => {
+		showToast('Schedule created successfully!');
+		loadSchedules();
 	};
 
 	const handleViewSchedule = (schedule: Schedule) => {
@@ -459,21 +516,8 @@ export default function DashboardPage() {
 		setShowEditModal(true);
 	};
 
-	const handleRename = async (schedule: Schedule, newLabel: string) => {
-		try {
-			await updateSchedule(schedule.id, { label: newLabel });
-			showToast(`Renamed to "${newLabel}"`, 'success');
-			loadSchedules();
-		} catch (err) {
-			showToast(err instanceof Error ? err.message : 'Failed to rename', 'error');
-		}
-	};
-
-	const handleScheduleCreated = () => {
-		loadSchedules();
-	};
-
 	const handleScheduleUpdated = () => {
+		showToast('Schedule updated successfully!');
 		loadSchedules();
 	};
 
@@ -485,47 +529,69 @@ export default function DashboardPage() {
 	const handleTrashConfirm = async () => {
 		if (!scheduleToTrash) return;
 		try {
-			await deleteSchedule(scheduleToTrash.id);
-			showToast(`"${scheduleToTrash.label}" moved to trash. Recoverable for 30 days.`, 'success');
+			await trashSchedule(scheduleToTrash.id);
+			showToast('Schedule moved to trash');
 			loadSchedules();
 		} catch (err) {
-			showToast(err instanceof Error ? err.message : 'Failed to move to trash', 'error');
-		} finally {
-			setShowTrashConfirm(false);
-			setScheduleToTrash(null);
+			showToast('Failed to move schedule to trash', 'error');
 		}
+		setShowTrashConfirm(false);
+		setScheduleToTrash(null);
 	};
 
 	const handleRecover = async (schedule: Schedule) => {
 		try {
 			await restoreSchedule(schedule.id);
-			showToast(`"${schedule.label}" restored successfully`, 'success');
+			showToast('Schedule restored successfully!');
 			loadSchedules();
 		} catch (err) {
-			showToast(err instanceof Error ? err.message : 'Failed to restore schedule', 'error');
+			showToast('Failed to restore schedule', 'error');
+		}
+	};
+
+	const handleRename = async (schedule: Schedule, newLabel: string) => {
+		try {
+			await updateSchedule(schedule.id, { label: newLabel });
+			showToast('Schedule renamed');
+			loadSchedules();
+		} catch (err) {
+			showToast('Failed to rename schedule', 'error');
 		}
 	};
 
 	const handleHardDelete = async (schedule: Schedule) => {
 		try {
 			await permanentDeleteSchedule(schedule.id);
-			showToast(`"${schedule.label}" permanently deleted`, 'success');
+			showToast('Schedule permanently deleted');
 			loadSchedules();
 		} catch (err) {
-			showToast(err instanceof Error ? err.message : 'Failed to delete', 'error');
+			showToast('Failed to delete schedule', 'error');
 		}
 	};
 
-	const handleDeleteAllTrashed = async () => {
-		try {
-			const result = await permanentDeleteAllTrashed();
-			showToast(`Permanently deleted ${result.count} trashed schedule${result.count > 1 ? 's' : ''}`, 'success');
-			loadSchedules();
-		} catch (err) {
-			showToast(err instanceof Error ? err.message : 'Failed to delete', 'error');
-		} finally {
-			setShowDeleteAllConfirm(false);
+	const trashSchedule = async (id: string) => {
+		const { error } = await supabase
+			.from('schedules')
+			.update({ status: 'trashed', previous_status: 'collecting' })
+			.eq('id', id);
+		if (error) throw error;
+	};
+
+	const getTimeBasedGreeting = () => {
+		const hour = new Date().getHours();
+		if (hour < 12) return 'Good morning';
+		if (hour < 17) return 'Good afternoon';
+		return 'Good evening';
+	};
+
+	const getUserFirstName = () => {
+		if (user?.user_metadata?.full_name) {
+			return user.user_metadata.full_name.split(' ')[0];
 		}
+		if (user?.email) {
+			return user.email.split('@')[0];
+		}
+		return '';
 	};
 
 	const filterTabs = [
@@ -533,453 +599,183 @@ export default function DashboardPage() {
 		{ key: 'draft', label: 'Draft' },
 		{ key: 'collecting', label: 'Active' },
 		{ key: 'archived', label: 'Archived' },
-		{ key: 'trashed', label: 'Trashed' },
-	] as const;
+		{ key: 'trashed', label: 'Trash' },
+	];
 
-	const visibleSchedules = schedules.filter((s) => {
-		if (filter === 'all') return true;
-		return s.status === filter;
-	});
-
-	// Determine if we should show the "All trashed" empty state
-	const showAllTrashedEmptyState = filter === 'all' && schedules.length > 0 && schedules.every(s => s.status === 'trashed');
-
-	const getFilteredCount = (status: typeof filter) => {
-		if (status === 'all') return schedules.length;
-		return schedules.filter(s => s.status === status).length;
+	const getFilteredSchedules = () => {
+		if (filter === 'all') return schedules;
+		return schedules.filter(s => s.status === filter);
 	};
+
+	const getFilteredCount = (tabKey: string) => {
+		if (tabKey === 'all') return schedules.length;
+		return schedules.filter(s => s.status === tabKey).length;
+	};
+
+	const visibleSchedules = getFilteredSchedules();
+	const showAllTrashedEmptyState = filter === 'all' && schedules.length > 0 && schedules.every(s => s.status === 'trashed');
 
 	if (loading) {
 		return (
-			<div style={{ 
-				...styles.dashboard, 
-				display: 'flex', 
-				alignItems: 'center', 
-				justifyContent: 'center' 
-			}}>
-				<div style={{ color: '#6b7280', fontSize: '1.125rem' }}>Loading schedules...</div>
+			<div style={{ ...styles.page, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+				<div style={{ textAlign: 'center', color: '#6b7280' }}>Loading...</div>
+			</div>
+		);
+	}
+
+	if (error) {
+		return (
+			<div style={{ ...styles.page, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+				<div style={{ textAlign: 'center', color: '#dc2626' }}>
+					{error}
+					<button onClick={loadSchedules} style={{ marginTop: '1rem', background: 'none', border: 'none', color: '#f97316', textDecoration: 'underline', cursor: 'pointer' }}>Try again</button>
+				</div>
 			</div>
 		);
 	}
 
 	return (
-		<div style={styles.dashboard}>
+		<div style={styles.page}>
+			<style>
+				{`
+					@keyframes slideUp {
+						from { opacity: 0; transform: translate(-50%, 20px); }
+						to { opacity: 1; transform: translate(-50%, 0); }
+					}
+					.tab:hover:not(.active) { background: #f3f4f6 !important; }
+					.tab.active { background: #fff7ed !important; color: #f97316 !important; }
+				`}
+			</style>
+
+			{/* Header */}
 			<header style={styles.header}>
 				<div style={styles.headerContent}>
-					<div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-						<img src={logo} alt="Aria" style={styles.logo} />
-						<div>
-							<h1 style={styles.title}>Aria</h1>
-							<p style={styles.subtitle}>Your scheduling assistant</p>
-						</div>
+					<div style={styles.logoSection}>
+						<img src={logo} alt='Aria' style={styles.logo} />
 					</div>
-					<div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-						<button
-							onClick={handleCreateSchedule}
-							style={{
-								...styles.button,
-								padding: '0.5rem 1rem',
-								fontSize: '0.875rem',
-							}}
-							onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#ea580c'; }}
-							onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = '#f97316'; }}
-						>
+					<div style={styles.greetingSection}>
+						<p style={styles.greeting}>{getTimeBasedGreeting()}, {getUserFirstName()}!</p>
+						<p style={styles.greetingSubtext}>Ready to organize your day?</p>
+					</div>
+					<div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+						<button onClick={handleCreateSchedule} style={styles.button}>
 							<Plus size={18} />
 							New Schedule
 						</button>
-						{user && <ProfileDropdown user={user} />}
+						<ProfileDropdown user={user || {}} />
 					</div>
 				</div>
 			</header>
 
-			{error && (
-				<div style={styles.main}>
-					<div style={{ 
-						backgroundColor: '#fef2f2', 
-						border: '1px solid #fecaca', 
-						color: '#991b1b', 
-						padding: '0.75rem 1rem', 
-						borderRadius: '0.5rem' 
-					}}>
-						{error}
-						<button 
-							onClick={loadSchedules}
-							style={{ 
-								background: 'none', 
-								border: 'none', 
-								color: '#dc2626', 
-								textDecoration: 'underline', 
-								cursor: 'pointer', 
-								marginLeft: '1rem' 
-							}}
-						>
-							Try again
-						</button>
+			{/* Main Content */}
+			<main style={styles.main}>
+				{/* Filter Tabs */}
+				<div style={styles.sectionHeader}>
+					<div style={styles.filterTabs}>
+						{filterTabs.map((tab) => (
+							<button
+								key={tab.key}
+								onClick={() => setFilter(tab.key as any)}
+								className={`tab ${filter === tab.key ? 'active' : ''}`}
+								style={filter === tab.key ? { ...styles.tab, ...styles.tabActive } : styles.tab}
+							>
+								{tab.label}
+								<span style={{
+									fontSize: '0.75rem',
+									padding: '0.125rem 0.5rem',
+									borderRadius: '9999px',
+									backgroundColor: filter === tab.key ? '#ffedd5' : '#f3f4f6',
+									color: filter === tab.key ? '#c2410c' : '#9ca3af',
+								}}>
+									{getFilteredCount(tab.key)}
+								</span>
+							</button>
+						))}
+					</div>
+				</div>
+
+				{/* Schedule List */}
+					{visibleSchedules.length === 0 ? (
+						showAllTrashedEmptyState ? (
+							<TrashedEmptyState count={schedules.length} onViewTrash={() => setFilter('trashed')} />
+						) : filter === 'all' ? (
+							<EmptyState onCreateSchedule={handleCreateSchedule} />
+						) : (
+							<div style={{ textAlign: 'center', padding: '4rem 2rem', color: '#6b7280' }}>
+								<p>No {filter} schedules found.</p>
+								<button onClick={() => setFilter('all')} style={{ marginTop: '1rem', ...styles.button, background: 'white', color: '#f97316', border: '1px solid #fed7aa' }}>
+									View All
+								</button>
+							</div>
+						)
+				) : (
+					<div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+						{filter === 'trashed' && (
+							<div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+								<button
+									onClick={() => setShowDeleteAllConfirm(true)}
+									style={{ ...styles.button, background: 'white', color: '#dc2626', border: '1px solid #fecaca', padding: '0.5rem 1rem', fontSize: '0.875rem', borderRadius: '12px' }}
+								>
+									<XCircle size={16} />
+									Delete All
+								</button>
+							</div>
+						)}
+						{visibleSchedules.map((schedule) => (
+							<ScheduleCard
+								key={schedule.id}
+								schedule={schedule}
+								onView={() => handleViewSchedule(schedule)}
+								onEdit={() => handleEditSchedule(schedule)}
+								onTrash={handleTrashClick}
+								onRecover={handleRecover}
+								onRename={handleRename}
+								onHardDelete={handleHardDelete}
+								isTrashed={schedule.status === 'trashed'}
+							/>
+						))}
+					</div>
+				)}
+			</main>
+
+			{/* Modals */}
+			<CreateScheduleModal isOpen={showCreateModal} onClose={() => setShowCreateModal(false)} onSuccess={handleScheduleCreated} />
+			<EditScheduleModal isOpen={showEditModal} onClose={() => setShowEditModal(false)} schedule={selectedSchedule} onSuccess={handleScheduleUpdated} />
+
+			{/* Trash Confirmation */}
+			{showTrashConfirm && (
+				<div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0, 0, 0, 0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }} onClick={() => setShowTrashConfirm(false)}>
+					<div style={{ backgroundColor: 'white', borderRadius: '16px', padding: '2rem', maxWidth: '400px', width: '90%' }} onClick={(e) => e.stopPropagation()}>
+						<h3 style={{ fontSize: '1.25rem', fontWeight: '600', margin: '0 0 1rem 0' }}>Move to Trash?</h3>
+						<p style={{ color: '#6b7280', marginBottom: '1.5rem' }}>Are you sure you want to move <strong>{scheduleToTrash?.label}</strong> to trash?</p>
+						<div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end' }}>
+							<button onClick={() => setShowTrashConfirm(false)} style={{ padding: '0.625rem 1.25rem', background: 'white', color: '#374151', border: '1px solid #d1d5db', borderRadius: '12px', cursor: 'pointer' }}>Cancel</button>
+							<button onClick={handleTrashConfirm} style={{ ...styles.button, borderRadius: '12px' }}>Move to Trash</button>
+						</div>
 					</div>
 				</div>
 			)}
 
-		<main style={styles.main}>
-			<div style={styles.twoColumnLayout}>
-				{/* Left column: Schedules */}
-				<div>
-					{visibleSchedules.length === 0 && filter === 'all' ? (
-						<EmptyState onCreateSchedule={handleCreateSchedule} />
-					) : (
-						<div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-							<div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-								<h2 style={{ fontSize: '1.5rem', fontWeight: '600', color: '#111827', margin: 0 }}>Your Schedules</h2>
-								<p style={{ color: '#6b7280', margin: 0 }}>
-									{visibleSchedules.length} {visibleSchedules.length === 1 ? "schedule" : "schedules"}
-								</p>
-							</div>
-
-							{/* Filter Tabs */}
-							<div style={{ display: 'flex', gap: '0.25rem', borderBottom: '1px solid #e5e7eb', paddingBottom: '0.5rem' }}>
-								{filterTabs.map((tab) => (
-									<button
-										key={tab.key}
-										onClick={() => setFilter(tab.key)}
-										style={{
-											padding: '0.5rem 1rem',
-											background: filter === tab.key ? '#fff7ed' : 'transparent',
-											border: 'none',
-											borderRadius: '0.5rem',
-											fontSize: '0.875rem',
-											fontWeight: filter === tab.key ? '500' : '400',
-											color: filter === tab.key ? '#f97316' : '#6b7280',
-											cursor: 'pointer',
-											transition: 'all 0.2s',
-											display: 'flex',
-											alignItems: 'center',
-											gap: '0.5rem',
-										}}
-										onMouseEnter={(e) => {
-											if (filter !== tab.key) {
-												e.currentTarget.style.backgroundColor = '#f3f4f6';
-											}
-										}}
-										onMouseLeave={(e) => {
-											if (filter !== tab.key) {
-												e.currentTarget.style.backgroundColor = 'transparent';
-											}
-										}}
-									>
-										{tab.label}
-										<span style={{
-											fontSize: '0.75rem',
-											padding: '0.125rem 0.5rem',
-											borderRadius: '9999px',
-											backgroundColor: filter === tab.key ? '#ffedd5' : '#f3f4f6',
-											color: filter === tab.key ? '#c2410c' : '#6b7280',
-										}}>
-											{getFilteredCount(tab.key)}
-										</span>
-									</button>
-								))}
-							</div>
-
-							{/* Special empty state when all schedules are trashed */}
-							{showAllTrashedEmptyState ? (
-								<div style={{
-									textAlign: 'center',
-									padding: '4rem 1.5rem',
-									color: '#6b7280',
-								}}>
-									<div style={{
-										width: '5rem',
-										height: '5rem',
-										borderRadius: '50%',
-										background: '#fef3c7',
-										display: 'flex',
-										alignItems: 'center',
-										justifyContent: 'center',
-										margin: '0 auto 1.5rem',
-									}}>
-										<Trash2 size={32} color="#f59e0b" />
-									</div>
-									<h3 style={{ fontSize: '1.25rem', fontWeight: '600', color: '#111827', marginBottom: '0.75rem' }}>
-										All your schedules are in trash
-									</h3>
-									<p style={{ fontSize: '1rem', marginBottom: '1.5rem', maxWidth: '24rem', margin: '0 auto 1.5rem' }}>
-										You have {schedules.length} schedule{schedules.length > 1 ? 's' : ''} in trash. 
-										They will be permanently deleted after 30 days.
-									</p>
-									<button
-										onClick={() => setFilter('trashed')}
-										style={{
-											padding: '0.75rem 1.5rem',
-											background: '#f97316',
-											color: 'white',
-											border: 'none',
-											borderRadius: '0.5rem',
-											cursor: 'pointer',
-											fontSize: '1rem',
-											fontWeight: '500',
-											display: 'inline-flex',
-											alignItems: 'center',
-											gap: '0.5rem',
-										}}
-										onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#ea580c'; }}
-										onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = '#f97316'; }}
-									>
-										<Trash2 size={20} />
-										View Trashed Schedules
-									</button>
-								</div>
-							) : visibleSchedules.length === 0 ? (
-								<div style={{
-									textAlign: 'center',
-									padding: '3rem 1.5rem',
-									color: '#6b7280',
-								}}>
-									<p>No {filter !== 'all' ? filter : ''} schedules found.</p>
-									{filter !== 'all' && (
-										<button
-											onClick={() => setFilter('all')}
-											style={{
-												marginTop: '1rem',
-												padding: '0.5rem 1rem',
-												background: '#f97316',
-												color: 'white',
-												border: 'none',
-												borderRadius: '0.5rem',
-												cursor: 'pointer',
-											}}
-										>
-											View All Schedules
-										</button>
-									)}
-								</div>
-							) : (
-								<div style={styles.list}>
-									{filter === 'trashed' && (
-										<div style={{
-											display: 'flex',
-											justifyContent: 'flex-end',
-											paddingBottom: '0.5rem',
-										}}>
-											<button
-												onClick={() => setShowDeleteAllConfirm(true)}
-												style={{
-													padding: '0.5rem 1rem',
-													background: 'white',
-													color: '#dc2626',
-													border: '1px solid #fecaca',
-													borderRadius: '0.5rem',
-													cursor: 'pointer',
-													fontSize: '0.875rem',
-													display: 'flex',
-													alignItems: 'center',
-													gap: '0.5rem',
-												}}
-												onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#fef2f2'; }}
-												onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'white'; }}
-											>
-												<XCircle size={16} />
-												Delete All
-											</button>
-										</div>
-									)}
-									{visibleSchedules.map((schedule) => (
-										<ScheduleCard
-											key={schedule.id}
-											schedule={schedule}
-											onView={() => handleViewSchedule(schedule)}
-											onEdit={() => handleEditSchedule(schedule)}
-											onTrash={handleTrashClick}
-											onRecover={handleRecover}
-											onRename={handleRename}
-											onHardDelete={handleHardDelete}
-											isTrashed={schedule.status === 'trashed'}
-										/>
-									))}
-								</div>
-							)}
+			{/* Delete All Confirmation */}
+			{showDeleteAllConfirm && (
+				<div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0, 0, 0, 0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }} onClick={() => setShowDeleteAllConfirm(false)}>
+					<div style={{ backgroundColor: 'white', borderRadius: '16px', padding: '2rem', maxWidth: '400px', width: '90%' }} onClick={(e) => e.stopPropagation()}>
+						<h3 style={{ fontSize: '1.25rem', fontWeight: '600', margin: '0 0 1rem 0' }}>Delete All?</h3>
+						<p style={{ color: '#6b7280', marginBottom: '1.5rem' }}>This will permanently delete all {schedules.filter(s => s.status === 'trashed').length} trashed schedules. This action cannot be undone.</p>
+						<div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end' }}>
+							<button onClick={() => setShowDeleteAllConfirm(false)} style={{ padding: '0.625rem 1.25rem', background: 'white', color: '#374151', border: '1px solid #d1d5db', borderRadius: '12px', cursor: 'pointer' }}>Cancel</button>
+							<button onClick={async () => { await permanentDeleteAllTrashed(); showToast('All schedules deleted'); loadSchedules(); setShowDeleteAllConfirm(false); }} style={{ ...styles.button, background: '#dc2626', borderRadius: '12px' }}>Delete All</button>
 						</div>
-					)}
-				</div>
-			</div>
-		</main>
-
-	{/* Modals */}
-	<CreateScheduleModal 
-		isOpen={showCreateModal}
-		onClose={() => setShowCreateModal(false)}
-		onSuccess={handleScheduleCreated}
-	/>
-	<EditScheduleModal
-		isOpen={showEditModal}
-		onClose={() => setShowEditModal(false)}
-		schedule={selectedSchedule}
-		onSuccess={handleScheduleUpdated}
-	/>
-
-	{/* Trash Confirmation Modal */}
-	{showTrashConfirm && (
-		<div style={{
-			position: 'fixed',
-			top: 0,
-			left: 0,
-			right: 0,
-			bottom: 0,
-			backgroundColor: 'rgba(0, 0, 0, 0.5)',
-			display: 'flex',
-			alignItems: 'center',
-			justifyContent: 'center',
-			zIndex: 1000,
-		}} onClick={() => setShowTrashConfirm(false)}>
-			<div style={{
-				backgroundColor: 'white',
-				borderRadius: '0.75rem',
-				padding: '1.5rem',
-				maxWidth: '400px',
-				width: '90%',
-			}} onClick={(e) => e.stopPropagation()}>
-				<div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1rem' }}>
-					<div style={{
-						width: '40px',
-						height: '40px',
-						borderRadius: '50%',
-						backgroundColor: '#fef3c7',
-						display: 'flex',
-						alignItems: 'center',
-						justifyContent: 'center',
-					}}>
-						<Trash2 size={24} color="#f59e0b" />
 					</div>
-					<h3 style={{ margin: 0, fontSize: '1.125rem', fontWeight: '600' }}>Move to Trash?</h3>
 				</div>
-				<p style={{ color: '#6b7280', marginBottom: '1.5rem' }}>
-					Are you sure you want to move <strong>{scheduleToTrash?.label}</strong> to trash? 
-					This schedule will be recoverable for 30 days.
-				</p>
-				<div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end' }}>
-					<button
-						onClick={() => setShowTrashConfirm(false)}
-						style={{
-							padding: '0.5rem 1rem',
-							background: 'white',
-							color: '#374151',
-							border: '1px solid #d1d5db',
-							borderRadius: '0.5rem',
-							cursor: 'pointer',
-						}}
-					>
-						Cancel
-					</button>
-					<button
-						onClick={handleTrashConfirm}
-						style={{
-							padding: '0.5rem 1rem',
-							background: '#f97316',
-							color: 'white',
-							border: 'none',
-							borderRadius: '0.5rem',
-							cursor: 'pointer',
-						}}
-					>
-						Move to Trash
-					</button>
-				</div>
-			</div>
-		</div>
-	)}
+			)}
 
-	{/* Delete All Confirmation Modal */}
-	{showDeleteAllConfirm && (
-		<div style={{
-			position: 'fixed',
-			top: 0,
-			left: 0,
-			right: 0,
-			bottom: 0,
-			backgroundColor: 'rgba(0, 0, 0, 0.5)',
-			display: 'flex',
-			alignItems: 'center',
-			justifyContent: 'center',
-			zIndex: 1000,
-		}} onClick={() => setShowDeleteAllConfirm(false)}>
-			<div style={{
-				backgroundColor: 'white',
-				borderRadius: '0.75rem',
-				padding: '1.5rem',
-				maxWidth: '400px',
-				width: '90%',
-			}} onClick={(e) => e.stopPropagation()}>
-				<div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1rem' }}>
-					<div style={{
-						width: '40px',
-						height: '40px',
-						borderRadius: '50%',
-						backgroundColor: '#fecaca',
-						display: 'flex',
-						alignItems: 'center',
-						justifyContent: 'center',
-					}}>
-						<Trash2 size={24} color="#dc2626" />
-					</div>
-					<h3 style={{ margin: 0, fontSize: '1.125rem', fontWeight: '600' }}>Permanently Delete All?</h3>
+			{/* Toast */}
+			{toast && (
+				<div style={{ ...styles.toast, ...(toast.type === 'success' ? styles.toastSuccess : styles.toastError) }}>
+					{toast.message}
 				</div>
-				<p style={{ color: '#6b7280', marginBottom: '1.5rem' }}>
-					Are you sure you want to permanently delete all <strong>{schedules.filter(s => s.status === 'trashed').length}</strong> trashed schedules? 
-					This action <strong>cannot be undone</strong>.
-				</p>
-				<div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end' }}>
-					<button
-						onClick={() => setShowDeleteAllConfirm(false)}
-						style={{
-							padding: '0.5rem 1rem',
-							background: 'white',
-							color: '#374151',
-							border: '1px solid #d1d5db',
-							borderRadius: '0.5rem',
-							cursor: 'pointer',
-						}}
-					>
-						Cancel
-					</button>
-					<button
-						onClick={handleDeleteAllTrashed}
-						style={{
-							padding: '0.5rem 1rem',
-							background: '#dc2626',
-							color: 'white',
-							border: 'none',
-							borderRadius: '0.5rem',
-							cursor: 'pointer',
-						}}
-					>
-						Delete All
-					</button>
-				</div>
-			</div>
+			)}
 		</div>
-	)}
-
-	{/* Toast Notification */}
-	{toast && (
-		<div style={{
-			position: 'fixed',
-			bottom: '2rem',
-			right: '2rem',
-			padding: '1rem 1.5rem',
-			backgroundColor: toast.type === 'success' ? '#10b981' : '#ef4444',
-			color: 'white',
-			borderRadius: '0.5rem',
-			boxShadow: '0 10px 25px rgba(0, 0, 0, 0.15)',
-			zIndex: 1000,
-			animation: 'slideIn 0.3s ease',
-		}}>
-			{toast.message}
-			<style>{`
-				@keyframes slideIn {
-					from { transform: translateY(20px); opacity: 0; }
-					to { transform: translateY(0); opacity: 1; }
-				}
-			`}</style>
-		</div>
-	)}
-</div>
 	);
 }
