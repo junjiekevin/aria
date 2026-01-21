@@ -334,15 +334,58 @@ export default function SchedulePage() {
     });
   };
 
+  const parseRecurrenceRule = (rule: string) => {
+    if (!rule) return null;
+
+    const freqMatch = rule.match(/FREQ=(\w+)/);
+    const intervalMatch = rule.match(/INTERVAL=(\d+)/);
+    const byDayMatch = rule.match(/BYDAY=(\w+)/);
+
+    const freq = freqMatch ? freqMatch[1] : 'WEEKLY';
+    const interval = intervalMatch ? parseInt(intervalMatch[1]) : 1;
+
+    const byDayStr = byDayMatch ? byDayMatch[1] : '';
+    const dayAbbrevs = ['SU', 'MO', 'TU', 'WE', 'TH', 'FR', 'SA'];
+    const dayIndex = dayAbbrevs.indexOf(byDayStr);
+
+    return { freq, interval, dayIndex: dayIndex >= 0 ? dayIndex : null };
+  };
+
   const isEntryInCurrentWeek = (entry: ScheduleEntry): boolean => {
     if (!weekStart || !schedule) return false;
-    
-    // Extract just the date part (YYYY-MM-DD) from entry
-    const entryDateStr = entry.start_time.split('T')[0];
-    const weekStartStr = weekStart.toISOString().split('T')[0];
-    const weekEndStr = weekEnd.toISOString().split('T')[0];
-    
-    return entryDateStr >= weekStartStr && entryDateStr <= weekEndStr;
+
+    const entryStart = new Date(entry.start_time);
+    const rule = parseRecurrenceRule(entry.recurrence_rule);
+
+    if (!rule || !rule.dayIndex) {
+      return entryStart >= weekStart && entryStart <= weekEnd;
+    }
+
+    const scheduleStart = parseLocalDate(schedule.start_date);
+    const scheduleFirstDay = new Date(scheduleStart);
+    scheduleFirstDay.setDate(scheduleStart.getDate() - scheduleStart.getDay());
+
+    const daysFromFirst = Math.floor((entryStart.getTime() - scheduleFirstDay.getTime()) / (1000 * 60 * 60 * 24));
+    const entryWeekOffset = Math.floor(daysFromFirst / 7);
+
+    const currentWeekFirstDay = new Date(weekStart);
+    const daysFromCurrentFirst = Math.floor((currentWeekFirstDay.getTime() - scheduleFirstDay.getTime()) / (1000 * 60 * 60 * 24));
+    const currentWeekOffset = Math.floor(daysFromCurrentFirst / 7);
+
+    if (rule.freq === 'WEEKLY' || rule.freq === '2WEEKLY') {
+      const weekDiff = Math.abs(entryWeekOffset - currentWeekOffset);
+      const interval = rule.freq === '2WEEKLY' ? 2 : 1;
+      return weekDiff % interval === 0;
+    }
+
+    if (rule.freq === 'MONTHLY') {
+      // INTERVAL in MONTHLY means number of weeks (default 4 weeks for "once every 4 weeks")
+      const weeksInterval = rule.interval > 0 ? rule.interval : 4;
+      const weekDiff = Math.abs(entryWeekOffset - currentWeekOffset);
+      return weekDiff % weeksInterval === 0;
+    }
+
+    return entryWeekOffset === currentWeekOffset;
   };
 
   const getEntriesForSlot = (day: string, hour: number) => {
@@ -351,13 +394,9 @@ export default function SchedulePage() {
     return entries.filter(entry => {
       if (!isEntryInCurrentWeek(entry)) return false;
       
-      // Get the date of this entry
-      const entryDateStr = entry.start_time.split('T')[0];
-      const [year, month, dayNum] = entryDateStr.split('-').map(Number);
-      const entryDate = new Date(year, month - 1, dayNum);
-      
-      // What day of week is this date?
-      const entryDayIndex = entryDate.getDay();
+      // Get the day of week for this entry from recurrence rule BYDAY, or from actual date
+      const rule = parseRecurrenceRule(entry.recurrence_rule);
+      const entryDayIndex = rule?.dayIndex ?? new Date(entry.start_time).getDay();
       
       // Get the hour from the entry
       const entryHour = new Date(entry.start_time).getHours();
