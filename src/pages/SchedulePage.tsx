@@ -716,8 +716,10 @@ export default function SchedulePage() {
       const originalRule = draggedEntry.recurrence_rule || '';
       let recurrenceRule = originalRule;
       
-      // Update BYDAY in the recurrence rule
-      if (originalRule.includes('FREQ=2WEEKLY')) {
+      if (!originalRule) {
+        // "Once" frequency - keep empty (no recurrence)
+        recurrenceRule = '';
+      } else if (originalRule.includes('FREQ=2WEEKLY')) {
         recurrenceRule = `FREQ=2WEEKLY;BYDAY=${dayAbbrev}`;
       } else if (originalRule.includes('FREQ=MONTHLY')) {
         // Extract INTERVAL if present
@@ -732,7 +734,7 @@ export default function SchedulePage() {
           ? `FREQ=WEEKLY;INTERVAL=${interval};BYDAY=${dayAbbrev}`
           : `FREQ=WEEKLY;BYDAY=${dayAbbrev}`;
       } else {
-        // No original rule or unknown - default to weekly
+        // Unknown format - default to weekly
         recurrenceRule = `FREQ=WEEKLY;BYDAY=${dayAbbrev}`;
       }
 
