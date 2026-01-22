@@ -297,6 +297,7 @@ function ScheduleCard({
 	onView, 
 	onEdit,
 	onTrash,
+	onArchive,
 	onRecover,
 	onRename,
 	onHardDelete,
@@ -306,6 +307,7 @@ function ScheduleCard({
 	onView: () => void; 
 	onEdit: () => void;
 	onTrash?: (schedule: Schedule) => void;
+	onArchive?: (schedule: Schedule) => void;
 	onRecover?: (schedule: Schedule) => void;
 	onRename?: (schedule: Schedule, newLabel: string) => void;
 	onHardDelete?: (schedule: Schedule) => void;
@@ -458,6 +460,13 @@ function ScheduleCard({
 								Edit
 							</button>
 							<button 
+								onClick={() => onArchive?.(schedule)}
+								style={{ ...styles.button, backgroundColor: 'transparent', color: '#6b7280', border: '1px solid #e5e7eb', boxShadow: 'none', padding: '0.75rem', borderRadius: '12px' }}
+								title="Archive"
+							>
+								<Archive size={16} />
+							</button>
+							<button 
 								onClick={() => onTrash?.(schedule)}
 								style={{ ...styles.button, backgroundColor: 'transparent', color: '#9ca3af', border: '1px solid #e5e7eb', boxShadow: 'none', padding: '0.75rem', borderRadius: '12px' }}
 							>
@@ -593,6 +602,16 @@ export default function DashboardPage() {
 		}
 		setShowTrashConfirm(false);
 		setScheduleToTrash(null);
+	};
+
+	const handleArchive = async (schedule: Schedule) => {
+		try {
+			await updateSchedule(schedule.id, { status: 'archived' });
+			showToast('Schedule archived');
+			loadSchedules();
+		} catch (err) {
+			showToast('Failed to archive schedule', 'error');
+		}
 	};
 
 	const handleRecover = async (schedule: Schedule) => {
@@ -806,6 +825,7 @@ export default function DashboardPage() {
 								onView={() => handleViewSchedule(schedule)}
 								onEdit={() => handleEditSchedule(schedule)}
 								onTrash={handleTrashClick}
+								onArchive={handleArchive}
 								onRecover={handleRecover}
 								onRename={handleRename}
 								onHardDelete={handleHardDelete}

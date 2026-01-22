@@ -1,7 +1,7 @@
 // src/pages/SchedulePage.tsx
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, ChevronLeft, ChevronRight, Trash2, Copy, Check, Sparkles } from 'lucide-react';
+import { ArrowLeft, ChevronLeft, ChevronRight, Trash2, Copy, Check, Sparkles, Archive, FileText, Clock } from 'lucide-react';
 import { getSchedule, updateSchedule, type Schedule } from '../lib/api/schedules';
 import { getScheduleEntries, createScheduleEntry, updateScheduleEntry, deleteScheduleEntry, type ScheduleEntry } from '../lib/api/schedule-entries';
 import { getFormResponses, deleteFormResponse, updateFormResponseAssigned, getPreferredTimings, type FormResponse } from '../lib/api/form-responses';
@@ -173,16 +173,29 @@ const styles = {
     alignItems: 'center',
     textAlign: 'center' as const,
   },
-  statusSelect: {
-    padding: '0.5rem 0.75rem',
-    border: '1px solid #d1d5db',
-    borderRadius: '0.375rem',
-    fontSize: '0.875rem',
+  statusBadge: {
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: '0.375rem',
+    padding: '0.375rem 0.625rem',
+    borderRadius: '9999px',
+    fontSize: '0.8125rem',
     fontWeight: '500',
-    backgroundColor: 'white',
+    border: '1px solid',
+  },
+  panelActionButton: {
+    padding: '0.5rem 0.75rem',
+    borderRadius: '0.375rem',
+    fontSize: '0.8125rem',
+    fontWeight: '500',
     cursor: 'pointer',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '0.375rem',
+    border: '1px solid #e5e7eb',
+    backgroundColor: 'white',
+    color: '#6b7280',
     transition: 'all 0.2s',
-    color: '#111827',
   },
   unassignedPanel: {
     backgroundColor: 'white',
@@ -426,6 +439,41 @@ function FormLink({ scheduleId }: { scheduleId: string }) {
       >
         {copied ? <Check size={16} /> : <Copy size={16} />}
       </button>
+    </div>
+  );
+}
+
+function StatusBadge({ status }: { status: string }) {
+  const statusConfig: Record<string, { label: string; icon: typeof FileText; style: React.CSSProperties }> = {
+    draft: {
+      label: 'Draft',
+      icon: FileText,
+      style: { ...styles.statusBadge, backgroundColor: '#fef3c7', color: '#92400e', borderColor: '#fed7aa' }
+    },
+    collecting: {
+      label: 'Active',
+      icon: Clock,
+      style: { ...styles.statusBadge, backgroundColor: '#d1fae5', color: '#065f46', borderColor: '#a7f3d0' }
+    },
+    archived: {
+      label: 'Archived',
+      icon: Archive,
+      style: { ...styles.statusBadge, backgroundColor: '#f1f5f9', color: '#475569', borderColor: '#e2e8f0' }
+    },
+    trashed: {
+      label: 'Trashed',
+      icon: Trash2,
+      style: { ...styles.statusBadge, backgroundColor: '#fee2e2', color: '#991b1b', borderColor: '#fecaca' }
+    }
+  };
+
+  const config = statusConfig[status] || statusConfig.draft;
+  const Icon = config.icon;
+
+  return (
+    <div style={config.style}>
+      <Icon size={14} />
+      {config.label}
     </div>
   );
 }
@@ -806,15 +854,27 @@ export default function SchedulePage() {
     loadScheduleData();
   };
 
-  const handleStatusChange = async (newStatus: 'draft' | 'collecting' | 'archived' | 'trashed') => {
-    if (!scheduleId) return;
+  const handleArchive = async () => {
+    if (!scheduleId || !schedule) return;
     
     try {
-      await updateSchedule(scheduleId, { status: newStatus });
+      await updateSchedule(scheduleId, { status: 'archived' });
       loadScheduleData();
     } catch (err) {
-      console.error('Failed to update status:', err);
-      alert(err instanceof Error ? err.message : 'Failed to update status');
+      console.error('Failed to archive schedule:', err);
+      alert(err instanceof Error ? err.message : 'Failed to archive schedule');
+    }
+  };
+
+  const handleTrash = async () => {
+    if (!scheduleId || !schedule) return;
+    
+    try {
+      await updateSchedule(scheduleId, { status: 'trashed' });
+      loadScheduleData();
+    } catch (err) {
+      console.error('Failed to trash schedule:', err);
+      alert(err instanceof Error ? err.message : 'Failed to trash schedule');
     }
   };
 
@@ -1531,17 +1591,7 @@ export default function SchedulePage() {
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', fontSize: '0.875rem' }}>
               <div>
                 <span style={{ color: '#6b7280', display: 'block', marginBottom: '0.5rem' }}>Status:</span>
-                <select
-                  value={schedule.status}
-                  onChange={(e) => handleStatusChange(e.target.value as any)}
-                  style={styles.statusSelect}
-                  disabled={schedule.status === 'collecting'}
-                >
-                  <option value="draft">Draft</option>
-                  <option value="collecting">Active (Collecting)</option>
-                  <option value="archived">Archived</option>
-                  <option value="trashed">Trashed</option>
-                </select>
+                <StatusBadge status={schedule.status} />
               </div>
               <div>
                 <span style={{ color: '#6b7280' }}>Duration: </span>
@@ -1551,7 +1601,7 @@ export default function SchedulePage() {
               </div>
               
               {schedule.status === 'draft' && (
-                <div style={{ marginTop: '1rem' }}>
+                <div style={{ marginTop: '0.5rem' }}>
                   <button
                     onClick={() => setShowConfigureFormModal(true)}
                     style={{
@@ -1579,7 +1629,7 @@ export default function SchedulePage() {
               )}
               
               {schedule.status === 'collecting' && (
-                <div style={{ marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid #e5e7eb' }}>
+                <div style={{ marginTop: '0.5rem', paddingTop: '1rem', borderTop: '1px solid #e5e7eb' }}>
                   {schedule.form_deadline && (
                     <div style={{ marginBottom: '0.75rem' }}>
                       <span style={{ color: '#6b7280', display: 'block', marginBottom: '0.25rem' }}>Deadline:</span>
@@ -1617,6 +1667,28 @@ export default function SchedulePage() {
                     onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'white'; }}
                   >
                     Edit Form Configuration
+                  </button>
+                </div>
+              )}
+              
+              {/* Archive and Trash buttons - always visible except when trashed */}
+              {schedule.status !== 'trashed' && (
+                <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem', paddingTop: '1rem', borderTop: '1px solid #e5e7eb' }}>
+                  <button
+                    onClick={handleArchive}
+                    style={{ ...styles.panelActionButton, flex: 1 }}
+                    title="Archive"
+                  >
+                    <Archive size={14} />
+                    Archive
+                  </button>
+                  <button
+                    onClick={handleTrash}
+                    style={{ ...styles.panelActionButton, flex: 1, color: '#dc2626', borderColor: '#fecaca' }}
+                    title="Trash"
+                  >
+                    <Trash2 size={14} />
+                    Trash
                   </button>
                 </div>
               )}

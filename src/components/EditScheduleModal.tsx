@@ -187,29 +187,6 @@ export default function EditScheduleModal({ isOpen, onClose, schedule, onSuccess
           />
         </div>
 
-        <div style={styles.formGroup}>
-          <label htmlFor="edit-status" style={styles.label}>
-            Status
-          </label>
-          <select
-            id="edit-status"
-            value={formData.status}
-            onChange={(e) => setFormData({ ...formData, status: e.target.value as any })}
-            style={styles.select}
-            onFocus={(e) => { e.currentTarget.style.borderColor = '#f97316'; }}
-            onBlur={(e) => { e.currentTarget.style.borderColor = '#d1d5db'; }}
-          >
-            <option value="draft">Draft</option>
-            <option value="collecting">Active (Collecting Responses)</option>
-            <option value="archived">Archived</option>
-          </select>
-          <p style={styles.helpText}>
-            {formData.status === 'draft' && 'Schedule is not yet active'}
-            {formData.status === 'collecting' && 'Students can submit their preferences'}
-            {formData.status === 'archived' && 'Schedule is completed and archived'}
-          </p>
-        </div>
-
         <div style={styles.buttonGroup}>
           <button
             type="button"
