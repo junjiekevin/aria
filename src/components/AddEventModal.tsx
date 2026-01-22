@@ -12,6 +12,7 @@ interface AddEventModalProps {
   scheduleStartDate: string;
   existingEntry?: ScheduleEntry | null;
   onNeedScopeConfirmation?: (entry: ScheduleEntry, updates: { student_name: string; start_time: string; end_time: string; recurrence_rule: string }) => void;
+  onNeedDeleteScopeConfirmation?: (entry: ScheduleEntry) => void;
 }
 
 const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
@@ -107,6 +108,7 @@ export default function AddEventModal({
   scheduleStartDate,
   existingEntry,
   onNeedScopeConfirmation,
+  onNeedDeleteScopeConfirmation,
 }: AddEventModalProps) {
   const isEditMode = !!existingEntry;
   
@@ -294,6 +296,12 @@ export default function AddEventModal({
 
   const handleDelete = async () => {
     if (!existingEntry) return;
+    
+    // If recurring entry and we have scope confirmation callback, trigger it
+    if (existingEntry.recurrence_rule && existingEntry.recurrence_rule !== '' && onNeedDeleteScopeConfirmation) {
+      onNeedDeleteScopeConfirmation(existingEntry);
+      return;
+    }
     
     try {
       setLoading(true);

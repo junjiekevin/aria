@@ -3,7 +3,7 @@ import { useState, useEffect, useMemo, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { ArrowLeft, ChevronLeft, ChevronRight, Trash2, Copy, Check, Sparkles } from 'lucide-react';
 import { getSchedule, updateSchedule, type Schedule } from '../lib/api/schedules';
-import { getScheduleEntries, createScheduleEntry, updateScheduleEntry, deleteScheduleEntry, deleteFutureEntries, splitRecurringEntry, deleteSingleOccurrence, type ScheduleEntry } from '../lib/api/schedule-entries';
+import { getScheduleEntries, createScheduleEntry, updateScheduleEntry, deleteScheduleEntry, splitRecurringEntry, type ScheduleEntry } from '../lib/api/schedule-entries';
 import { getFormResponses, deleteFormResponse, updateFormResponseAssigned, getPreferredTimings, type FormResponse } from '../lib/api/form-responses';
 import AddEventModal from '../components/AddEventModal';
 import Modal from '../components/Modal';
@@ -1620,6 +1620,9 @@ export default function SchedulePage() {
           setEditScopeEntry(entry);
           setPendingEditUpdates(updates);
         }}
+        onNeedDeleteScopeConfirmation={(entry) => {
+          setEntryToDelete(entry);
+        }}
       />
 
       <EditScopeModal
@@ -1734,24 +1737,12 @@ export default function SchedulePage() {
         isOpen={!!entryToDelete && entryToDelete.recurrence_rule !== '' && entryToDelete.recurrence_rule !== null}
         onClose={() => setEntryToDelete(null)}
         entry={entryToDelete}
-        onDelete={async (scope) => {
+        onDelete={async () => {
           if (!entryToDelete) return;
           try {
-            if (scope === 'single') {
-              // Delete only this occurrence, keep future occurrences
-              await deleteSingleOccurrence(entryToDelete);
-              // Reload to get the new entry created for future
-              loadScheduleData();
-            } else {
-              // Delete this occurrence and all future (keep this as single)
-              await deleteFutureEntries(entryToDelete);
-              setEntries(entries.map(e => {
-                if (e.id === entryToDelete.id) {
-                  return { ...e, recurrence_rule: '' };
-                }
-                return e;
-              }));
-            }
+            // Simply delete the row
+            await deleteScheduleEntry(entryToDelete.id);
+            setEntries(entries.filter(e => e.id !== entryToDelete.id));
             setEntryToDelete(null);
           } catch (err) {
             console.error('Failed to delete event:', err);
