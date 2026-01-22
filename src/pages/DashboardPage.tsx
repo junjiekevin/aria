@@ -7,7 +7,7 @@ import { Plus, Calendar, Clock, Archive, Trash2, FileText, RotateCcw, XCircle, S
 import CreateScheduleModal from '../components/CreateScheduleModal';
 import EditScheduleModal from '../components/EditScheduleModal';
 import ProfileDropdown from '../components/ProfileDropdown';
-import logo from '../assets/images/aria-logo.png';
+import logo from '../assets/images/logo-with-text.png';
 
 	const styles: Record<string, React.CSSProperties> = {
 	page: {
@@ -38,7 +38,7 @@ import logo from '../assets/images/aria-logo.png';
 		flexShrink: 0,
 	},
 	logo: {
-		height: '56px',
+		height: '72px',
 		width: 'auto',
 		display: 'block',
 	},
