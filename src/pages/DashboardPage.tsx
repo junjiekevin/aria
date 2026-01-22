@@ -38,7 +38,7 @@ import logo from '../assets/images/logo-with-text.png';
 		flexShrink: 0,
 	},
 	logo: {
-		height: '72px',
+		height: '56px',
 		width: 'auto',
 		display: 'block',
 	},
