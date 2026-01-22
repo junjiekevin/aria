@@ -36,12 +36,9 @@ import logo from '../assets/images/aria-logo.png';
 		display: 'flex',
 		alignItems: 'center',
 		flexShrink: 0,
-		backgroundColor: 'rgba(255, 255, 255, 0.9)',
-		padding: '0.25rem',
-		borderRadius: '8px',
 	},
 	logo: {
-		height: '36px',
+		height: '56px',
 		width: 'auto',
 		display: 'block',
 	},
@@ -50,7 +47,7 @@ import logo from '../assets/images/aria-logo.png';
 		textAlign: 'center',
 	},
 	greeting: {
-		fontSize: '1.25rem',
+		fontSize: '1.5rem',
 		fontWeight: '700',
 		color: '#111827',
 		margin: 0,
