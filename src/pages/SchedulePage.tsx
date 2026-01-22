@@ -524,6 +524,10 @@ export default function SchedulePage() {
   const startDateInputRef = useRef<HTMLInputElement>(null);
   const endDateInputRef = useRef<HTMLInputElement>(null);
 
+  const isArchived = schedule?.status === 'archived';
+  const isTrashed = schedule?.status === 'trashed';
+  const isViewOnly = isArchived || isTrashed;
+
   useEffect(() => {
     if (scheduleId) {
       loadScheduleData();
@@ -839,6 +843,7 @@ export default function SchedulePage() {
   };
 
   const handleSlotClick = (day: string, hour: number) => {
+    if (isViewOnly) return;
     setSelectedSlot({ day, hour });
     setSelectedEntry(null);
     setShowAddModal(true);
@@ -1249,6 +1254,7 @@ export default function SchedulePage() {
       const { attributes, listeners, setNodeRef } = useDraggable({
         id: entry.id,
         data: entry,
+        disabled: isViewOnly,
       });
 
       const isBeingDragged = activeDragId === entry.id;
@@ -1261,16 +1267,16 @@ export default function SchedulePage() {
             opacity: isBeingDragged ? 0 : 1,
             visibility: isBeingDragged ? 'hidden' : 'visible',
             pointerEvents: isBeingDragged ? 'none' : 'auto',
+            cursor: isViewOnly ? 'default' : 'grab',
           }}
           onClick={(e) => {
-            if (!isDragging) {
+            if (!isDragging && !isViewOnly) {
               handleEntryClick(entry, e);
             }
           }}
-          {...attributes}
-          {...listeners}
-          onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#ea580c'; }}
-          onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = '#fb923c'; }}
+          {...(!isViewOnly ? { ...attributes, ...listeners } : {})}
+          onMouseEnter={(e) => { if (!isViewOnly) { e.currentTarget.style.backgroundColor = '#ea580c'; } }}
+          onMouseLeave={(e) => { if (!isViewOnly) { e.currentTarget.style.backgroundColor = '#fb923c'; } }}
         >
           {children}
         </div>
@@ -1281,6 +1287,7 @@ export default function SchedulePage() {
       const { attributes, listeners, setNodeRef } = useDraggable({
         id: `unassigned-${response.id}`,
         data: { ...response, isUnassigned: true },
+        disabled: isViewOnly,
       });
 
       const isBeingDragged = activeDragId === `unassigned-${response.id}`;
@@ -1291,18 +1298,18 @@ export default function SchedulePage() {
           style={{
             ...styles.unassignedCard,
             ...(isBeingDragged ? styles.unassignedCardDragging : {}),
+            cursor: isViewOnly ? 'default' : 'grab',
           }}
-          {...attributes}
-          {...listeners}
+          {...(!isViewOnly ? { ...attributes, ...listeners } : {})}
           onClick={() => setResponseToView(response)}
           onMouseEnter={(e) => {
-            if (!isBeingDragged) {
+            if (!isBeingDragged && !isViewOnly) {
               e.currentTarget.style.backgroundColor = '#fde68a';
               e.currentTarget.style.borderColor = '#f59e0b';
             }
           }}
           onMouseLeave={(e) => {
-            if (!isBeingDragged) {
+            if (!isBeingDragged && !isViewOnly) {
               e.currentTarget.style.backgroundColor = '#fef3c7';
               e.currentTarget.style.borderColor = '#fde68a';
             }
@@ -1312,13 +1319,14 @@ export default function SchedulePage() {
           <div style={styles.unassignedCardActions}>
             <Trash2
               size={16}
-              style={styles.unassignedCardIcon}
+              style={{ ...styles.unassignedCardIcon, cursor: isViewOnly ? 'default' : 'pointer' }}
               onClick={(e: React.MouseEvent) => {
+                if (isViewOnly) return;
                 e.stopPropagation();
                 setParticipantToDelete(response);
               }}
-              onMouseEnter={(e: React.MouseEvent) => { (e.target as HTMLElement).style.color = '#dc2626'; }}
-              onMouseLeave={(e: React.MouseEvent) => { (e.target as HTMLElement).style.color = '#9ca3af'; }}
+              onMouseEnter={(e: React.MouseEvent) => { if (!isViewOnly) { (e.target as HTMLElement).style.color = '#dc2626'; } }}
+              onMouseLeave={(e: React.MouseEvent) => { if (!isViewOnly) { (e.target as HTMLElement).style.color = '#9ca3af'; } }}
             />
           </div>
         </div>
@@ -1336,10 +1344,11 @@ export default function SchedulePage() {
           style={{
             ...styles.timeSlot,
             backgroundColor: isOver ? '#ffedd5' : 'white',
+            cursor: isViewOnly ? 'default' : 'pointer',
           }}
           onClick={() => handleSlotClick(day, hour)}
-          onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#ffedd5'; e.currentTarget.style.cursor = 'pointer'; }}
-          onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'white'; }}
+          onMouseEnter={(e) => { if (!isViewOnly) { e.currentTarget.style.backgroundColor = '#ffedd5'; e.currentTarget.style.cursor = 'pointer'; } }}
+          onMouseLeave={(e) => { if (!isViewOnly) { e.currentTarget.style.backgroundColor = 'white'; } }}
         >
           {children}
         </div>
@@ -1602,7 +1611,7 @@ export default function SchedulePage() {
                 </span>
               </div>
               
-              {schedule.status === 'draft' && (
+              {schedule.status === 'draft' && !isViewOnly && (
                 <div style={{ marginTop: '0.5rem' }}>
                   <button
                     onClick={() => setShowConfigureFormModal(true)}
@@ -1652,24 +1661,26 @@ export default function SchedulePage() {
                   </div>
                   <span style={{ color: '#6b7280', display: 'block', marginBottom: '0.5rem' }}>Form Link:</span>
                   <FormLink scheduleId={scheduleId!} />
-                  <button
-                    onClick={() => setShowConfigureFormModal(true)}
-                    style={{
-                      marginTop: '0.75rem',
-                      padding: '0.5rem 0.75rem',
-                      backgroundColor: 'white',
-                      color: '#6b7280',
-                      border: '1px solid #d1d5db',
-                      borderRadius: '0.375rem',
-                      fontSize: '0.75rem',
-                      cursor: 'pointer',
-                      width: '100%',
-                    }}
-                    onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#f9fafb'; }}
-                    onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'white'; }}
-                  >
-                    Edit Form Configuration
-                  </button>
+                  {!isViewOnly && (
+                    <button
+                      onClick={() => setShowConfigureFormModal(true)}
+                      style={{
+                        marginTop: '0.75rem',
+                        padding: '0.5rem 0.75rem',
+                        backgroundColor: 'white',
+                        color: '#6b7280',
+                        border: '1px solid #d1d5db',
+                        borderRadius: '0.375rem',
+                        fontSize: '0.75rem',
+                        cursor: 'pointer',
+                        width: '100%',
+                      }}
+                      onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#f9fafb'; }}
+                      onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'white'; }}
+                    >
+                      Edit Form Configuration
+                    </button>
+                  )}
                 </div>
               )}
               
@@ -1746,44 +1757,46 @@ export default function SchedulePage() {
             </div>
           </div>
 
-          <div style={styles.unassignedPanel}>
-            <div style={styles.unassignedPanelHeader}>
-              <div style={styles.unassignedPanelTitle}>
-                <h3 style={styles.unassignedPanelTitleText}>Unassigned Events</h3>
-                {getUnassignedStudents().length > 0 && (
-                  <span 
-                    style={styles.unassignedBadge}
-                    onClick={() => setShowUnassignedModal(true)}
-                    onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#ea580c'; }}
-                    onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = '#f97316'; }}
-                  >
-                    {getUnassignedStudents().length}
-                  </span>
-                )}
+          {!isViewOnly && (
+            <div style={styles.unassignedPanel}>
+              <div style={styles.unassignedPanelHeader}>
+                <div style={styles.unassignedPanelTitle}>
+                  <h3 style={styles.unassignedPanelTitleText}>Unassigned Events</h3>
+                  {getUnassignedStudents().length > 0 && (
+                    <span 
+                      style={styles.unassignedBadge}
+                      onClick={() => setShowUnassignedModal(true)}
+                      onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#ea580c'; }}
+                      onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = '#f97316'; }}
+                    >
+                      {getUnassignedStudents().length}
+                    </span>
+                  )}
+                </div>
+                <button
+                  onClick={() => getUnassignedStudents().length > 0 && setShowSchedulingPreview(true)}
+                  disabled={getUnassignedStudents().length === 0}
+                  style={{
+                    ...styles.scheduleButton,
+                    ...(getUnassignedStudents().length === 0 ? styles.scheduleButtonDisabled : {}),
+                  }}
+                  onMouseEnter={(e) => { if (getUnassignedStudents().length > 0) { e.currentTarget.style.backgroundColor = '#16a34a'; } }}
+                  onMouseLeave={(e) => { if (getUnassignedStudents().length > 0) { e.currentTarget.style.backgroundColor = '#22c55e'; } }}
+                >
+                  <Sparkles size={12} />
+                  Schedule All
+                </button>
               </div>
-              <button
-                onClick={() => getUnassignedStudents().length > 0 && setShowSchedulingPreview(true)}
-                disabled={getUnassignedStudents().length === 0}
-                style={{
-                  ...styles.scheduleButton,
-                  ...(getUnassignedStudents().length === 0 ? styles.scheduleButtonDisabled : {}),
-                }}
-                onMouseEnter={(e) => { if (getUnassignedStudents().length > 0) { e.currentTarget.style.backgroundColor = '#16a34a'; } }}
-                onMouseLeave={(e) => { if (getUnassignedStudents().length > 0) { e.currentTarget.style.backgroundColor = '#22c55e'; } }}
-              >
-                <Sparkles size={12} />
-                Schedule All
-              </button>
+              <div style={styles.unassignedCardList}>
+                {getUnassignedStudents().map((response) => (
+                  <DraggableUnassignedCard key={response.id} response={response} />
+                ))}
+              </div>
             </div>
-            <div style={styles.unassignedCardList}>
-              {getUnassignedStudents().map((response) => (
-                <DraggableUnassignedCard key={response.id} response={response} />
-              ))}
-            </div>
-          </div>
+          )}
           
           <div style={styles.panel}>
-            <TrashDroppable />
+            {!isViewOnly && <TrashDroppable />}
           </div>
         </div>
       </main>

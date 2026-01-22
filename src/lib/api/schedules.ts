@@ -35,6 +35,7 @@ export interface UpdateScheduleInput {
     end_date?: string;   // YYYY-MM-DD Format
     status?: 'draft' | 'collecting' | 'archived' | 'trashed';
     send_confirmation_email?: boolean;
+    previous_status?: 'draft' | 'collecting' | 'archived' | null;
 }
 
 export interface ScheduleValidationError extends Error {
@@ -304,9 +305,31 @@ export async function restoreSchedule(scheduleId: string) {
         throw error;
     }
 
-    // Restore to previous_status, or 'draft' if not available
-    const restoreStatus = currentSchedule.previous_status || 'draft';
+    // Restore to previous_status, or 'collecting' if not available (archived schedules restore to collecting)
+    const restoreStatus = currentSchedule.previous_status || 'collecting';
 
+    // Validate status transition (allow restoring archived schedules to previous_status)
+    if (currentSchedule.status === 'archived') {
+        // Allow restoring archived schedule to its previous status (or collecting if not available)
+        const { data: updateResult, error } = await supabase
+            .from('schedules')
+            .update({
+                status: restoreStatus,
+                deleted_at: null,
+                previous_status: null
+            })
+            .eq('id', scheduleId)
+            .eq('user_id', user.id)
+            .select()
+            .single();
+        
+        if (error) {
+            throw new Error(`Failed to restore schedule: ${error.message}`);
+        }
+        return updateResult;
+    }
+
+    // For non-archived schedules being restored from trash, use updateSchedule with validation
     const { data, error } = await supabase
         .from('schedules')
         .update({

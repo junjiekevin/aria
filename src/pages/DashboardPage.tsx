@@ -304,7 +304,7 @@ function ScheduleCard({
 	isTrashed = false 
 }: { 
 	schedule: Schedule; 
-	onView: () => void; 
+	onView: (schedule: Schedule) => void; 
 	onEdit: () => void;
 	onTrash?: (schedule: Schedule) => void;
 	onArchive?: (schedule: Schedule) => void;
@@ -447,6 +447,13 @@ function ScheduleCard({
 						) : schedule.status === 'archived' ? (
 							<>
 								<button 
+									onClick={() => onView?.(schedule)}
+									style={{ ...styles.button, flex: 1, borderRadius: '12px' }}
+								>
+									<Sparkles size={16} />
+									View
+								</button>
+								<button 
 									onClick={() => onRecover?.(schedule)}
 									style={{ ...styles.button, flex: 1, backgroundColor: '#10b981', borderRadius: '12px' }}
 								>
@@ -464,7 +471,7 @@ function ScheduleCard({
 						) : (
 							<>
 								<button 
-									onClick={onView}
+									onClick={() => onView(schedule)}
 									style={{ ...styles.button, flex: 1, borderRadius: '12px' }}
 								>
 									<Sparkles size={16} />
@@ -625,7 +632,10 @@ export default function DashboardPage() {
 
 	const handleArchive = async (schedule: Schedule) => {
 		try {
-			await updateSchedule(schedule.id, { status: 'archived' });
+			await updateSchedule(schedule.id, { 
+				status: 'archived',
+				previous_status: schedule.status as 'draft' | 'collecting' | 'archived'
+			});
 			showToast('Schedule archived');
 			loadSchedules();
 		} catch (err) {
@@ -666,7 +676,7 @@ export default function DashboardPage() {
 	const trashSchedule = async (id: string) => {
 		const { error } = await supabase
 			.from('schedules')
-			.update({ status: 'trashed', previous_status: 'collecting' })
+			.update({ status: 'trashed' })
 			.eq('id', id);
 		if (error) throw error;
 	};
