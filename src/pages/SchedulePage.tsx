@@ -3,13 +3,11 @@ import { useState, useEffect, useMemo, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { ArrowLeft, ChevronLeft, ChevronRight, Trash2, Copy, Check, Sparkles } from 'lucide-react';
 import { getSchedule, updateSchedule, type Schedule } from '../lib/api/schedules';
-import { getScheduleEntries, createScheduleEntry, updateScheduleEntry, deleteScheduleEntry, splitRecurringEntry, type ScheduleEntry } from '../lib/api/schedule-entries';
+import { getScheduleEntries, createScheduleEntry, updateScheduleEntry, deleteScheduleEntry, type ScheduleEntry } from '../lib/api/schedule-entries';
 import { getFormResponses, deleteFormResponse, updateFormResponseAssigned, getPreferredTimings, type FormResponse } from '../lib/api/form-responses';
 import AddEventModal from '../components/AddEventModal';
 import Modal from '../components/Modal';
 import SchedulingPreviewModal from '../components/SchedulingPreviewModal';
-import DeleteScopeModal from '../components/DeleteScopeModal';
-import EditScopeModal from '../components/EditScopeModal';
 import { DndContext, DragOverlay, useDraggable, useDroppable, PointerSensor, useSensor, useSensors, type DragEndEvent, type DragStartEvent } from '@dnd-kit/core';
 
 const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
@@ -470,10 +468,6 @@ export default function SchedulePage() {
   const nameInputRef = useRef<HTMLInputElement>(null);
   const startDateInputRef = useRef<HTMLInputElement>(null);
   const endDateInputRef = useRef<HTMLInputElement>(null);
-  
-  // State for edit scope modal
-  const [editScopeEntry, setEditScopeEntry] = useState<ScheduleEntry | null>(null);
-  const [pendingEditUpdates, setPendingEditUpdates] = useState<{ student_name: string; start_time: string; end_time: string; recurrence_rule: string } | null>(null);
 
   useEffect(() => {
     if (scheduleId) {
@@ -1607,8 +1601,6 @@ export default function SchedulePage() {
           setShowAddModal(false);
           setSelectedEntry(null);
           setSelectedSlot(null);
-          setEditScopeEntry(null);
-          setPendingEditUpdates(null);
         }}
         onSuccess={handleEventSaved}
         scheduleId={scheduleId!}
@@ -1616,48 +1608,8 @@ export default function SchedulePage() {
         initialHour={selectedSlot?.hour}
         scheduleStartDate={schedule.start_date}
         existingEntry={selectedEntry}
-        onNeedScopeConfirmation={(entry, updates) => {
-          setEditScopeEntry(entry);
-          setPendingEditUpdates(updates);
-        }}
-        onNeedDeleteScopeConfirmation={(entry) => {
-          setEntryToDelete(entry);
-        }}
-      />
-
-      <EditScopeModal
-        isOpen={!!editScopeEntry && !!pendingEditUpdates}
-        onClose={() => {
-          setEditScopeEntry(null);
-          setPendingEditUpdates(null);
-        }}
-        entry={editScopeEntry}
-        onApply={async (scope) => {
-          if (!editScopeEntry || !pendingEditUpdates) return;
-          try {
-            if (scope === 'single') {
-              // Update just this occurrence
-              await updateScheduleEntry(editScopeEntry.id, pendingEditUpdates);
-              setEntries(entries.map(e => {
-                if (e.id === editScopeEntry.id) {
-                  return { ...e, ...pendingEditUpdates };
-                }
-                return e;
-              }));
-            } else {
-              // Split: keep current as single, create new for future
-              await splitRecurringEntry(editScopeEntry, pendingEditUpdates.start_time, pendingEditUpdates.end_time, pendingEditUpdates.recurrence_rule);
-              // Reload to get the new entry
-              loadScheduleData();
-            }
-          } catch (err) {
-            console.error('Failed to update event:', err);
-          }
-          setEditScopeEntry(null);
-          setPendingEditUpdates(null);
-          setShowAddModal(false);
-          setSelectedEntry(null);
-          setSelectedSlot(null);
+        onNeedDeleteConfirmation={() => {
+          setEntryToDelete(selectedEntry);
         }}
       />
 
@@ -1733,22 +1685,46 @@ export default function SchedulePage() {
         </div>
       </Modal>
 
-      <DeleteScopeModal
-        isOpen={!!entryToDelete && entryToDelete.recurrence_rule !== '' && entryToDelete.recurrence_rule !== null}
+      <Modal
+        isOpen={!!entryToDelete}
         onClose={() => setEntryToDelete(null)}
-        entry={entryToDelete}
-        onDelete={async () => {
-          if (!entryToDelete) return;
-          try {
-            // Simply delete the row
-            await deleteScheduleEntry(entryToDelete.id);
-            setEntries(entries.filter(e => e.id !== entryToDelete.id));
-            setEntryToDelete(null);
-          } catch (err) {
-            console.error('Failed to delete event:', err);
-          }
-        }}
-      />
+        title="Delete Event"
+        maxWidth="35rem"
+      >
+        <div style={{ padding: '0.5rem 0' }}>
+          <p style={{ color: '#374151', marginBottom: '1rem' }}>
+            Delete <strong>{entryToDelete?.student_name}</strong>? This cannot be undone.
+          </p>
+          <div style={{ display: 'flex', gap: '0.75rem' }}>
+            <button
+              onClick={async () => {
+                if (!entryToDelete) return;
+                try {
+                  await deleteScheduleEntry(entryToDelete.id);
+                  setEntries(entries.filter(e => e.id !== entryToDelete.id));
+                  setEntryToDelete(null);
+                  // Also close the AddEventModal if open
+                  if (selectedEntry?.id === entryToDelete.id) {
+                    setShowAddModal(false);
+                    setSelectedEntry(null);
+                  }
+                } catch (err) {
+                  console.error('Failed to delete event:', err);
+                }
+              }}
+              style={{ flex: 1, padding: '0.75rem', backgroundColor: '#dc2626', color: 'white', border: 'none', borderRadius: '0.5rem', cursor: 'pointer' }}
+            >
+              Delete
+            </button>
+            <button
+              onClick={() => setEntryToDelete(null)}
+              style={{ flex: 1, padding: '0.75rem', backgroundColor: 'white', color: '#374151', border: '1px solid #d1d5db', borderRadius: '0.5rem', cursor: 'pointer' }}
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      </Modal>
 
       <SchedulingPreviewModal
         isOpen={showSchedulingPreview}

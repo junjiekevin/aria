@@ -11,8 +11,7 @@ interface AddEventModalProps {
   initialHour?: number;
   scheduleStartDate: string;
   existingEntry?: ScheduleEntry | null;
-  onNeedScopeConfirmation?: (entry: ScheduleEntry, updates: { student_name: string; start_time: string; end_time: string; recurrence_rule: string }) => void;
-  onNeedDeleteScopeConfirmation?: (entry: ScheduleEntry) => void;
+  onNeedDeleteConfirmation?: () => void;
 }
 
 const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
@@ -107,8 +106,7 @@ export default function AddEventModal({
   initialHour,
   scheduleStartDate,
   existingEntry,
-  onNeedScopeConfirmation,
-  onNeedDeleteScopeConfirmation,
+  onNeedDeleteConfirmation,
 }: AddEventModalProps) {
   const isEditMode = !!existingEntry;
   
@@ -255,19 +253,6 @@ export default function AddEventModal({
       }
 
       if (isEditMode && existingEntry) {
-        // Check if entry is recurring and we have scope confirmation callback
-        if (existingEntry.recurrence_rule && existingEntry.recurrence_rule !== '' && onNeedScopeConfirmation) {
-          // Trigger scope confirmation modal
-          setLoading(false);
-          onNeedScopeConfirmation(existingEntry, {
-            student_name: studentName.trim(),
-            start_time: firstOccurrence.toISOString(),
-            end_time: endTime.toISOString(),
-            recurrence_rule: recurrenceRule,
-          });
-          return;
-        }
-        
         await updateScheduleEntry(existingEntry.id, {
           student_name: studentName.trim(),
           start_time: firstOccurrence.toISOString(),
@@ -297,12 +282,13 @@ export default function AddEventModal({
   const handleDelete = async () => {
     if (!existingEntry) return;
     
-    // If recurring entry and we have scope confirmation callback, trigger it
-    if (existingEntry.recurrence_rule && existingEntry.recurrence_rule !== '' && onNeedDeleteScopeConfirmation) {
-      onNeedDeleteScopeConfirmation(existingEntry);
+    // If recurring entry, show confirmation modal via callback
+    if (existingEntry.recurrence_rule && existingEntry.recurrence_rule !== '' && onNeedDeleteConfirmation) {
+      onNeedDeleteConfirmation();
       return;
     }
     
+    // Otherwise delete immediately
     try {
       setLoading(true);
       await deleteScheduleEntry(existingEntry.id);
