@@ -196,7 +196,9 @@ const styles = {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: '0.75rem',
+    gap: '0.75rem',
+    marginBottom: '0.5rem',
+    flexWrap: 'wrap' as const,
     flexShrink: 0 as const,
   },
   unassignedPanelTitle: {
@@ -213,9 +215,9 @@ const styles = {
   unassignedBadge: {
     backgroundColor: '#f97316',
     color: 'white',
-    padding: '0.25rem 0.5rem',
+    padding: '0.2rem 0.45rem',
     borderRadius: '9999px',
-    fontSize: '0.75rem',
+    fontSize: '0.7rem',
     fontWeight: '600',
     cursor: 'pointer',
     transition: 'all 0.2s',
@@ -226,17 +228,18 @@ const styles = {
   scheduleButton: {
     display: 'flex',
     alignItems: 'center',
-    gap: '0.375rem',
-    padding: '0.375rem 0.75rem',
+    gap: '0.25rem',
+    padding: '0.3rem 0.6rem',
     backgroundColor: '#22c55e',
     color: 'white',
     border: 'none',
     borderRadius: '0.375rem',
-    fontSize: '0.75rem',
+    fontSize: '0.7rem',
     fontWeight: '600',
     cursor: 'pointer',
     boxShadow: '0 1px 3px rgba(34, 197, 94, 0.3)',
     transition: 'all 0.2s ease',
+    whiteSpace: 'nowrap' as const,
   },
   scheduleButtonDisabled: {
     backgroundColor: '#9ca3af',
@@ -251,7 +254,7 @@ const styles = {
     flexDirection: 'column' as const,
     gap: '0.5rem',
     overflowY: 'auto' as const,
-    maxHeight: '280px',
+    maxHeight: '160px',
   },
   unassignedCardListScrollbar: {
     '&::-webkit-scrollbar': {
@@ -768,12 +771,6 @@ export default function SchedulePage() {
     return labels[freq] || freq;
   };
 
-  const getFirstPreference = (response: FormResponse) => {
-    const timings = getPreferredTimings(response);
-    if (timings.length === 0) return null;
-    return timings[0];
-  };
-
   const toggleResponseExpanded = (responseId: string) => {
     setExpandedResponseIds(prev => {
       const newSet = new Set(prev);
@@ -1216,7 +1213,6 @@ export default function SchedulePage() {
       });
 
       const isBeingDragged = activeDragId === `unassigned-${response.id}`;
-      const firstPref = getFirstPreference(response);
 
       return (
         <div
@@ -1241,15 +1237,7 @@ export default function SchedulePage() {
             }
           }}
         >
-          <div style={{ flex: 1 }}>
-            <div style={styles.unassignedCardName}>{response.student_name}</div>
-            {firstPref && (
-              <div style={styles.unassignedCardPreferred}>
-                {firstPref.day} {formatTime(firstPref.start!)} - {formatTime(firstPref.end!)}
-                {firstPref.duration && ` (${firstPref.duration} min)`}
-              </div>
-            )}
-          </div>
+          <div style={styles.unassignedCardName}>{response.student_name}</div>
           <div style={styles.unassignedCardActions}>
             <Trash2
               size={16}
@@ -1586,7 +1574,7 @@ export default function SchedulePage() {
                 onMouseEnter={(e) => { if (getUnassignedStudents().length > 0) { e.currentTarget.style.backgroundColor = '#16a34a'; } }}
                 onMouseLeave={(e) => { if (getUnassignedStudents().length > 0) { e.currentTarget.style.backgroundColor = '#22c55e'; } }}
               >
-                <Sparkles size={14} />
+                <Sparkles size={12} />
                 Schedule All
               </button>
             </div>

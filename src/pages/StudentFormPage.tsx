@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { Copy, Check, AlertCircle } from 'lucide-react';
-import { getSchedule, sendConfirmationEmail, type Schedule } from '../lib/api/schedules';
+import { getSchedule, type Schedule } from '../lib/api/schedules';
 import { createFormResponse, getFormResponses } from '../lib/api/form-responses';
 
 const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
@@ -476,9 +476,6 @@ export default function StudentFormPage() {
                 preferred_3_end: `${timing3.endHour}:${timing3.endMinute}`,
                 preferred_3_frequency: timing3.frequency,
             });
-            
-            // Always send confirmation email
-            await sendConfirmationEmail(email.trim(), `${firstName} ${lastName}`, schedule.label);
             
             setSubmitted(true);
         } catch (err) {
