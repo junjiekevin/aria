@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate, Navigate } from "react-router-dom";
 import { Auth as SupabaseAuth, ThemeSupa } from "@supabase/auth-ui-react";
 import { supabase } from "../lib/supabase";
+import logo from "../assets/images/logo-with-text.png";
 
 const styles: Record<string, React.CSSProperties> = {
     container: {
@@ -21,12 +22,9 @@ const styles: Record<string, React.CSSProperties> = {
         boxShadow: '0 1px 3px rgba(0,0,0,0.08), 0 4px 12px rgba(0,0,0,0.04)',
     },
     logo: {
-        fontSize: '2rem',
-        fontWeight: '700',
-        color: '#111827',
-        textAlign: 'center',
-        marginBottom: '0.5rem',
-        letterSpacing: '-0.025em',
+        height: '48px',
+        display: 'block',
+        margin: '0 auto 0.75rem',
     },
     tagline: {
         fontSize: '1rem',
@@ -87,7 +85,7 @@ const styles: Record<string, React.CSSProperties> = {
 
 function CheckIcon() {
     return (
-        <svg style={styles.featureIcon} viewBox="0 0 24 24" fill="none" stroke="#f97316" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+        <svg style={{...styles.featureIcon, stroke: '#fb923c'}} viewBox="0 0 24 24" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <polyline points="20 6 9 17 4 12"></polyline>
         </svg>
     );
@@ -146,7 +144,7 @@ export default function AuthPage() {
     return (
         <div style={styles.container}>
             <div style={styles.card}>
-                <h1 style={styles.logo}>Aria</h1>
+                <img src={logo} alt="Aria" style={styles.logo} />
                 <p style={styles.tagline}>
                     Smart scheduling for teams, clinics,<br />studios, and organizations
                 </p>
@@ -183,23 +181,23 @@ export default function AuthPage() {
 
                 <div style={styles.divider} />
 
-                <h2 style={styles.sectionTitle}>Features</h2>
+                <h2 style={styles.sectionTitle}>How Aria Works</h2>
                 <ul style={styles.featureList}>
                     <li style={styles.featureItem}>
                         <CheckIcon />
-                        <span>Drag & drop scheduling interface</span>
+                        <span>Visual drag &amp; drop scheduling</span>
                     </li>
                     <li style={styles.featureItem}>
                         <CheckIcon />
-                        <span>Recurring sessions (weekly, biweekly, monthly)</span>
+                        <span>Easy online preference collection</span>
                     </li>
                     <li style={styles.featureItem}>
                         <CheckIcon />
-                        <span>Easy participant management</span>
+                        <span>Flexible recurring sessions</span>
                     </li>
                     <li style={styles.featureItem}>
                         <CheckIcon />
-                        <span>Swap and move sessions instantly</span>
+                        <span>Centralized participant tracking</span>
                     </li>
                 </ul>
 
