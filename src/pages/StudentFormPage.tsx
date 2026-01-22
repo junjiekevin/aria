@@ -7,9 +7,10 @@ import { createFormResponse, getFormResponses } from '../lib/api/form-responses'
 const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 const HOURS = Array.from({ length: 14 }, (_, i) => i + 8);
 const FREQUENCIES = [
+    { value: 'once', label: 'Once' },
     { value: 'weekly', label: 'Weekly' },
     { value: '2weekly', label: 'Every 2 weeks' },
-    { value: 'monthly', label: 'Every 4 weeks' },
+    { value: 'monthly', label: 'Monthly' },
 ];
 
 interface TimingSlot {

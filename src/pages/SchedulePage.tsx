@@ -546,10 +546,13 @@ export default function SchedulePage() {
     let freq = freqMatch ? freqMatch[1] : 'WEEKLY';
     let interval = intervalMatch ? parseInt(intervalMatch[1]) : 1;
 
-    // Handle INTERVAL=4 as "monthly" frequency
-    if (freq === 'WEEKLY' && interval === 4) {
-      freq = 'MONTHLY';
-      // Keep interval as 4 for monthly calculation (shows every 4 weeks)
+    // Handle INTERVAL as frequency indicators (standard iCal format)
+    if (freq === 'WEEKLY') {
+      if (interval === 4) {
+        freq = 'MONTHLY';
+      } else if (interval === 2) {
+        freq = '2WEEKLY';
+      }
     }
 
     const byDayStr = byDayMatch ? byDayMatch[1] : '';
@@ -872,7 +875,7 @@ export default function SchedulePage() {
         const dayAbbrev = ['SU', 'MO', 'TU', 'WE', 'TH', 'FR', 'SA'][dayIndex];
         const frequency = response.preferred_1_frequency || 'weekly';
         const recurrenceRule = frequency === 'once' ? '' : 
-          frequency === '2weekly' ? `FREQ=2WEEKLY;BYDAY=${dayAbbrev}` :
+          frequency === '2weekly' ? `FREQ=WEEKLY;INTERVAL=2;BYDAY=${dayAbbrev}` :
           frequency === 'monthly' ? `FREQ=WEEKLY;INTERVAL=4;BYDAY=${dayAbbrev}` :
           `FREQ=WEEKLY;BYDAY=${dayAbbrev}`;
         
@@ -940,7 +943,7 @@ export default function SchedulePage() {
         // Helper to get frequency type from recurrence rule
         const getFrequency = (rule: string): 'once' | 'weekly' | '2weekly' | 'monthly' => {
           if (!rule) return 'once';
-          if (rule.includes('FREQ=2WEEKLY')) return '2weekly';
+          if (rule.includes('INTERVAL=2')) return '2weekly';
           if (rule.includes('FREQ=MONTHLY')) return 'monthly';
           // Check for INTERVAL=4 (which represents "monthly" in our system)
           if (rule.includes('INTERVAL=4')) return 'monthly';
@@ -951,7 +954,7 @@ export default function SchedulePage() {
         const updateRecurrenceDay = (rule: string, newDayAbbrev: string): string => {
           const freq = getFrequency(rule);
           if (freq === 'once') return '';
-          if (freq === '2weekly') return `FREQ=2WEEKLY;BYDAY=${newDayAbbrev}`;
+          if (freq === '2weekly') return `FREQ=WEEKLY;INTERVAL=2;BYDAY=${newDayAbbrev}`;
           if (freq === 'monthly') return `FREQ=WEEKLY;INTERVAL=4;BYDAY=${newDayAbbrev}`;
           return `FREQ=WEEKLY;BYDAY=${newDayAbbrev}`;
         };
@@ -1005,8 +1008,11 @@ export default function SchedulePage() {
       if (!originalRule) {
         // "Once" frequency - keep empty (no recurrence)
         recurrenceRule = '';
-      } else if (originalRule.includes('FREQ=2WEEKLY')) {
-        recurrenceRule = `FREQ=2WEEKLY;BYDAY=${dayAbbrev}`;
+      } else if (originalRule.includes('INTERVAL=2')) {
+        // 2weekly - extract INTERVAL if present, default to 2
+        const intervalMatch = originalRule.match(/INTERVAL=(\d+)/);
+        const interval = intervalMatch ? intervalMatch[1] : '2';
+        recurrenceRule = `FREQ=WEEKLY;INTERVAL=${interval};BYDAY=${dayAbbrev}`;
       } else if (originalRule.includes('FREQ=MONTHLY')) {
         // Extract INTERVAL if present
         const intervalMatch = originalRule.match(/INTERVAL=(\d+)/);
@@ -1092,7 +1098,7 @@ export default function SchedulePage() {
         // Helper to get frequency type from recurrence rule
         const getFrequency = (rule: string): 'once' | 'weekly' | '2weekly' | 'monthly' => {
           if (!rule) return 'once';
-          if (rule.includes('FREQ=2WEEKLY')) return '2weekly';
+          if (rule.includes('INTERVAL=2')) return '2weekly';
           if (rule.includes('FREQ=MONTHLY')) return 'monthly';
           // Check for INTERVAL=4 (which represents "monthly" in our system)
           if (rule.includes('INTERVAL=4')) return 'monthly';
@@ -1108,7 +1114,7 @@ export default function SchedulePage() {
           const freq = getFrequency(rule);
           
           if (freq === 'once') return '';
-          if (freq === '2weekly') return `FREQ=2WEEKLY;BYDAY=${newDayAbbrev}`;
+          if (freq === '2weekly') return `FREQ=WEEKLY;INTERVAL=2;BYDAY=${newDayAbbrev}`;
           if (freq === 'monthly') return `FREQ=WEEKLY;INTERVAL=4;BYDAY=${newDayAbbrev}`;
           return `FREQ=WEEKLY;BYDAY=${newDayAbbrev}`;
         };

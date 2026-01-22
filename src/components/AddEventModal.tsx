@@ -140,7 +140,7 @@ export default function AddEventModal({
       const rule = existingEntry.recurrence_rule || '';
       if (!rule) {
         setFrequency('once');
-      } else if (rule.includes('FREQ=2WEEKLY')) {
+      } else if (rule.includes('INTERVAL=2')) {
         setFrequency('2weekly');
       } else if (rule.includes('FREQ=MONTHLY') || rule.includes('INTERVAL=4')) {
         setFrequency('monthly');
@@ -245,9 +245,9 @@ export default function AddEventModal({
       if (frequency === 'once') {
         recurrenceRule = '';
       } else if (frequency === '2weekly') {
-        recurrenceRule = `FREQ=2WEEKLY;BYDAY=${dayAbbrev}`;
+        recurrenceRule = `FREQ=WEEKLY;INTERVAL=2;BYDAY=${dayAbbrev}`;
       } else if (frequency === 'monthly') {
-        recurrenceRule = `FREQ=MONTHLY;INTERVAL=4;BYDAY=${dayAbbrev}`;
+        recurrenceRule = `FREQ=WEEKLY;INTERVAL=4;BYDAY=${dayAbbrev}`;
       } else {
         recurrenceRule = `FREQ=WEEKLY;BYDAY=${dayAbbrev}`;
       }
