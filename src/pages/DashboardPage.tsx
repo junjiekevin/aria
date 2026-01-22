@@ -566,6 +566,16 @@ export default function DashboardPage() {
 	useEffect(() => {
 		loadSchedules();
 		loadUser();
+
+		// Listen for schedule changes from chat
+		const handleScheduleChange = () => {
+			loadSchedules();
+		};
+		window.addEventListener('aria-schedule-change', handleScheduleChange);
+
+		return () => {
+			window.removeEventListener('aria-schedule-change', handleScheduleChange);
+		};
 	}, []);
 
 	const loadSchedules = async () => {

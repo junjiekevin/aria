@@ -4,6 +4,9 @@ import { sendChatMessage, ARIA_SYSTEM_PROMPT, type Message } from '../lib/openro
 import { executeFunction } from '../lib/functions';
 import ariaProfile from '../assets/images/aria-profile.png';
 
+const CHAT_STORAGE_KEY = 'aria_chat_messages';
+const MAX_MESSAGES = 100;
+
 interface ChatMessage extends Message {
   id: string;
   timestamp: Date;
@@ -279,9 +282,29 @@ export default function FloatingChat({ onScheduleChange }: FloatingChatProps) {
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
-  // Scroll to bottom when messages change
+  // Load chat from sessionStorage on mount
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    const stored = sessionStorage.getItem(CHAT_STORAGE_KEY);
+    if (stored) {
+      try {
+        const parsed = JSON.parse(stored);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          setMessages(parsed);
+        }
+      } catch (e) {
+        console.error('Failed to load chat from sessionStorage:', e);
+      }
+    }
+  }, []);
+
+  // Save chat to sessionStorage when messages change (with 100 message limit)
+  useEffect(() => {
+    if (messages.length > 0) {
+      const limitedMessages = messages.length > MAX_MESSAGES
+        ? messages.slice(-MAX_MESSAGES)
+        : messages;
+      sessionStorage.setItem(CHAT_STORAGE_KEY, JSON.stringify(limitedMessages));
+    }
   }, [messages]);
 
   // Focus input when chat opens
@@ -302,7 +325,14 @@ export default function FloatingChat({ onScheduleChange }: FloatingChatProps) {
       timestamp: new Date(),
     };
 
-    setMessages((prev) => [...prev, userMessage]);
+    // Add user message with 100 message limit
+    setMessages((prev) => {
+      const updated = [...prev, userMessage];
+      if (updated.length > MAX_MESSAGES) {
+        return updated.slice(-MAX_MESSAGES);
+      }
+      return updated;
+    });
     setInput('');
     setLoading(true);
 
@@ -321,7 +351,13 @@ export default function FloatingChat({ onScheduleChange }: FloatingChatProps) {
         timestamp: new Date(),
       };
 
-      setMessages((prev) => [...prev, assistantMessage]);
+      setMessages((prev) => {
+        const updated = [...prev, assistantMessage];
+        if (updated.length > MAX_MESSAGES) {
+          return updated.slice(-MAX_MESSAGES);
+        }
+        return updated;
+      });
 
       if (response.functionCall) {
         const { name, arguments: args } = response.functionCall;
@@ -332,7 +368,13 @@ export default function FloatingChat({ onScheduleChange }: FloatingChatProps) {
           content: `Executing ${name}...`,
           timestamp: new Date(),
         };
-        setMessages((prev) => [...prev, executingMessage]);
+        setMessages((prev) => {
+          const updated = [...prev, executingMessage];
+          if (updated.length > MAX_MESSAGES) {
+            return updated.slice(-MAX_MESSAGES);
+          }
+          return updated;
+        });
 
         const result = await executeFunction(name, args);
         setMessages((prev) => prev.filter((msg) => msg.id !== executingMessage.id));
@@ -395,7 +437,13 @@ export default function FloatingChat({ onScheduleChange }: FloatingChatProps) {
           content: resultContent,
           timestamp: new Date(),
         };
-        setMessages((prev) => [...prev, resultMessage]);
+        setMessages((prev) => {
+          const updated = [...prev, resultMessage];
+          if (updated.length > MAX_MESSAGES) {
+            return updated.slice(-MAX_MESSAGES);
+          }
+          return updated;
+        });
 
         if (scheduleModified && onScheduleChange) {
           setTimeout(() => onScheduleChange(), 100);
@@ -409,7 +457,13 @@ export default function FloatingChat({ onScheduleChange }: FloatingChatProps) {
         content: "I'm sorry, I encountered an error. Please try again.",
         timestamp: new Date(),
       };
-      setMessages((prev) => [...prev, errorMessage]);
+      setMessages((prev) => {
+        const updated = [...prev, errorMessage];
+        if (updated.length > MAX_MESSAGES) {
+          return updated.slice(-MAX_MESSAGES);
+        }
+        return updated;
+      });
     } finally {
       setLoading(false);
     }

@@ -1,9 +1,11 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useCallback } from 'react'
 import { Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import AuthPage from './pages/AuthPage.tsx'
 import ProtectedRoute from './components/ProtectedRoute.tsx'
 import FloatingChat from './components/FloatingChat.tsx'
 import { supabase } from './lib/supabase'
+
+const CHAT_STORAGE_KEY = 'aria_chat_messages';
 
 const StudentFormPage = React.lazy(() => import('./pages/StudentFormPage.tsx'))
 const DashboardPage = React.lazy(() => import('./pages/DashboardPage.tsx'))
@@ -27,9 +29,19 @@ const App = () => {
 
         const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
             setIsAuthenticated(!!session);
+            // Clear chat on logout
+            if (!session) {
+                sessionStorage.removeItem(CHAT_STORAGE_KEY);
+            }
         });
 
         return () => subscription.unsubscribe();
+    }, []);
+
+    // Callback to refresh schedules when chat creates/edits/trashes
+    const handleScheduleChange = useCallback(() => {
+        // Trigger a custom event that DashboardPage can listen to
+        window.dispatchEvent(new CustomEvent('aria-schedule-change'));
     }, []);
 
     // Show chat on all pages except auth page
@@ -47,7 +59,7 @@ const App = () => {
                 <Route path="/about" element={<ProtectedRoute><AboutPage /></ProtectedRoute>} />
                 <Route path="*" element={<Navigate to="/" />} />
             </Routes>
-            {showChat && <FloatingChat />}
+            {showChat && <FloatingChat onScheduleChange={handleScheduleChange} />}
         </React.Suspense>
     )
 }

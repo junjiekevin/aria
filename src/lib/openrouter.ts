@@ -2,8 +2,8 @@
 // OpenRouter API client for Gemini 2.0 Flash integration
 
 const OPENROUTER_API_URL = 'https://openrouter.ai/api/v1/chat/completions';
-// Using Xiaomi Mimo V2 Flash - free model with good availability
-const GEMINI_MODEL = 'xiaomi/mimo-v2-flash:free';
+// Using TNG DeepSeek R1T2 Chimera - free, fast model optimized for dialogue and function calling
+const GEMINI_MODEL = 'tngtech/deepseek-r1t2-chimera:free';
 
 export interface Message {
   role: 'user' | 'assistant' | 'system';
