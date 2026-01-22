@@ -1051,9 +1051,12 @@ export default function SchedulePage() {
         loadScheduleData();
       }
     } else if (dropId === 'trash') {
-      // Check if entry is recurring
+      // Cancel drag first (clean transition)
+      setActiveDragId(null);
+      setIsDragging(false);
+      
+      // Then open delete confirmation
       if (draggedEntry.recurrence_rule && draggedEntry.recurrence_rule !== '') {
-        // Show delete scope modal for recurring entries
         setEntryToDelete(draggedEntry);
       } else {
         // Delete immediately for non-recurring entries
@@ -1345,6 +1348,11 @@ export default function SchedulePage() {
         sensors={sensors}
         onDragStart={handleDragStart}
         onDragEnd={handleDragEnd}
+        onDragCancel={() => {
+          setActiveDragId(null);
+          setIsDragging(false);
+          setEntryToDelete(null);
+        }}
         autoScroll={false}
       >
       <header style={styles.header}>
@@ -1687,7 +1695,11 @@ export default function SchedulePage() {
 
       <Modal
         isOpen={!!entryToDelete}
-        onClose={() => setEntryToDelete(null)}
+        onClose={() => {
+          setEntryToDelete(null);
+          setActiveDragId(null);
+          setIsDragging(false);
+        }}
         title="Delete Event"
         maxWidth="35rem"
       >
@@ -1703,6 +1715,8 @@ export default function SchedulePage() {
                   await deleteScheduleEntry(entryToDelete.id);
                   setEntries(entries.filter(e => e.id !== entryToDelete.id));
                   setEntryToDelete(null);
+                  setActiveDragId(null);
+                  setIsDragging(false);
                   // Also close the AddEventModal if open
                   if (selectedEntry?.id === entryToDelete.id) {
                     setShowAddModal(false);
@@ -1717,7 +1731,11 @@ export default function SchedulePage() {
               Delete
             </button>
             <button
-              onClick={() => setEntryToDelete(null)}
+              onClick={() => {
+                setEntryToDelete(null);
+                setActiveDragId(null);
+                setIsDragging(false);
+              }}
               style={{ flex: 1, padding: '0.75rem', backgroundColor: 'white', color: '#374151', border: '1px solid #d1d5db', borderRadius: '0.5rem', cursor: 'pointer' }}
             >
               Cancel

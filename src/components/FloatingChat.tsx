@@ -508,7 +508,7 @@ export default function FloatingChat({ onScheduleChange }: FloatingChatProps) {
                 </div>
                 <h4 style={styles.emptyStateTitle}>Start a conversation</h4>
                 <p style={styles.emptyStateText}>
-                  Ask me to help you create schedules, place students, or manage your lessons.
+                  Ask me to help you create schedules or manage your events.
                 </p>
               </div>
             ) : (
