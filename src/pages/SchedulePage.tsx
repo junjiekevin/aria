@@ -1546,7 +1546,7 @@ export default function SchedulePage() {
               <div>
                 <span style={{ color: '#6b7280' }}>Duration: </span>
                 <span style={{ fontWeight: '500', color: '#111827' }}>
-                  {Math.ceil((new Date(schedule.end_date).getTime() - new Date(schedule.start_date).getTime()) / (1000 * 60 * 60 * 24 * 7))} weeks
+                  {totalWeeks} weeks
                 </span>
               </div>
               
