@@ -108,7 +108,11 @@ function doesTimingConflict(
     frequency: string
 ): boolean {
     const startWeek = 0;
-    const interval = frequency === '2weekly' ? 2 : 1;
+    const interval = frequency === 'once' ? 0 : frequency === '2weekly' ? 2 : frequency === 'monthly' ? 4 : 1;
+    
+    if (interval === 0) {
+        return !isSlotAvailable(timing, availability, 0);
+    }
     
     for (let week = startWeek; week < totalWeeks; week++) {
         if ((week - startWeek) % interval !== 0) continue;
@@ -127,7 +131,12 @@ function markTimingAsOccupied(
     frequency: string
 ): void {
     const startWeek = 0;
-    const interval = frequency === '2weekly' ? 2 : 1;
+    const interval = frequency === 'once' ? 0 : frequency === '2weekly' ? 2 : frequency === 'monthly' ? 4 : 1;
+    
+    if (interval === 0) {
+        markSlotOccupied(timing, availability, 0);
+        return;
+    }
     
     for (let week = startWeek; week < totalWeeks; week++) {
         if ((week - startWeek) % interval !== 0) continue;
