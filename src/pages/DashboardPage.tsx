@@ -27,34 +27,35 @@ import logo from '../assets/images/aria-logo.png';
 	headerContent: {
 		maxWidth: '1100px',
 		margin: '0 auto',
-		padding: '1rem',
-		display: 'grid',
-		gridTemplateColumns: 'auto 1fr auto',
+		padding: '1rem 1.5rem',
+		display: 'flex',
+		justifyContent: 'space-between',
 		alignItems: 'center',
-		gap: '1rem',
 	},
 	logoSection: {
 		display: 'flex',
 		alignItems: 'center',
-		gap: '0.5rem',
+		flexShrink: 0,
 	},
 	logo: {
-		height: '32px',
+		height: '40px',
 		width: 'auto',
 	},
 	greetingSection: {
-		textAlign: 'center' as const,
+		flex: 1,
+		textAlign: 'center',
 	},
 	greeting: {
-		fontSize: '1rem',
-		fontWeight: '600',
+		fontSize: '1.25rem',
+		fontWeight: '700',
 		color: '#111827',
 		margin: 0,
 	},
-	greetingSubtext: {
-		fontSize: '0.75rem',
-		color: '#6b7280',
-		margin: '0.125rem 0 0 0',
+	headerActions: {
+		display: 'flex',
+		alignItems: 'center',
+		gap: '0.75rem',
+		flexShrink: 0,
 	},
 	button: {
 		backgroundColor: '#f97316',
@@ -84,13 +85,14 @@ import logo from '../assets/images/aria-logo.png';
 		gap: '1rem',
 		marginBottom: '1.5rem',
 	},
-	sectionTitle: {
-		fontSize: '1.125rem',
-		fontWeight: '600',
-		color: '#111827',
-		margin: 0,
+	filterBar: {
+		display: 'flex',
+		justifyContent: 'space-between',
+		alignItems: 'center',
+		gap: '1rem',
+		marginBottom: '1.5rem',
 	},
-	filterTabs: {
+	filterTabsContainer: {
 		display: 'flex',
 		gap: '0.25rem',
 		background: 'white',
@@ -731,13 +733,8 @@ export default function DashboardPage() {
 					</div>
 					<div className="greetingSection" style={styles.greetingSection}>
 						<p style={styles.greeting}>{getTimeBasedGreeting()}, {getUserFirstName()}!</p>
-						<p style={styles.greetingSubtext}>Ready to organize your day?</p>
 					</div>
-					<div className="headerActions" style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-						<button className="createButton" onClick={handleCreateSchedule} style={styles.button}>
-							<Plus size={18} />
-							New Schedule
-						</button>
+					<div className="headerActions" style={styles.headerActions}>
 						<ProfileDropdown user={user || {}} />
 					</div>
 				</div>
@@ -745,9 +742,9 @@ export default function DashboardPage() {
 
 			{/* Main Content */}
 			<main className="main" style={styles.main}>
-				{/* Filter Tabs */}
-				<div style={styles.sectionHeader}>
-					<div style={styles.filterTabs}>
+				{/* Filter Bar */}
+				<div style={styles.filterBar}>
+					<div style={styles.filterTabsContainer}>
 						{filterTabs.map((tab) => (
 							<button
 								key={tab.key}
@@ -768,6 +765,10 @@ export default function DashboardPage() {
 							</button>
 						))}
 					</div>
+					<button className="createButton" onClick={handleCreateSchedule} style={styles.button}>
+						<Plus size={18} />
+						New Schedule
+					</button>
 				</div>
 
 				{/* Schedule List */}
