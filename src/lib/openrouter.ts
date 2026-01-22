@@ -120,8 +120,9 @@ export async function sendChatMessage(
         
         const functionCall = JSON.parse(jsonString);
         
+        // Remove FUNCTION_CALL and everything after it (AI adds confirmation text after)
         const textResponse = assistantMessage
-          .replace(/FUNCTION_CALL:\s*\{[\s\S]*?\}\s*$/, '')
+          .replace(/FUNCTION_CALL:\s*\{[\s\S]*?\}\s*.*$/, '')
           .replace(/<tool_call>\s*\{[\s\S]*?\}\s*<\/tool_call>/, '')
           .trim();
         
@@ -216,7 +217,32 @@ Status flow: draft → collecting → archived (can also go to trash at any stag
 
 If user asks for an invalid transition, guide them: "I can help with that, but [schedule] is [status]. To [action], it needs to be [required status] first."
 
-## Handling Ambiguity
+## Schedule Identification - CRITICAL
+
+When user mentions a SPECIFIC schedule by name (e.g., "Practice Schedule 2026"):
+
+1. ALWAYS call listSchedules FIRST to get all schedules
+2. Find the schedule that MATCHES or PARTIALLY MATCHES the user's request
+3. Extract the EXACT UUID from the response (format: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx)
+4. Use that UUID in subsequent function calls
+5. If NO schedule matches, say "I can't find '[schedule name]'. Did you mean...?" and list available schedules
+
+NEVER guess or invent schedule IDs - always extract from listSchedules response.
+
+Example workflow:
+User: "Add a piano lesson to Practice Schedule 2026"
+You: First call listSchedules, find the UUID for "Practice Schedule 2026", then call addEventToSchedule with that UUID.
+
+## Event Identification - CRITICAL
+
+When user mentions a SPECIFIC event (e.g., "John's Monday lesson"):
+
+1. Call getEventSummaryInSchedule to see all events
+2. Find the event that matches the user's description
+3. If MULTIPLE events match, ask "Which one? (1) John's Monday 3pm, (2) John's Tuesday 4pm..."
+4. If NO events match, tell the user "I can't find any event matching '[description]'"
+
+## Multi-Action Requests
 
 When unclear, ask naturally:
 - "Which schedule did you mean? You have: 1) Fall 2026, 2) Spring 2026..."
