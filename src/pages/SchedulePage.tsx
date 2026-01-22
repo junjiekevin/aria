@@ -512,6 +512,7 @@ export default function SchedulePage() {
   const [showUnassignedModal, setShowUnassignedModal] = useState(false);
   
   const [showConfigureFormModal, setShowConfigureFormModal] = useState(false);
+  const [showTrashConfirm, setShowTrashConfirm] = useState(false);
 
   const [isEditingName, setIsEditingName] = useState(false);
   const [editingName, setEditingName] = useState('');
@@ -866,12 +867,13 @@ export default function SchedulePage() {
     }
   };
 
-  const handleTrash = async () => {
+  const handleTrashWithRedirect = async () => {
     if (!scheduleId || !schedule) return;
     
     try {
       await updateSchedule(scheduleId, { status: 'trashed' });
-      loadScheduleData();
+      setShowTrashConfirm(false);
+      navigate('/');
     } catch (err) {
       console.error('Failed to trash schedule:', err);
       alert(err instanceof Error ? err.message : 'Failed to trash schedule');
@@ -1671,19 +1673,21 @@ export default function SchedulePage() {
                 </div>
               )}
               
-              {/* Archive and Trash buttons - always visible except when trashed */}
+              {/* Archive and Trash buttons - visible based on status */}
               {schedule.status !== 'trashed' && (
                 <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem', paddingTop: '1rem', borderTop: '1px solid #e5e7eb' }}>
+                  {schedule.status !== 'archived' && (
+                    <button
+                      onClick={handleArchive}
+                      style={{ ...styles.panelActionButton, flex: 1 }}
+                      title="Archive"
+                    >
+                      <Archive size={14} />
+                      Archive
+                    </button>
+                  )}
                   <button
-                    onClick={handleArchive}
-                    style={{ ...styles.panelActionButton, flex: 1 }}
-                    title="Archive"
-                  >
-                    <Archive size={14} />
-                    Archive
-                  </button>
-                  <button
-                    onClick={handleTrash}
+                    onClick={() => setShowTrashConfirm(true)}
                     style={{ ...styles.panelActionButton, flex: 1, color: '#dc2626', borderColor: '#fecaca' }}
                     title="Trash"
                   >
@@ -1692,6 +1696,53 @@ export default function SchedulePage() {
                   </button>
                 </div>
               )}
+
+              {/* Trash Confirmation Modal */}
+              <Modal
+                isOpen={showTrashConfirm}
+                onClose={() => setShowTrashConfirm(false)}
+                title="Move to Trash"
+                maxWidth="28rem"
+              >
+                <div style={{ padding: '0.5rem 0' }}>
+                  <p style={{ marginBottom: '1.5rem', color: '#374151', lineHeight: 1.5 }}>
+                    Are you sure you want to move <strong>{schedule.label}</strong> to trash? 
+                    This schedule can be restored later.
+                  </p>
+                  <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end' }}>
+                    <button
+                      onClick={() => setShowTrashConfirm(false)}
+                      style={{
+                        padding: '0.625rem 1.25rem',
+                        backgroundColor: 'white',
+                        color: '#374151',
+                        border: '1px solid #d1d5db',
+                        borderRadius: '0.5rem',
+                        fontSize: '0.875rem',
+                        fontWeight: '500',
+                        cursor: 'pointer',
+                      }}
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={handleTrashWithRedirect}
+                      style={{
+                        padding: '0.625rem 1.25rem',
+                        backgroundColor: '#dc2626',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '0.5rem',
+                        fontSize: '0.875rem',
+                        fontWeight: '500',
+                        cursor: 'pointer',
+                      }}
+                    >
+                      Move to Trash
+                    </button>
+                  </div>
+                </div>
+              </Modal>
             </div>
           </div>
 

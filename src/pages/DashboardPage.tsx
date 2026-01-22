@@ -426,55 +426,72 @@ function ScheduleCard({
 					<StatusBadge status={schedule.status} />
 				</div>
 
-				<div style={{ display: 'flex', gap: '0.5rem', paddingTop: '0.25rem' }}>
-					{isTrashed ? (
-						<>
-							<button 
-								onClick={() => onRecover?.(schedule)}
-								style={{ ...styles.button, flex: 1, backgroundColor: '#10b981', borderRadius: '12px' }}
-							>
-								<RotateCcw size={16} />
-								Recover
-							</button>
-							<button 
-								onClick={() => onHardDelete?.(schedule)}
-								style={{ ...styles.button, flex: 1, backgroundColor: 'white', color: '#dc2626', border: '1px solid #fecaca', borderRadius: '12px' }}
-							>
-								<XCircle size={16} />
-								Delete
-							</button>
-						</>
-					) : (
-						<>
-							<button 
-								onClick={onView}
-								style={{ ...styles.button, flex: 1, borderRadius: '12px' }}
-							>
-								<Sparkles size={16} />
-								View
-							</button>
-							<button 
-								onClick={onEdit}
-								style={{ ...styles.button, flex: 1, backgroundColor: 'white', color: '#374151', border: '1px solid #e5e7eb', boxShadow: 'none', borderRadius: '12px' }}
-							>
-								Edit
-							</button>
-							<button 
-								onClick={() => onArchive?.(schedule)}
-								style={{ ...styles.button, backgroundColor: 'transparent', color: '#6b7280', border: '1px solid #e5e7eb', boxShadow: 'none', padding: '0.75rem', borderRadius: '12px' }}
-								title="Archive"
-							>
-								<Archive size={16} />
-							</button>
-							<button 
-								onClick={() => onTrash?.(schedule)}
-								style={{ ...styles.button, backgroundColor: 'transparent', color: '#9ca3af', border: '1px solid #e5e7eb', boxShadow: 'none', padding: '0.75rem', borderRadius: '12px' }}
-							>
-								<Trash2 size={16} />
-							</button>
-						</>
-					)}
-				</div>
+					<div style={{ display: 'flex', gap: '0.5rem', paddingTop: '0.25rem' }}>
+						{isTrashed ? (
+							<>
+								<button 
+									onClick={() => onRecover?.(schedule)}
+									style={{ ...styles.button, flex: 1, backgroundColor: '#10b981', borderRadius: '12px' }}
+								>
+									<RotateCcw size={16} />
+									Recover
+								</button>
+								<button 
+									onClick={() => onHardDelete?.(schedule)}
+									style={{ ...styles.button, flex: 1, backgroundColor: 'white', color: '#dc2626', border: '1px solid #fecaca', borderRadius: '12px' }}
+								>
+									<XCircle size={16} />
+									Delete
+								</button>
+							</>
+						) : schedule.status === 'archived' ? (
+							<>
+								<button 
+									onClick={() => onRecover?.(schedule)}
+									style={{ ...styles.button, flex: 1, backgroundColor: '#10b981', borderRadius: '12px' }}
+								>
+									<RotateCcw size={16} />
+									Restore
+								</button>
+								<button 
+									onClick={() => onTrash?.(schedule)}
+									style={{ ...styles.button, flex: 1, backgroundColor: 'white', color: '#dc2626', border: '1px solid #fecaca', borderRadius: '12px' }}
+								>
+									<Trash2 size={16} />
+									Trash
+								</button>
+							</>
+						) : (
+							<>
+								<button 
+									onClick={onView}
+									style={{ ...styles.button, flex: 1, borderRadius: '12px' }}
+								>
+									<Sparkles size={16} />
+									View
+								</button>
+								<button 
+									onClick={onEdit}
+									style={{ ...styles.button, flex: 1, backgroundColor: 'white', color: '#374151', border: '1px solid #e5e7eb', boxShadow: 'none', borderRadius: '12px' }}
+								>
+									Edit
+								</button>
+								<button 
+									onClick={() => onArchive?.(schedule)}
+									style={{ ...styles.button, backgroundColor: 'transparent', color: '#6b7280', border: '1px solid #e5e7eb', boxShadow: 'none', padding: '0.75rem', borderRadius: '12px' }}
+									title="Archive"
+								>
+									<Archive size={16} />
+								</button>
+								<button 
+									onClick={() => onTrash?.(schedule)}
+									style={{ ...styles.button, backgroundColor: 'transparent', color: '#9ca3af', border: '1px solid #e5e7eb', boxShadow: 'none', padding: '0.75rem', borderRadius: '12px' }}
+								>
+									<Trash2 size={16} />
+								</button>
+							</>
+						)}
+					</div>
 			</div>
 		</div>
 	);
