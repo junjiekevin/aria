@@ -36,10 +36,14 @@ import logo from '../assets/images/aria-logo.png';
 		display: 'flex',
 		alignItems: 'center',
 		flexShrink: 0,
+		backgroundColor: 'rgba(255, 255, 255, 0.9)',
+		padding: '0.25rem',
+		borderRadius: '8px',
 	},
 	logo: {
-		height: '40px',
+		height: '36px',
 		width: 'auto',
+		display: 'block',
 	},
 	greetingSection: {
 		flex: 1,
