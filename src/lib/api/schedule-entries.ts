@@ -115,3 +115,33 @@ export async function deleteFutureEntries(entry: ScheduleEntry): Promise<void> {
         recurrence_rule: ''  // Remove recurrence rule
     });
 }
+
+// Delete only this single occurrence of a recurring entry
+// Keeps future occurrences by creating a new recurring entry for them
+export async function deleteSingleOccurrence(entry: ScheduleEntry): Promise<void> {
+    // Calculate the next occurrence date for the future entry
+    const currentStart = new Date(entry.start_time);
+    const currentEnd = new Date(entry.end_time);
+    
+    // Move to next week (7 days)
+    const nextOccurrence = new Date(currentStart);
+    nextOccurrence.setDate(currentStart.getDate() + 7);
+    
+    const nextEnd = new Date(currentEnd);
+    nextEnd.setDate(currentEnd.getDate() + 7);
+    
+    // Step 1: Create new entry for future occurrences (keep the recurrence rule)
+    await createScheduleEntry({
+        schedule_id: entry.schedule_id,
+        student_name: entry.student_name,
+        start_time: nextOccurrence.toISOString(),
+        end_time: nextEnd.toISOString(),
+        recurrence_rule: entry.recurrence_rule
+    });
+    
+    // Step 2: Convert current entry to single (remove recurrence rule)
+    // This makes "this occurrence" display as a single event while future shows via new entry
+    await updateScheduleEntry(entry.id, {
+        recurrence_rule: ''  // Remove recurrence rule for this specific occurrence
+    });
+}
