@@ -8,6 +8,7 @@ import { getFormResponses, deleteFormResponse, updateFormResponseAssigned, getPr
 import AddEventModal from '../components/AddEventModal';
 import Modal from '../components/Modal';
 import SchedulingPreviewModal from '../components/SchedulingPreviewModal';
+import ConfigureFormModal from '../components/ConfigureFormModal';
 import { DndContext, DragOverlay, useDraggable, useDroppable, PointerSensor, useSensor, useSensors, type DragEndEvent, type DragStartEvent } from '@dnd-kit/core';
 
 const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
@@ -462,6 +463,8 @@ export default function SchedulePage() {
   
   const [showUnassignedModal, setShowUnassignedModal] = useState(false);
   
+  const [showConfigureFormModal, setShowConfigureFormModal] = useState(false);
+
   const [isEditingName, setIsEditingName] = useState(false);
   const [editingName, setEditingName] = useState('');
   const [isEditingDates, setIsEditingDates] = useState(false);
@@ -1526,6 +1529,7 @@ export default function SchedulePage() {
                   value={schedule.status}
                   onChange={(e) => handleStatusChange(e.target.value as any)}
                   style={styles.statusSelect}
+                  disabled={schedule.status === 'collecting'}
                 >
                   <option value="draft">Draft</option>
                   <option value="collecting">Active (Collecting)</option>
@@ -1540,10 +1544,74 @@ export default function SchedulePage() {
                 </span>
               </div>
               
+              {schedule.status === 'draft' && (
+                <div style={{ marginTop: '1rem' }}>
+                  <button
+                    onClick={() => setShowConfigureFormModal(true)}
+                    style={{
+                      width: '100%',
+                      padding: '0.75rem 1rem',
+                      backgroundColor: '#f97316',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '0.5rem',
+                      fontSize: '0.875rem',
+                      fontWeight: '600',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '0.5rem',
+                    }}
+                    onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#ea580c'; }}
+                    onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = '#f97316'; }}
+                  >
+                    <Sparkles size={16} />
+                    Configure & Activate Form
+                  </button>
+                </div>
+              )}
+              
               {schedule.status === 'collecting' && (
                 <div style={{ marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid #e5e7eb' }}>
+                  {schedule.form_deadline && (
+                    <div style={{ marginBottom: '0.75rem' }}>
+                      <span style={{ color: '#6b7280', display: 'block', marginBottom: '0.25rem' }}>Deadline:</span>
+                      <span style={{ fontWeight: '500', color: '#111827' }}>
+                        {new Date(schedule.form_deadline).toLocaleDateString('en-US', {
+                          weekday: 'short',
+                          month: 'short',
+                          day: 'numeric',
+                          year: 'numeric',
+                        })}
+                      </span>
+                    </div>
+                  )}
+                  <div style={{ marginBottom: '0.75rem' }}>
+                    <span style={{ color: '#6b7280', display: 'block', marginBottom: '0.25rem' }}>
+                      {schedule.max_choices === 1 ? '1 choice' : `${schedule.max_choices} choices`} per student
+                    </span>
+                  </div>
                   <span style={{ color: '#6b7280', display: 'block', marginBottom: '0.5rem' }}>Form Link:</span>
                   <FormLink scheduleId={scheduleId!} />
+                  <button
+                    onClick={() => setShowConfigureFormModal(true)}
+                    style={{
+                      marginTop: '0.75rem',
+                      padding: '0.5rem 0.75rem',
+                      backgroundColor: 'white',
+                      color: '#6b7280',
+                      border: '1px solid #d1d5db',
+                      borderRadius: '0.375rem',
+                      fontSize: '0.75rem',
+                      cursor: 'pointer',
+                      width: '100%',
+                    }}
+                    onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#f9fafb'; }}
+                    onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'white'; }}
+                  >
+                    Edit Form Configuration
+                  </button>
                 </div>
               )}
             </div>
@@ -1740,6 +1808,13 @@ export default function SchedulePage() {
         scheduleStart={new Date(schedule.start_date)}
         scheduleId={scheduleId!}
         onScheduled={loadScheduleData}
+      />
+
+      <ConfigureFormModal
+        isOpen={showConfigureFormModal}
+        onClose={() => setShowConfigureFormModal(false)}
+        onConfigured={loadScheduleData}
+        schedule={schedule}
       />
 
       <Modal

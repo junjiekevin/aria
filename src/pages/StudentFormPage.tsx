@@ -325,6 +325,7 @@ export default function StudentFormPage() {
     const [error, setError] = useState<string | null>(null);
     const [submitted, setSubmitted] = useState(false);
     const [copied, setCopied] = useState(false);
+    const [formClosedDueToDeadline, setFormClosedDueToDeadline] = useState(false);
     
     const [firstName, setFirstName] = useState('');
     const [lastName, setLastName] = useState('');
@@ -342,6 +343,17 @@ export default function StudentFormPage() {
             try {
                 const scheduleData = await getSchedule(scheduleId);
                 setSchedule(scheduleData);
+                
+                // Check deadline
+                if (scheduleData.form_deadline) {
+                    const deadline = new Date(scheduleData.form_deadline);
+                    const today = new Date();
+                    today.setHours(0, 0, 0, 0);
+                    deadline.setHours(0, 0, 0, 0);
+                    if (today > deadline) {
+                        setFormClosedDueToDeadline(true);
+                    }
+                }
             } catch (err) {
                 console.error('Failed to load schedule:', err);
                 setError('Schedule not found');
@@ -389,7 +401,8 @@ export default function StudentFormPage() {
             errors.push('Please enter a valid email address');
         }
         
-        const timings = [timing1, timing2, timing3];
+        const maxChoices = schedule?.max_choices || 3;
+        const timings = [timing1, timing2, timing3].slice(0, maxChoices);
         
         for (let i = 0; i < timings.length; i++) {
             const t = timings[i];
@@ -459,23 +472,25 @@ export default function StudentFormPage() {
                 }
             }
             
-            await createFormResponse({
+            const maxChoices = schedule.max_choices || 3;
+            const timings = [timing1, timing2, timing3];
+            
+            const formData: any = {
                 schedule_id: scheduleId,
                 student_name: `${firstName} ${lastName}`,
                 email: email.trim(),
-                preferred_1_day: timing1.day,
-                preferred_1_start: `${timing1.startHour}:${timing1.startMinute}`,
-                preferred_1_end: `${timing1.endHour}:${timing1.endMinute}`,
-                preferred_1_frequency: timing1.frequency,
-                preferred_2_day: timing2.day,
-                preferred_2_start: `${timing2.startHour}:${timing2.startMinute}`,
-                preferred_2_end: `${timing2.endHour}:${timing2.endMinute}`,
-                preferred_2_frequency: timing2.frequency,
-                preferred_3_day: timing3.day,
-                preferred_3_start: `${timing3.startHour}:${timing3.startMinute}`,
-                preferred_3_end: `${timing3.endHour}:${timing3.endMinute}`,
-                preferred_3_frequency: timing3.frequency,
-            });
+            };
+            
+            // Add only the configured number of choices
+            for (let i = 0; i < maxChoices; i++) {
+                const t = timings[i];
+                formData[`preferred_${i + 1}_day`] = t.day;
+                formData[`preferred_${i + 1}_start`] = `${t.startHour}:${t.startMinute}`;
+                formData[`preferred_${i + 1}_end`] = `${t.endHour}:${t.endMinute}`;
+                formData[`preferred_${i + 1}_frequency`] = t.frequency;
+            }
+            
+            await createFormResponse(formData);
             
             setSubmitted(true);
         } catch (err) {
@@ -564,6 +579,15 @@ export default function StudentFormPage() {
                 </div>
                 
                 <form onSubmit={handleSubmit} style={styles.content}>
+                    {formClosedDueToDeadline && (
+                        <div style={{ ...styles.error, backgroundColor: '#fef3c7', border: '1px solid #f59e0b', color: '#92400e' }}>
+                            <AlertCircle size={20} style={{ flexShrink: 0, marginTop: 2 }} />
+                            <div>
+                                This form is closed. The deadline has passed.
+                            </div>
+                        </div>
+                    )}
+                    
                     {formErrors.length > 0 && (
                         <div style={styles.error}>
                             <AlertCircle size={20} style={{ flexShrink: 0, marginTop: 2 }} />
@@ -579,6 +603,21 @@ export default function StudentFormPage() {
                         <div style={styles.error}>
                             <AlertCircle size={20} style={{ flexShrink: 0, marginTop: 2 }} />
                             <div>{error}</div>
+                        </div>
+                    )}
+                    
+                    {schedule?.form_instructions && (
+                        <div style={{ 
+                            backgroundColor: '#f0f9ff', 
+                            border: '1px solid #bae6fd', 
+                            borderRadius: '0.5rem', 
+                            padding: '1rem',
+                            marginBottom: '1.5rem',
+                            fontSize: '0.875rem',
+                            color: '#0369a1',
+                        }}>
+                            <div style={{ fontWeight: '600', marginBottom: '0.25rem' }}>Instructions</div>
+                            <div>{schedule.form_instructions}</div>
                         </div>
                     )}
                     
@@ -620,38 +659,46 @@ export default function StudentFormPage() {
                     <div style={{ marginTop: '1.5rem', marginBottom: '1rem' }}>
                         <div style={styles.sectionTitle}>Preferred Time Slots *</div>
                         <div style={{ fontSize: '0.8rem', color: '#6b7280', marginBottom: '1rem' }}>
-                            Please provide 3 preferred time slots. All 3 are required.
+                            Please provide {schedule?.max_choices || 3} preferred time slot{(schedule?.max_choices || 3) !== 1 ? 's' : ''}. All {(schedule?.max_choices || 3)} are required.
                         </div>
                         
-                        <TimingSelector
-                            timing={timing1}
-                            onChange={setTiming1}
-                            index={0}
-                            errors={formErrors.filter(e => e.includes('Choice 1') || e.includes('1'))}
-                        />
-                        <TimingSelector
-                            timing={timing2}
-                            onChange={setTiming2}
-                            index={1}
-                            errors={formErrors.filter(e => e.includes('Choice 2') || e.includes('2'))}
-                        />
-                        <TimingSelector
-                            timing={timing3}
-                            onChange={setTiming3}
-                            index={2}
-                            errors={formErrors.filter(e => e.includes('Choice 3') || e.includes('3'))}
-                        />
+                        {(!formClosedDueToDeadline) && (
+                            <>
+                                <TimingSelector
+                                    timing={timing1}
+                                    onChange={setTiming1}
+                                    index={0}
+                                    errors={formErrors.filter(e => e.includes('Choice 1') || e.includes('1'))}
+                                />
+                                {(schedule?.max_choices || 3) >= 2 && (
+                                    <TimingSelector
+                                        timing={timing2}
+                                        onChange={setTiming2}
+                                        index={1}
+                                        errors={formErrors.filter(e => e.includes('Choice 2') || e.includes('2'))}
+                                    />
+                                )}
+                                {(schedule?.max_choices || 3) >= 3 && (
+                                    <TimingSelector
+                                        timing={timing3}
+                                        onChange={setTiming3}
+                                        index={2}
+                                        errors={formErrors.filter(e => e.includes('Choice 3') || e.includes('3'))}
+                                    />
+                                )}
+                            </>
+                        )}
                     </div>
                     
                     <button
                         type="submit"
-                        disabled={submitting}
+                        disabled={submitting || formClosedDueToDeadline}
                         style={{
                             ...styles.button,
-                            opacity: submitting ? 0.7 : 1,
+                            opacity: (submitting || formClosedDueToDeadline) ? 0.7 : 1,
                         }}
                     >
-                        {submitting ? 'Submitting...' : 'Submit Availability'}
+                        {submitting ? 'Submitting...' : formClosedDueToDeadline ? 'Form Closed' : 'Submit Availability'}
                     </button>
                 </form>
             </div>

@@ -11,6 +11,16 @@ export interface Schedule {
     previous_status: 'draft' | 'collecting' | 'archived' | null; // Store status before trashing
     send_confirmation_email: boolean; // Whether to send confirmation emails
     created_at: string;
+    // Form configuration
+    max_choices: number;
+    form_instructions: string | null;
+    form_deadline: string | null;
+}
+
+export interface FormConfigInput {
+    max_choices?: number;
+    form_instructions?: string | null;
+    form_deadline?: string | null;
 }
 
 export interface CreateScheduleInput {
@@ -464,4 +474,49 @@ export async function checkScheduleOverlaps(startDate: string, endDate: string, 
     });
 
     return overlaps;
+}
+
+// Configure form settings and activate schedule
+export async function updateFormConfig(scheduleId: string, config: FormConfigInput): Promise<Schedule> {
+    const { data: { user } } = await supabase.auth.getUser();
+
+    if (!user) {
+        const error = new Error('User not authenticated') as ScheduleValidationError;
+        error.code = 'UNAUTHORIZED';
+        throw error;
+    }
+
+    // Validate max_choices
+    if (config.max_choices !== undefined && (config.max_choices < 1 || config.max_choices > 3)) {
+        throw new Error('max_choices must be between 1 and 3');
+    }
+
+    // Build update payload
+    const updatePayload: any = {};
+    if (config.max_choices !== undefined) updatePayload.max_choices = config.max_choices;
+    if (config.form_instructions !== undefined) updatePayload.form_instructions = config.form_instructions;
+    if (config.form_deadline !== undefined) updatePayload.form_deadline = config.form_deadline;
+
+    // Update schedule configuration and set status to 'collecting'
+    const { data, error } = await supabase
+        .from('schedules')
+        .update({
+            ...updatePayload,
+            status: 'collecting'
+        })
+        .eq('id', scheduleId)
+        .eq('user_id', user.id)
+        .select()
+        .single();
+
+    if (error) {
+        if (error.code === 'PGRST116') {
+            const notFoundError = new Error('Schedule not found') as ScheduleValidationError;
+            notFoundError.code = 'SCHEDULE_NOT_FOUND';
+            throw notFoundError;
+        }
+        throw new Error(`Failed to configure form: ${error.message}`);
+    }
+
+    return data;
 }
