@@ -3,11 +3,13 @@ import { useState, useEffect, useMemo, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { ArrowLeft, ChevronLeft, ChevronRight, Trash2, Copy, Check, Sparkles } from 'lucide-react';
 import { getSchedule, updateSchedule, type Schedule } from '../lib/api/schedules';
-import { getScheduleEntries, createScheduleEntry, updateScheduleEntry, deleteScheduleEntry, type ScheduleEntry } from '../lib/api/schedule-entries';
+import { getScheduleEntries, createScheduleEntry, updateScheduleEntry, deleteScheduleEntry, deleteFutureEntries, splitRecurringEntry, type ScheduleEntry } from '../lib/api/schedule-entries';
 import { getFormResponses, deleteFormResponse, updateFormResponseAssigned, getPreferredTimings, type FormResponse } from '../lib/api/form-responses';
 import AddEventModal from '../components/AddEventModal';
 import Modal from '../components/Modal';
 import SchedulingPreviewModal from '../components/SchedulingPreviewModal';
+import DeleteScopeModal from '../components/DeleteScopeModal';
+import EditScopeModal from '../components/EditScopeModal';
 import { DndContext, DragOverlay, useDraggable, useDroppable, PointerSensor, useSensor, useSensors, type DragEndEvent, type DragStartEvent } from '@dnd-kit/core';
 
 const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
@@ -468,6 +470,10 @@ export default function SchedulePage() {
   const nameInputRef = useRef<HTMLInputElement>(null);
   const startDateInputRef = useRef<HTMLInputElement>(null);
   const endDateInputRef = useRef<HTMLInputElement>(null);
+  
+  // State for edit scope modal
+  const [editScopeEntry, setEditScopeEntry] = useState<ScheduleEntry | null>(null);
+  const [pendingEditUpdates, setPendingEditUpdates] = useState<{ student_name: string; start_time: string; end_time: string; recurrence_rule: string } | null>(null);
 
   useEffect(() => {
     if (scheduleId) {
@@ -1051,7 +1057,19 @@ export default function SchedulePage() {
         loadScheduleData();
       }
     } else if (dropId === 'trash') {
-      setEntryToDelete(draggedEntry);
+      // Check if entry is recurring
+      if (draggedEntry.recurrence_rule && draggedEntry.recurrence_rule !== '') {
+        // Show delete scope modal for recurring entries
+        setEntryToDelete(draggedEntry);
+      } else {
+        // Delete immediately for non-recurring entries
+        try {
+          await deleteScheduleEntry(draggedEntry.id);
+          setEntries(entries.filter(e => e.id !== draggedEntry.id));
+        } catch (err) {
+          console.error('Failed to delete event:', err);
+        }
+      }
     } else if (dropId.startsWith('entry-')) {
       const targetEntryId = dropId.replace('entry-', '');
       const targetEntry = entries.find(e => e.id === targetEntryId);
@@ -1589,6 +1607,8 @@ export default function SchedulePage() {
           setShowAddModal(false);
           setSelectedEntry(null);
           setSelectedSlot(null);
+          setEditScopeEntry(null);
+          setPendingEditUpdates(null);
         }}
         onSuccess={handleEventSaved}
         scheduleId={scheduleId!}
@@ -1596,6 +1616,46 @@ export default function SchedulePage() {
         initialHour={selectedSlot?.hour}
         scheduleStartDate={schedule.start_date}
         existingEntry={selectedEntry}
+        onNeedScopeConfirmation={(entry, updates) => {
+          setEditScopeEntry(entry);
+          setPendingEditUpdates(updates);
+        }}
+      />
+
+      <EditScopeModal
+        isOpen={!!editScopeEntry && !!pendingEditUpdates}
+        onClose={() => {
+          setEditScopeEntry(null);
+          setPendingEditUpdates(null);
+        }}
+        entry={editScopeEntry}
+        onApply={async (scope) => {
+          if (!editScopeEntry || !pendingEditUpdates) return;
+          try {
+            if (scope === 'single') {
+              // Update just this occurrence
+              await updateScheduleEntry(editScopeEntry.id, pendingEditUpdates);
+              setEntries(entries.map(e => {
+                if (e.id === editScopeEntry.id) {
+                  return { ...e, ...pendingEditUpdates };
+                }
+                return e;
+              }));
+            } else {
+              // Split: keep current as single, create new for future
+              await splitRecurringEntry(editScopeEntry, pendingEditUpdates.start_time, pendingEditUpdates.end_time, pendingEditUpdates.recurrence_rule);
+              // Reload to get the new entry
+              loadScheduleData();
+            }
+          } catch (err) {
+            console.error('Failed to update event:', err);
+          }
+          setEditScopeEntry(null);
+          setPendingEditUpdates(null);
+          setShowAddModal(false);
+          setSelectedEntry(null);
+          setSelectedSlot(null);
+        }}
       />
 
       <Modal
@@ -1635,7 +1695,7 @@ export default function SchedulePage() {
       </Modal>
 
       <Modal
-        isOpen={!!entryToDelete}
+        isOpen={!!entryToDelete && (!entryToDelete.recurrence_rule || entryToDelete.recurrence_rule === '')}
         onClose={() => setEntryToDelete(null)}
         title="Delete Event"
         maxWidth="35rem"
@@ -1669,6 +1729,32 @@ export default function SchedulePage() {
           </div>
         </div>
       </Modal>
+
+      <DeleteScopeModal
+        isOpen={!!entryToDelete && entryToDelete.recurrence_rule !== '' && entryToDelete.recurrence_rule !== null}
+        onClose={() => setEntryToDelete(null)}
+        entry={entryToDelete}
+        onDelete={async (scope) => {
+          if (!entryToDelete) return;
+          try {
+            if (scope === 'single') {
+              await deleteScheduleEntry(entryToDelete.id);
+              setEntries(entries.filter(e => e.id !== entryToDelete.id));
+            } else {
+              await deleteFutureEntries(entryToDelete);
+              setEntries(entries.map(e => {
+                if (e.id === entryToDelete.id) {
+                  return { ...e, recurrence_rule: '' };
+                }
+                return e;
+              }));
+            }
+            setEntryToDelete(null);
+          } catch (err) {
+            console.error('Failed to delete event:', err);
+          }
+        }}
+      />
 
       <SchedulingPreviewModal
         isOpen={showSchedulingPreview}

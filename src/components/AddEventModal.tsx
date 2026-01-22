@@ -11,6 +11,7 @@ interface AddEventModalProps {
   initialHour?: number;
   scheduleStartDate: string;
   existingEntry?: ScheduleEntry | null;
+  onNeedScopeConfirmation?: (entry: ScheduleEntry, updates: { student_name: string; start_time: string; end_time: string; recurrence_rule: string }) => void;
 }
 
 const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
@@ -105,6 +106,7 @@ export default function AddEventModal({
   initialHour,
   scheduleStartDate,
   existingEntry,
+  onNeedScopeConfirmation,
 }: AddEventModalProps) {
   const isEditMode = !!existingEntry;
   
@@ -251,6 +253,19 @@ export default function AddEventModal({
       }
 
       if (isEditMode && existingEntry) {
+        // Check if entry is recurring and we have scope confirmation callback
+        if (existingEntry.recurrence_rule && existingEntry.recurrence_rule !== '' && onNeedScopeConfirmation) {
+          // Trigger scope confirmation modal
+          setLoading(false);
+          onNeedScopeConfirmation(existingEntry, {
+            student_name: studentName.trim(),
+            start_time: firstOccurrence.toISOString(),
+            end_time: endTime.toISOString(),
+            recurrence_rule: recurrenceRule,
+          });
+          return;
+        }
+        
         await updateScheduleEntry(existingEntry.id, {
           student_name: studentName.trim(),
           start_time: firstOccurrence.toISOString(),

@@ -17,6 +17,11 @@ export interface CreateScheduleEntryInput {
     recurrence_rule: string;
 }
 
+// Check if an entry is recurring
+export function isRecurringEntry(entry: ScheduleEntry): boolean {
+    return entry.recurrence_rule !== '' && entry.recurrence_rule !== null;
+}
+
 // Get all entries for a schedule
 export async function getScheduleEntries(scheduleId: string): Promise<ScheduleEntry[]> {
     const { data, error } = await supabase
@@ -76,4 +81,37 @@ export async function deleteScheduleEntry(entryId: string): Promise<void> {
     if (error) {
         throw new Error(`Failed to delete: ${error.message}`);
     }
+}
+
+// Split a recurring entry: keep current as single, create new for future
+export async function splitRecurringEntry(
+    entry: ScheduleEntry,
+    newStartTime: string,
+    newEndTime: string,
+    newRecurrenceRule: string
+): Promise<void> {
+    // Step 1: Convert current entry to single occurrence (remove recurrence rule)
+    await updateScheduleEntry(entry.id, {
+        start_time: entry.start_time,  // Keep original time for this occurrence
+        end_time: entry.end_time,
+        recurrence_rule: ''  // Remove recurrence to keep only this occurrence
+    });
+    
+    // Step 2: Create new entry for future occurrences
+    await createScheduleEntry({
+        schedule_id: entry.schedule_id,
+        student_name: entry.student_name,
+        start_time: newStartTime,
+        end_time: newEndTime,
+        recurrence_rule: newRecurrenceRule
+    });
+}
+
+// Delete all future occurrences of a recurring entry
+// Converts current entry to single occurrence (preserves history)
+export async function deleteFutureEntries(entry: ScheduleEntry): Promise<void> {
+    // Convert current entry to single occurrence
+    await updateScheduleEntry(entry.id, {
+        recurrence_rule: ''  // Remove recurrence rule
+    });
 }
