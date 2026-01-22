@@ -1676,7 +1676,7 @@ export default function SchedulePage() {
               {/* Archive and Trash buttons - visible based on status */}
               {schedule.status !== 'trashed' && (
                 <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem', paddingTop: '1rem', borderTop: '1px solid #e5e7eb' }}>
-                  {schedule.status !== 'archived' && (
+                  {schedule.status === 'collecting' && (
                     <button
                       onClick={handleArchive}
                       style={{ ...styles.panelActionButton, flex: 1 }}

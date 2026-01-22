@@ -433,7 +433,7 @@ function validateStatusTransition(currentStatus: string, newStatus: string): boo
     const validTransitions: Record<string, string[]> = {
         draft: ['collecting', 'trashed'],
         collecting: ['archived', 'trashed'],
-        archived: ['trashed'], // Archived schedules can only go to trash
+        archived: ['collecting', 'trashed'], // Can restore to collecting or trash
         trashed: ['draft', 'collecting', 'archived'] // Can restore to any status
     };
 

@@ -476,13 +476,15 @@ function ScheduleCard({
 								>
 									Edit
 								</button>
-								<button 
-									onClick={() => onArchive?.(schedule)}
-									style={{ ...styles.button, backgroundColor: 'transparent', color: '#6b7280', border: '1px solid #e5e7eb', boxShadow: 'none', padding: '0.75rem', borderRadius: '12px' }}
-									title="Archive"
-								>
-									<Archive size={16} />
-								</button>
+								{schedule.status === 'collecting' && (
+									<button 
+										onClick={() => onArchive?.(schedule)}
+										style={{ ...styles.button, backgroundColor: 'transparent', color: '#6b7280', border: '1px solid #e5e7eb', boxShadow: 'none', padding: '0.75rem', borderRadius: '12px' }}
+										title="Archive"
+									>
+										<Archive size={16} />
+									</button>
+								)}
 								<button 
 									onClick={() => onTrash?.(schedule)}
 									style={{ ...styles.button, backgroundColor: 'transparent', color: '#9ca3af', border: '1px solid #e5e7eb', boxShadow: 'none', padding: '0.75rem', borderRadius: '12px' }}
