@@ -534,6 +534,17 @@ export default function SchedulePage() {
     }
   }, [scheduleId]);
 
+  // Listen for schedule changes from FloatingChat
+  useEffect(() => {
+    const handleScheduleChange = () => {
+      console.log('[SchedulePage] Schedule change event received, reloading data...');
+      loadScheduleData();
+    };
+
+    window.addEventListener('aria-schedule-change', handleScheduleChange);
+    return () => window.removeEventListener('aria-schedule-change', handleScheduleChange);
+  }, [scheduleId]);
+
   // Helper to parse YYYY-MM-DD in local timezone (not UTC)
   const parseLocalDate = (dateStr: string): Date => {
     const [year, month, day] = dateStr.split('-').map(Number);

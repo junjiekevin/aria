@@ -52,3 +52,4 @@ coverage/
 
 # TypeScript
 *.tsbuildinfo
+.claude
