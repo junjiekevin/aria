@@ -1,7 +1,8 @@
 // src/pages/SchedulePage.tsx
-import { useState, useEffect, useMemo, useRef } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, ChevronLeft, ChevronRight, Trash2 } from 'lucide-react';
+import { ArrowLeft, ChevronLeft, ChevronRight, Trash2, Settings, List, Sparkles, Copy, Check, Layout } from 'lucide-react';
+import s from './SchedulePage.module.css';
 import { getSchedule, updateSchedule, type Schedule } from '../lib/api/schedules';
 import { getScheduleEntries, createScheduleEntry, updateScheduleEntry, deleteScheduleEntry, type ScheduleEntry } from '../lib/api/schedule-entries';
 import { getFormResponses, deleteFormResponse, updateFormResponseAssigned, getPreferredTimings, type FormResponse } from '../lib/api/form-responses';
@@ -9,398 +10,37 @@ import AddEventModal from '../components/AddEventModal';
 import Modal from '../components/Modal';
 import SchedulingPreviewModal from '../components/SchedulingPreviewModal';
 import ConfigureFormModal from '../components/ConfigureFormModal';
-import SidePanel from '../components/ScheduleSidePanel';
 import { DndContext, DragOverlay, useDraggable, useDroppable, PointerSensor, useSensor, useSensors, type DragEndEvent, type DragStartEvent } from '@dnd-kit/core';
+
 
 const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 const HOURS = Array.from({ length: 14 }, (_, i) => i + 8);
 
-const styles = {
-  container: {
-    minHeight: '100vh',
-    background: 'linear-gradient(135deg, #fff7ed 0%, #ffffff 50%, #fff7ed 100%)',
-    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto", sans-serif',
-  },
-  header: {
-    borderBottom: '1px solid #e5e7eb',
-    background: 'rgba(255, 255, 255, 0.8)',
-    backdropFilter: 'blur(4px)',
-    position: 'sticky' as const,
-    top: 0,
-    zIndex: 50,
-    boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
-  },
-  headerContent: {
-    maxWidth: '1600px',
-    margin: '0 auto',
-    padding: '0.6rem 1rem',
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    gap: '1rem',
-  },
-  backButton: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '0.25rem',
-    padding: '0.35rem 0.6rem',
-    background: 'none',
-    border: '1px solid #d1d5db',
-    borderRadius: '0.3rem',
-    cursor: 'pointer',
-    fontSize: '0.8rem',
-    color: '#374151',
-    transition: 'all 0.2s',
-  },
-  title: {
-    fontSize: '1.1rem',
-    fontWeight: '600',
-    color: '#111827',
-    margin: 0,
-    display: 'flex',
-    alignItems: 'center',
-    gap: '0.5rem',
-  },
-  subtitle: {
-    fontSize: '0.7rem',
-    color: '#6b7280',
-    margin: '0.25rem 0 0 0',
-  },
-  main: {
-    maxWidth: '1600px',
-    margin: '0 auto',
-    padding: '0.6rem',
-    display: 'grid',
-    gridTemplateColumns: 'minmax(0, 1fr) 280px',
-    gap: '0.85rem',
-  },
-  mainMobile: {
-    gridTemplateColumns: '1fr',
-  },
-  timetableContainer: {
-    backgroundColor: 'white',
-    borderRadius: '0.5rem',
-    boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
-    border: '1px solid #e5e7eb',
-    overflow: 'auto',
-    WebkitOverflowScrolling: 'touch' as const,
-  },
-  timetableHeader: {
-    display: 'grid',
-    gridTemplateColumns: '55px repeat(7, 1fr)',
-    minWidth: '700px',
-    borderBottom: '2px solid #f97316',
-    backgroundColor: '#fff7ed',
-  },
-  dayHeader: {
-    padding: '0.35rem 0.5rem',
-    textAlign: 'center' as const,
-    fontWeight: '600',
-    fontSize: '0.7rem',
-    color: '#c2410c',
-    borderRight: '1px solid #fed7aa',
-    backgroundColor: '#ffedd5',
-    display: 'flex',
-    flexDirection: 'column' as const,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: '0.15rem',
-  },
-  dayHeaderDate: {
-    fontSize: '0.8rem',
-    color: '#92400e',
-  },
-  timeLabel: {
-    width: '55px',
-    padding: '0.25rem 0.25rem',
-    fontSize: '0.7rem',
-    color: '#6b7280',
-    textAlign: 'right' as const,
-    borderRight: '1px solid #e5e7eb',
-    borderBottom: '1px solid #f3f4f6',
-    fontWeight: '500',
-  },
-  timetableGrid: {
-    display: 'grid',
-    gridTemplateColumns: '55px repeat(7, 1fr)',
-    minWidth: '700px',
-  },
-  timeSlot: {
-    height: '40px',
-    borderRight: '1px solid #fed7aa',
-    borderBottom: '1px solid #ffedd5',
-    position: 'relative' as const,
-    backgroundColor: 'white',
-    transition: 'background-color 0.2s',
-  },
-  sidePanel: {
-    display: 'flex',
-    flexDirection: 'column' as const,
-    gap: '1.5rem',
-  },
-  panel: {
-    backgroundColor: 'white',
-    borderRadius: '0.5rem',
-    boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
-    border: '1px solid #e5e7eb',
-    padding: '0.85rem',
-  },
-  panelTitle: {
-    fontSize: '0.8rem',
-    fontWeight: '600',
-    color: '#111827',
-    margin: '0 0 0.6rem 0',
-    display: 'flex',
-    alignItems: 'center',
-    gap: '0.5rem',
-  },
-  emptyState: {
-    textAlign: 'center' as const,
-    padding: '0.6rem',
-    color: '#6b7280',
-    fontSize: '0.7rem',
-  },
-  lessonBlock: {
-    position: 'absolute' as const,
-    top: 0,
-    left: '2px',
-    right: '2px',
-    backgroundColor: '#f97316',
-    color: 'white',
-    borderRadius: '0.25rem',
-    padding: '0.25rem 0.5rem',
-    fontSize: '0.625rem',
-    fontWeight: '600',
-    cursor: 'pointer',
-    boxShadow: '0 1px 3px rgba(0, 0, 0, 0.2)',
-    transition: 'all 0.2s',
-    display: 'flex',
-    flexDirection: 'column' as const,
-    justifyContent: 'center',
-    alignItems: 'center',
-    textAlign: 'center' as const,
-  },
-  statusBadge: {
-    display: 'inline-flex',
-    alignItems: 'center',
-    gap: '0.375rem',
-    padding: '0.375rem 0.625rem',
-    borderRadius: '9999px',
-    fontSize: '0.8125rem',
-    fontWeight: '500',
-    border: '1px solid',
-  },
-  panelActionButton: {
-    padding: '0.5rem 0.75rem',
-    borderRadius: '0.375rem',
-    fontSize: '0.8125rem',
-    fontWeight: '500',
-    cursor: 'pointer',
-    display: 'flex',
-    alignItems: 'center',
-    gap: '0.375rem',
-    border: '1px solid #e5e7eb',
-    backgroundColor: 'white',
-    color: '#6b7280',
-    transition: 'all 0.2s',
-  },
-  unassignedPanel: {
-    backgroundColor: 'white',
-    borderRadius: '0.5rem',
-    boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
-    border: '1px solid #e5e7eb',
-    padding: '0.85rem',
-    display: 'flex',
-    flexDirection: 'column' as const,
-  },
-  unassignedPanelHeader: {
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: '0.75rem',
-    marginBottom: '0.5rem',
-    flexWrap: 'wrap' as const,
-    flexShrink: 0 as const,
-  },
-  unassignedPanelTitle: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '0.5rem',
-  },
-  unassignedPanelTitleText: {
-    fontSize: '0.8rem',
-    fontWeight: '600',
-    color: '#111827',
-    margin: 0,
-  },
-  unassignedBadge: {
-    backgroundColor: '#f97316',
-    color: 'white',
-    padding: '0.2rem 0.45rem',
-    borderRadius: '9999px',
-    fontSize: '0.7rem',
-    fontWeight: '600',
-    cursor: 'pointer',
-    transition: 'all 0.2s',
-  },
-  unassignedBadgeHover: {
-    backgroundColor: '#ea580c',
-  },
-  scheduleButton: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '0.25rem',
-    padding: '0.3rem 0.6rem',
-    backgroundColor: '#22c55e',
-    color: 'white',
-    border: 'none',
-    borderRadius: '0.375rem',
-    fontSize: '0.7rem',
-    fontWeight: '600',
-    cursor: 'pointer',
-    boxShadow: '0 1px 3px rgba(34, 197, 94, 0.3)',
-    transition: 'all 0.2s ease',
-    whiteSpace: 'nowrap' as const,
-  },
-  scheduleButtonDisabled: {
-    backgroundColor: '#9ca3af',
-    cursor: 'not-allowed',
-    boxShadow: 'none',
-  },
-  scheduleButtonHover: {
-    backgroundColor: '#16a34a',
-  },
-  unassignedCardList: {
-    display: 'flex',
-    flexDirection: 'column' as const,
-    gap: '0.5rem',
-    overflowY: 'auto' as const,
-    maxHeight: '160px',
-  },
-  unassignedCardListScrollbar: {
-    '&::-webkit-scrollbar': {
-      width: '4px',
-    },
-    '&::-webkit-scrollbar-track': {
-      background: '#f1f1f1',
-      borderRadius: '2px',
-    },
-    '&::-webkit-scrollbar-thumb': {
-      background: '#d1d5db',
-      borderRadius: '2px',
-    },
-  },
-  unassignedCard: {
-    padding: '0.6rem 0.75rem',
-    backgroundColor: '#fef3c7',
-    borderRadius: '0.5rem',
-    border: '1px solid #fde68a',
-    fontSize: '0.875rem',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    cursor: 'grab',
-    transition: 'all 0.2s',
-  },
-  unassignedCardHover: {
-    backgroundColor: '#fde68a',
-    borderColor: '#f59e0b',
-  },
-  unassignedCardDragging: {
-    backgroundColor: '#fbbf24',
-    borderColor: '#f59e0b',
-    opacity: 0.5,
-  },
-  unassignedCardName: {
-    fontWeight: '600',
-    color: '#92400e',
-  },
-  unassignedCardPreferred: {
-    fontSize: '0.75rem',
-    color: '#a16207',
-    marginTop: '0.125rem',
-  },
-  unassignedCardActions: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '0.5rem',
-  },
-  unassignedCardIcon: {
-    color: '#9ca3af',
-    cursor: 'pointer',
-    transition: 'color 0.2s',
-  },
-  unassignedCardIconHover: {
-    color: '#dc2626',
-  },
-  detailModalCard: {
-    backgroundColor: '#fffbeb',
-    borderRadius: '0.5rem',
-    border: '1px solid #fde68a',
-    overflow: 'hidden',
-  },
-  detailModalCardHeader: {
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: '0.75rem 1rem',
-    backgroundColor: '#fef3c7',
-    borderBottom: '1px solid #fde68a',
-    cursor: 'pointer',
-  },
-  detailModalCardHeaderExpanded: {
-    borderBottom: '1px solid #fde68a',
-  },
-  detailModalCardName: {
-    fontWeight: '600',
-    color: '#92400e',
-    fontSize: '0.9375rem',
-  },
-  detailModalCardActions: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '0.5rem',
-  },
-  detailModalCardBody: {
-    padding: '1rem',
-  },
-  detailModalField: {
-    display: 'flex',
-    flexDirection: 'column' as const,
-    gap: '0.25rem',
-    marginBottom: '0.75rem',
-  },
-  detailModalFieldLabel: {
-    fontSize: '0.75rem',
-    fontWeight: '600',
-    color: '#a16207',
-    textTransform: 'uppercase' as const,
-    letterSpacing: '0.025em',
-  },
-  detailModalFieldValue: {
-    fontSize: '0.875rem',
-    color: '#111827',
-  },
-  detailModalPreferenceCard: {
-    backgroundColor: 'white',
-    borderRadius: '0.375rem',
-    border: '1px solid #e5e7eb',
-    padding: '0.625rem 0.75rem',
-    marginTop: '0.5rem',
-  },
-  detailModalPreferenceLabel: {
-    fontSize: '0.7rem',
-    fontWeight: '600',
-    color: '#f97316',
-    marginBottom: '0.25rem',
-  },
-  detailModalPreferenceValue: {
-    fontSize: '0.8125rem',
-    color: '#374151',
-  },
-};
+function TrashZone() {
+  const { setNodeRef, isOver } = useDroppable({
+    id: 'trash',
+  });
 
-
+  return (
+    <div
+      ref={setNodeRef}
+      style={{
+        border: `2px dashed ${isOver ? '#ef4444' : '#d1d5db'}`,
+        padding: '1.5rem',
+        textAlign: 'center',
+        backgroundColor: isOver ? '#fee2e2' : '#f9fafb',
+        borderRadius: 'var(--radius-full)',
+        color: isOver ? '#991b1b' : '#6b7280',
+        width: '100%',
+        maxWidth: '400px',
+        fontWeight: 600,
+        fontSize: '0.875rem'
+      }}
+    >
+      {isOver ? 'Drop here to delete' : 'Drag here to delete'}
+    </div>
+  );
+}
 
 export default function SchedulePage() {
   const sensors = useSensors(
@@ -420,6 +60,8 @@ export default function SchedulePage() {
   const [error, setError] = useState<string | null>(null);
   const [showAddModal, setShowAddModal] = useState(false);
   const [selectedSlot, setSelectedSlot] = useState<{ day: string; hour: number } | null>(null);
+  const [isEventsOpen, setIsEventsOpen] = useState(false);
+  const [isInfoOpen, setIsInfoOpen] = useState(false);
   const [selectedEntry, setSelectedEntry] = useState<ScheduleEntry | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [activeDragId, setActiveDragId] = useState<string | null>(null);
@@ -429,25 +71,12 @@ export default function SchedulePage() {
   const [entryToDelete, setEntryToDelete] = useState<ScheduleEntry | null>(null);
 
   const [showSchedulingPreview, setShowSchedulingPreview] = useState(false);
-
   const [responseToView, setResponseToView] = useState<FormResponse | null>(null);
-  const [expandedResponseIds, setExpandedResponseIds] = useState<Set<string>>(new Set());
 
-  const [showUnassignedModal, setShowUnassignedModal] = useState(false);
 
   const [showConfigureFormModal, setShowConfigureFormModal] = useState(false);
   const [showTrashConfirm, setShowTrashConfirm] = useState(false);
-  const [isMobile, setIsMobile] = useState(false);
-
-  const [isEditingName, setIsEditingName] = useState(false);
-  const [editingName, setEditingName] = useState('');
-  const [isEditingDates, setIsEditingDates] = useState(false);
-  const [editingStartDate, setEditingStartDate] = useState('');
-  const [editingEndDate, setEditingEndDate] = useState('');
-  const [dateError, setDateError] = useState<string | null>(null);
-  const nameInputRef = useRef<HTMLInputElement>(null);
-  const startDateInputRef = useRef<HTMLInputElement>(null);
-  const endDateInputRef = useRef<HTMLInputElement>(null);
+  const [isCopied, setIsCopied] = useState(false);
 
   const isArchived = schedule?.status === 'archived';
   const isTrashed = schedule?.status === 'trashed';
@@ -459,26 +88,6 @@ export default function SchedulePage() {
     }
   }, [scheduleId]);
 
-  // Listen for schedule changes from FloatingChat
-  useEffect(() => {
-    const handleScheduleChange = () => {
-      console.log('[SchedulePage] Schedule change event received, reloading data...');
-      loadScheduleData();
-    };
-
-    window.addEventListener('aria-schedule-change', handleScheduleChange);
-    return () => window.removeEventListener('aria-schedule-change', handleScheduleChange);
-  }, [scheduleId]);
-
-  // Detect mobile viewport
-  useEffect(() => {
-    const checkMobile = () => {
-      setIsMobile(window.innerWidth < 1024); // Use 1024 as breakpoint for side panel stacking
-    };
-    checkMobile();
-    window.addEventListener('resize', checkMobile);
-    return () => window.removeEventListener('resize', checkMobile);
-  }, []);
 
   // Helper to parse YYYY-MM-DD in local timezone (not UTC)
   const parseLocalDate = (dateStr: string): Date => {
@@ -567,7 +176,8 @@ export default function SchedulePage() {
     const entryStart = new Date(entry.start_time);
     const rule = parseRecurrenceRule(entry.recurrence_rule);
 
-    if (!rule || !rule.dayIndex) {
+    // Use == null to check for null/undefined, not falsy (0 is a valid dayIndex for Sunday)
+    if (!rule || rule.dayIndex == null) {
       return entryStart >= weekStart && entryStart <= weekEnd;
     }
 
@@ -623,107 +233,6 @@ export default function SchedulePage() {
     setCurrentWeekOffset(prev => Math.min(totalWeeks - 1, prev + 1));
   };
 
-  const handleNameClick = () => {
-    if (!schedule) return;
-    setIsEditingName(true);
-    setEditingName(schedule.label);
-    setTimeout(() => nameInputRef.current?.focus(), 50);
-  };
-
-  const handleNameBlur = async () => {
-    setIsEditingName(false);
-    if (!schedule) return;
-
-    const trimmedName = editingName.trim();
-    if (trimmedName && trimmedName !== schedule.label) {
-      try {
-        await updateSchedule(schedule.id, { label: trimmedName });
-        setSchedule({ ...schedule, label: trimmedName });
-      } catch (err) {
-        console.error('Failed to rename schedule:', err);
-        setEditingName(schedule.label);
-      }
-    } else {
-      setEditingName(schedule.label);
-    }
-  };
-
-  const handleNameKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter') {
-      handleNameBlur();
-    } else if (e.key === 'Escape') {
-      setIsEditingName(false);
-      setEditingName(schedule?.label || '');
-    }
-  };
-
-  const handleDatesClick = () => {
-    if (!schedule) return;
-    setIsEditingDates(true);
-    setEditingStartDate(schedule.start_date);
-    setEditingEndDate(schedule.end_date);
-    setDateError(null);
-    setTimeout(() => startDateInputRef.current?.focus(), 50);
-  };
-
-  const handleStartDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setEditingStartDate(e.target.value);
-    setDateError(null);
-    if (editingEndDate && e.target.value > editingEndDate) {
-      setDateError('End date must be after start date');
-    }
-  };
-
-  const handleEndDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setEditingEndDate(e.target.value);
-    setDateError(null);
-    if (editingStartDate && e.target.value < editingStartDate) {
-      setDateError('End date must be after start date');
-    }
-  };
-
-  const handleDatesBlur = async () => {
-    if (!schedule) return;
-
-    if (dateError) {
-      setIsEditingDates(false);
-      setEditingStartDate(schedule.start_date);
-      setEditingEndDate(schedule.end_date);
-      setDateError(null);
-      return;
-    }
-
-    if (editingStartDate && editingEndDate &&
-      (editingStartDate !== schedule.start_date || editingEndDate !== schedule.end_date)) {
-      try {
-        await updateSchedule(schedule.id, {
-          start_date: editingStartDate,
-          end_date: editingEndDate
-        });
-        setSchedule({
-          ...schedule,
-          start_date: editingStartDate,
-          end_date: editingEndDate
-        });
-      } catch (err) {
-        console.error('Failed to update dates:', err);
-        setEditingStartDate(schedule.start_date);
-        setEditingEndDate(schedule.end_date);
-      }
-    }
-
-    setIsEditingDates(false);
-    setDateError(null);
-  };
-
-  const handleDatesKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter') {
-      handleDatesBlur();
-    } else if (e.key === 'Escape') {
-      setIsEditingDates(false);
-      setDateError(null);
-    }
-  };
 
   const loadScheduleData = async () => {
     if (!scheduleId) return;
@@ -776,17 +285,21 @@ export default function SchedulePage() {
     return labels[freq] || freq;
   };
 
-  const toggleResponseExpanded = (responseId: string) => {
-    setExpandedResponseIds(prev => {
-      const newSet = new Set(prev);
-      if (newSet.has(responseId)) {
-        newSet.delete(responseId);
-      } else {
-        newSet.add(responseId);
-      }
-      return newSet;
-    });
+  const getStatusLabel = (status: string) => {
+    if (status === 'draft') return 'Draft';
+    if (status === 'collecting') return 'Active (Collecting)';
+    if (status === 'archived') return 'Archived';
+    return status.charAt(0).toUpperCase() + status.slice(1);
   };
+
+  const handleCopyLink = () => {
+    if (!schedule) return;
+    const link = `${window.location.origin}/form/${schedule.id}`;
+    navigator.clipboard.writeText(link);
+    setIsCopied(true);
+    setTimeout(() => setIsCopied(false), 2000);
+  };
+
 
   const handleSlotClick = (day: string, hour: number) => {
     if (isViewOnly) return;
@@ -1190,7 +703,6 @@ export default function SchedulePage() {
     const height = (durationMinutes / 60) * 40;
 
     return {
-      ...styles.lessonBlock,
       top: `${topOffset}px`,
       height: `${height}px`,
     };
@@ -1208,6 +720,7 @@ export default function SchedulePage() {
     return (
       <div
         ref={setNodeRef}
+        className={s.lessonBlock}
         style={{
           ...getLessonBlockStyle(entry),
           opacity: isBeingDragged ? 0 : 1,
@@ -1239,8 +752,8 @@ export default function SchedulePage() {
     return (
       <div
         ref={setSlotRef}
+        className={s.timeSlot}
         style={{
-          ...styles.timeSlot,
           backgroundColor: isOver ? '#ffedd5' : 'white',
           cursor: isViewOnly ? 'default' : 'pointer',
         }}
@@ -1257,7 +770,7 @@ export default function SchedulePage() {
 
   if (loading) {
     return (
-      <div style={{ ...styles.container, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <div className={s.container} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
         <div style={{ color: '#6b7280', fontSize: '1.125rem' }}>Loading schedule...</div>
       </div>
     );
@@ -1265,13 +778,14 @@ export default function SchedulePage() {
 
   if (!schedule) {
     return (
-      <div style={{ ...styles.container, display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: '1rem' }}>
+      <div className={s.container} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: '1rem' }}>
         <div style={{ color: '#991b1b', fontSize: '1.125rem' }}>
           {error || 'Schedule not found'}
         </div>
         <button
           onClick={() => navigate('/dashboard')}
-          style={{ ...styles.backButton, backgroundColor: '#f97316', color: 'white', borderColor: '#f97316' }}
+          className={s.backButton}
+          style={{ backgroundColor: '#f97316', color: 'white', borderColor: '#f97316' }}
         >
           <ArrowLeft size={18} />
           Back to Dashboard
@@ -1281,7 +795,7 @@ export default function SchedulePage() {
   }
 
   return (
-    <div style={styles.container}>
+    <div className={s.container}>
       <DndContext
         sensors={sensors}
         onDragStart={handleDragStart}
@@ -1293,155 +807,214 @@ export default function SchedulePage() {
         }}
         autoScroll={false}
       >
-        <header style={styles.header}>
-          <div style={styles.headerContent}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
-              <button
-                onClick={() => navigate('/dashboard')}
-                style={styles.backButton}
-              >
+        {/* New Toolbar Redesign */}
+        <header className={s.toolbar}>
+          <div className={s.toolbarContent}>
+            {/* Left: Back & Title */}
+            <div className={s.leftSection}>
+              <button onClick={() => navigate('/dashboard')} className={s.backButton}>
                 <ArrowLeft size={18} />
-                Back
               </button>
+              <div className={s.titleArea}>
+                <h1 className={s.title}>{schedule.label}</h1>
+                <div className={s.subtitle}>
+                  {formatLocalDate(parseLocalDate(schedule.start_date))} – {formatLocalDate(parseLocalDate(schedule.end_date))}
+                </div>
+              </div>
+            </div>
 
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.15rem' }}>
-                {isEditingName ? (
-                  <input
-                    ref={nameInputRef}
-                    type="text"
-                    value={editingName}
-                    onChange={(e) => setEditingName(e.target.value)}
-                    onBlur={handleNameBlur}
-                    onKeyDown={handleNameKeyDown}
-                    style={{
-                      fontSize: '1.1rem',
-                      fontWeight: '600',
-                      color: '#111827',
-                      padding: '0.25rem 0.5rem',
-                      border: '1px solid #f97316',
-                      borderRadius: '0.375rem',
-                      outline: 'none',
-                      maxWidth: '200px',
-                    }}
-                  />
-                ) : (
-                  <h1
-                    style={{ ...styles.title, cursor: 'pointer', margin: 0 }}
-                    onClick={handleNameClick}
+            {/* Center: Week Navigation */}
+            <div className={s.centerSection}>
+              <button
+                onClick={goToPreviousWeek}
+                className={s.backButton}
+                disabled={currentWeekOffset === 0}
+                style={{ opacity: currentWeekOffset === 0 ? 0.4 : 1 }}
+              >
+                <ChevronLeft size={20} />
+              </button>
+              <div style={{ fontSize: '0.875rem', fontWeight: 600, minWidth: '160px', textAlign: 'center' }}>
+                Week {weekNumber} of {totalWeeks}
+              </div>
+              <button
+                onClick={goToNextWeek}
+                className={s.backButton}
+                disabled={currentWeekOffset >= totalWeeks - 1}
+                style={{ opacity: currentWeekOffset >= totalWeeks - 1 ? 0.4 : 1 }}
+              >
+                <ChevronRight size={20} />
+              </button>
+            </div>
+
+            {/* Right: Actions & Dropdowns */}
+            <div className={s.rightSection}>
+              {/* Events Dropdown Trigger */}
+              <div style={{ position: 'relative' }}>
+                <button
+                  className={s.toolbarButton}
+                  onClick={() => { setIsEventsOpen(!isEventsOpen); setIsInfoOpen(false); }}
+                >
+                  <List size={16} />
+                  <span>Events</span>
+                  {getUnassignedStudents().length > 0 && (
+                    <div className={s.badge}>{getUnassignedStudents().length}</div>
+                  )}
+                </button>
+
+                {isEventsOpen && (
+                  <>
+                    <div className={s.popoverOverlay} onClick={() => setIsEventsOpen(false)} />
+                    <div className={s.popover}>
+                      <div className={s.popoverHeader}>
+                        <h3 className={s.popoverTitle}>Unassigned Events</h3>
+                        <button
+                          onClick={() => getUnassignedStudents().length > 0 && setShowSchedulingPreview(true)}
+                          disabled={getUnassignedStudents().length === 0}
+                          className={s.activateButton}
+                          style={{ padding: '4px 10px', fontSize: '0.75rem' }}
+                        >
+                          <Sparkles size={12} />
+                          Schedule All
+                        </button>
+                      </div>
+                      <div className={s.popoverContent}>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                          {getUnassignedStudents().map((response) => (
+                            <div
+                              key={response.id}
+                              className={s.unassignedCard}
+                              onClick={() => setResponseToView(response)}
+                            >
+                              <div className={s.unassignedCardName}>{response.student_name}</div>
+                              <Trash2
+                                size={14}
+                                className={s.unassignedCardIcon}
+                                onClick={(e) => { e.stopPropagation(); setParticipantToDelete(response); }}
+                              />
+                            </div>
+                          ))}
+                          {getUnassignedStudents().length === 0 && (
+                            <div className={s.emptyState}>No unassigned events</div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </>
+                )}
+              </div>
+
+              {/* Info Dropdown Trigger */}
+              <div style={{ position: 'relative' }}>
+                <button
+                  className={s.toolbarButton}
+                  onClick={() => { setIsInfoOpen(!isInfoOpen); setIsEventsOpen(false); }}
+                >
+                  <Settings size={16} />
+                  <span>Settings</span>
+                </button>
+
+                {isInfoOpen && (
+                  <>
+                    <div className={s.popoverOverlay} onClick={() => setIsInfoOpen(false)} />
+                    <div className={s.popover}>
+                      <div className={s.popoverHeader}>
+                        <h3 className={s.popoverTitle}>Schedule Settings</h3>
+                      </div>
+                      <div className={s.popoverContent}>
+                        <div style={{ fontSize: '0.875rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                          <div>
+                            <span style={{ color: 'var(--text-500)', display: 'block', marginBottom: '0.25rem' }}>Status</span>
+                            <span style={{ fontWeight: 600 }}>{getStatusLabel(schedule.status)}</span>
+                          </div>
+
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.625rem', borderTop: '1px solid var(--border-divider)', paddingTop: '1rem' }}>
+                            {schedule.status !== 'draft' && !isViewOnly && (
+                              <button
+                                onClick={() => { setShowConfigureFormModal(true); setIsInfoOpen(false); }}
+                                className={s.toolbarButton}
+                                style={{ width: '100%', justifyContent: 'flex-start' }}
+                              >
+                                <Settings size={14} />
+                                <span>Edit Form Configuration</span>
+                              </button>
+                            )}
+
+                            {schedule.status === 'collecting' && !isViewOnly && (
+                              <button
+                                onClick={handleArchive}
+                                className={s.toolbarButton}
+                                style={{ width: '100%', justifyContent: 'flex-start' }}
+                              >
+                                <Layout size={14} />
+                                <span>Archive Schedule</span>
+                              </button>
+                            )}
+
+                            <button
+                              onClick={() => setShowTrashConfirm(true)}
+                              className={s.toolbarButton}
+                              style={{ width: '100%', justifyContent: 'flex-start', color: 'var(--brand-error)', borderColor: 'rgba(220, 38, 38, 0.1)' }}
+                            >
+                              <Trash2 size={14} />
+                              <span>Move to Trash</span>
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </>
+                )}
+              </div>
+
+              {/* Form Link & Actions */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                {schedule.status === 'collecting' && !isViewOnly && (
+                  <button
+                    className={`${s.toolbarButton} ${isCopied ? s.successButton : ''}`}
+                    onClick={handleCopyLink}
+                    style={{ borderColor: 'var(--brand-primary)', color: 'var(--brand-primary)' }}
                   >
-                    {schedule.label}
-                  </h1>
+                    <div className={s.pulse} />
+                    <span>{isCopied ? 'Copied!' : 'Copy Form Link'}</span>
+                    {isCopied ? <Check size={14} /> : <Copy size={14} />}
+                  </button>
                 )}
 
-                <span style={{ color: '#6b7280', fontSize: '0.8rem' }}>
-                  {isEditingDates ? (
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                      <input
-                        ref={startDateInputRef}
-                        type="date"
-                        value={editingStartDate}
-                        onChange={handleStartDateChange}
-                        onBlur={handleDatesBlur}
-                        onKeyDown={handleDatesKeyDown}
-                        style={{
-                          fontSize: '0.75rem',
-                          padding: '0.15rem 0.35rem',
-                          border: dateError ? '1px solid #dc2626' : '1px solid #d1d5db',
-                          borderRadius: '0.375rem',
-                          outline: 'none',
-                        }}
-                      />
-                      <span style={{ color: '#9ca3af' }}>-</span>
-                      <input
-                        ref={endDateInputRef}
-                        type="date"
-                        value={editingEndDate}
-                        onChange={handleEndDateChange}
-                        onBlur={handleDatesBlur}
-                        onKeyDown={handleDatesKeyDown}
-                        style={{
-                          fontSize: '0.75rem',
-                          padding: '0.15rem 0.35rem',
-                          border: dateError ? '1px solid #dc2626' : '1px solid #d1d5db',
-                          borderRadius: '0.375rem',
-                          outline: 'none',
-                        }}
-                      />
-                      {dateError && (
-                        <span style={{ color: '#dc2626', fontSize: '0.7rem' }}>{dateError}</span>
-                      )}
-                    </div>
-                  ) : (
-                    <span
-                      style={{ cursor: 'pointer' }}
-                      onClick={handleDatesClick}
-                    >
-                      {formatLocalDate(parseLocalDate(schedule.start_date))} - {formatLocalDate(parseLocalDate(schedule.end_date))}
-                    </span>
-                  )}
-                </span>
+                {schedule.status === 'draft' && !isViewOnly && (
+                  <button
+                    onClick={() => setShowConfigureFormModal(true)}
+                    className={s.activateButton}
+                  >
+                    <Sparkles size={16} />
+                    <span>Configure & Activate</span>
+                  </button>
+                )}
               </div>
             </div>
-
-            <div style={{
-              display: 'flex',
-              flexDirection: 'column' as const,
-              alignItems: 'center',
-              flex: 1,
-            }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                <button
-                  onClick={goToPreviousWeek}
-                  disabled={currentWeekOffset === 0}
-                  style={{ ...styles.backButton, opacity: currentWeekOffset === 0 ? 0.5 : 1 }}
-                >
-                  <ChevronLeft size={20} />
-                </button>
-
-                <div style={{ textAlign: 'center' }}>
-                  <p style={{ fontSize: '1.1rem', fontWeight: '600', color: '#111827', margin: 0 }}>
-                    {weekStart && weekEnd ? `${formatLocalDate(weekStart)} - ${formatLocalDate(weekEnd)}` : ''}
-                  </p>
-                </div>
-
-                <button
-                  onClick={goToNextWeek}
-                  disabled={currentWeekOffset >= totalWeeks - 1}
-                  style={{ ...styles.backButton, opacity: currentWeekOffset >= totalWeeks - 1 ? 0.5 : 1 }}
-                >
-                  <ChevronRight size={20} />
-                </button>
-              </div>
-
-              <span style={{ marginTop: '0.35rem', fontSize: '0.85rem', fontWeight: '500', color: '#f97316' }}>
-                Week {weekNumber} of {totalWeeks}
-              </span>
-            </div>
-
-            <div style={{ width: '100px' }}></div>
           </div>
         </header>
 
-        <main style={{ ...styles.main, ...(isMobile ? styles.mainMobile : {}) }}>
-          <div style={styles.timetableContainer}>
-            <div style={styles.timetableHeader}>
-              <div style={styles.dayHeader}></div>
+        {/* Main Content Area */}
+        <main className={s.main}>
+          <div className={s.timetableContainer}>
+            <div className={s.timetableHeader}>
+              <div className={s.dayHeader}></div>
               {DAYS.map((day, index) => {
                 const date = weekStart ? new Date(weekStart) : null;
                 if (date) date.setDate(date.getDate() + index);
                 const dateStr = date ? date.getDate() : '';
                 return (
-                  <div key={day} style={styles.dayHeader}>
+                  <div key={day} className={s.dayHeader}>
                     <span>{day}</span>
-                    <span style={styles.dayHeaderDate}>{dateStr}</span>
+                    <span className={s.dayHeaderDate}>{dateStr}</span>
                   </div>
                 );
               })}
             </div>
 
             {HOURS.map((hour) => (
-              <div key={hour} style={styles.timetableGrid}>
-                <div style={styles.timeLabel}>
+              <div key={hour} className={s.timetableGrid}>
+                <div className={s.timeLabel}>
                   {hour === 12 ? '12 PM' : hour > 12 ? `${hour - 12} PM` : `${hour} AM`}
                 </div>
                 {DAYS.map((day) => {
@@ -1465,26 +1038,19 @@ export default function SchedulePage() {
               </div>
             ))}
           </div>
-
-          <SidePanel
-            schedule={schedule}
-            scheduleId={scheduleId!}
-            isViewOnly={isViewOnly}
-            totalWeeks={totalWeeks}
-            responses={responses}
-            unassignedStudents={getUnassignedStudents()}
-            onShowConfigure={() => setShowConfigureFormModal(true)}
-            onArchive={handleArchive}
-            onTrash={() => setShowTrashConfirm(true)}
-            onShowUnassignedModal={() => setShowUnassignedModal(true)}
-            onShowSchedulingPreview={() => setShowSchedulingPreview(true)}
-            onResponseClick={setResponseToView}
-            onDeleteResponse={(response) => setParticipantToDelete(response)}
-            showTrashConfirm={showTrashConfirm}
-            onCloseTrashConfirm={() => setShowTrashConfirm(false)}
-            onConfirmTrash={handleTrashWithRedirect}
-          />
         </main>
+
+        {/* Mobile FAB or other persistent overlays can go here */}
+
+        {/* Contextual Trash Zone */}
+        {isDragging && (
+          <div
+            className={`${s.trashZone} ${activeDragId === 'trash' ? s.trashZoneActive : ''}`}
+          // Using a simple data attribute or specific ID for dnd-kit drop target
+          >
+            <TrashZone />
+          </div>
+        )}
 
         <AddEventModal
           isOpen={showAddModal}
@@ -1652,7 +1218,7 @@ export default function SchedulePage() {
         >
           {responseToView && (
             <div style={{ padding: '0.25rem 0' }}>
-              <div style={styles.detailModalCard}>
+              <div className={s.detailModalCard}>
                 <div style={{ padding: '1rem', backgroundColor: '#fef3c7', borderBottom: '1px solid #fde68a' }}>
                   <div style={{ fontWeight: '600', fontSize: '1.125rem', color: '#92400e' }}>{responseToView.student_name}</div>
                   {responseToView.email && (
@@ -1661,11 +1227,11 @@ export default function SchedulePage() {
                 </div>
                 <div style={{ padding: '1rem' }}>
                   {getPreferredTimings(responseToView).map((timing, index) => (
-                    <div key={index} style={styles.detailModalPreferenceCard}>
-                      <div style={styles.detailModalPreferenceLabel}>
+                    <div key={index} className={s.detailModalPreferenceCard}>
+                      <div className={s.detailModalPreferenceLabel}>
                         {index === 0 ? '1st Choice' : index === 1 ? '2nd Choice' : '3rd Choice'}
                       </div>
-                      <div style={styles.detailModalPreferenceValue}>
+                      <div className={s.detailModalPreferenceValue}>
                         {timing.day} {formatTime(timing.start)} - {formatTime(timing.end)}
                         {timing.duration && ` (${timing.duration} min)`}
                         <br />
@@ -1696,97 +1262,31 @@ export default function SchedulePage() {
           )}
         </Modal>
 
-        <Modal
-          isOpen={showUnassignedModal}
-          onClose={() => setShowUnassignedModal(false)}
-          title="Unassigned Events"
-          maxWidth="40rem"
-        >
-          <div style={{ maxHeight: '60vh', overflowY: 'auto' }}>
-            {getUnassignedStudents().length === 0 ? (
-              <div style={{ textAlign: 'center', padding: '2rem', color: '#6b7280' }}>
-                No unassigned events
-              </div>
-            ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                {getUnassignedStudents().map((response) => {
-                  const isExpanded = expandedResponseIds.has(response.id);
-                  const timings = getPreferredTimings(response);
 
-                  return (
-                    <div key={response.id} style={styles.detailModalCard}>
-                      <div
-                        style={styles.detailModalCardHeader}
-                        onClick={() => toggleResponseExpanded(response.id)}
-                      >
-                        <div>
-                          <div style={styles.detailModalCardName}>{response.student_name}</div>
-                          {timings[0] && (
-                            <div style={{ fontSize: '0.8125rem', color: '#a16207', marginTop: '0.125rem' }}>
-                              {timings[0].day} {formatTime(timings[0].start)} - {formatTime(timings[0].end)}
-                              {timings[0].duration && ` (${timings[0].duration} min)`}
-                            </div>
-                          )}
-                        </div>
-                        <div style={styles.detailModalCardActions}>
-                          {isExpanded ? (
-                            <span style={{ fontSize: '0.875rem', color: '#f97316', fontWeight: '500' }}>Hide</span>
-                          ) : (
-                            <span style={{ fontSize: '0.875rem', color: '#f97316', fontWeight: '500' }}>Show</span>
-                          )}
-                          <Trash2
-                            size={16}
-                            style={{ color: '#9ca3af', cursor: 'pointer' }}
-                            onClick={(e: React.MouseEvent) => {
-                              e.stopPropagation();
-                              setShowUnassignedModal(false);
-                              setParticipantToDelete(response);
-                            }}
-                            onMouseEnter={(e: React.MouseEvent) => { (e.target as HTMLElement).style.color = '#dc2626'; }}
-                            onMouseLeave={(e: React.MouseEvent) => { (e.target as HTMLElement).style.color = '#9ca3af'; }}
-                          />
-                        </div>
-                      </div>
-                      {isExpanded && (
-                        <div style={styles.detailModalCardBody}>
-                          {response.email && (
-                            <div style={styles.detailModalField}>
-                              <span style={styles.detailModalFieldLabel}>Email</span>
-                              <span style={styles.detailModalFieldValue}>{response.email}</span>
-                            </div>
-                          )}
-                          <div style={styles.detailModalField}>
-                            <span style={styles.detailModalFieldLabel}>Preferences</span>
-                            {timings.map((timing, index) => (
-                              <div key={index} style={styles.detailModalPreferenceCard}>
-                                <div style={styles.detailModalPreferenceLabel}>
-                                  {index === 0 ? '1st Choice' : index === 1 ? '2nd Choice' : '3rd Choice'}
-                                </div>
-                                <div style={styles.detailModalPreferenceValue}>
-                                  {timing.day} {formatTime(timing.start)} - {formatTime(timing.end)}
-                                  {timing.duration && ` (${timing.duration} min)`}
-                                  <br />
-                                  <span style={{ fontSize: '0.75rem', color: '#6b7280' }}>{formatFrequency(timing.frequency)}</span>
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                          <button
-                            onClick={() => {
-                              setShowUnassignedModal(false);
-                              setResponseToView(response);
-                            }}
-                            style={{ marginTop: '1rem', width: '100%', padding: '0.625rem', backgroundColor: '#f97316', color: 'white', border: 'none', borderRadius: '0.375rem', cursor: 'pointer', fontWeight: '500' }}
-                          >
-                            View Full Details
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            )}
+        <Modal
+          isOpen={showTrashConfirm}
+          onClose={() => setShowTrashConfirm(false)}
+          title="Move Schedule to Trash"
+          maxWidth="30rem"
+        >
+          <div style={{ padding: '0.5rem 0' }}>
+            <p style={{ color: '#374151', marginBottom: '1.5rem', lineHeight: 1.5 }}>
+              Are you sure you want to move <strong>{schedule.label}</strong> to trash?
+            </p>
+            <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end' }}>
+              <button
+                onClick={() => setShowTrashConfirm(false)}
+                style={{ padding: '0.625rem 1.25rem', backgroundColor: 'white', color: '#374151', border: '1px solid #d1d5db', borderRadius: '0.5rem', fontSize: '0.875rem', fontWeight: '500', cursor: 'pointer' }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleTrashWithRedirect}
+                style={{ padding: '0.625rem 1.25rem', backgroundColor: '#dc2626', color: 'white', border: 'none', borderRadius: '0.5rem', fontSize: '0.875rem', fontWeight: '500', cursor: 'pointer' }}
+              >
+                Move to Trash
+              </button>
+            </div>
           </div>
         </Modal>
 
@@ -1816,8 +1316,8 @@ export default function SchedulePage() {
             );
           })()}
         </DragOverlay>
-      </DndContext>
-    </div>
+      </DndContext >
+    </div >
   );
 }
 
