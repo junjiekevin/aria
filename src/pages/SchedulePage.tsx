@@ -77,6 +77,13 @@ export default function SchedulePage() {
   const [showTrashConfirm, setShowTrashConfirm] = useState(false);
   const [isCopied, setIsCopied] = useState(false);
 
+  // Editable title and date range state
+  const [isEditingTitle, setIsEditingTitle] = useState(false);
+  const [editedTitle, setEditedTitle] = useState('');
+  const [isEditingDates, setIsEditingDates] = useState(false);
+  const [editedStartDate, setEditedStartDate] = useState('');
+  const [editedEndDate, setEditedEndDate] = useState('');
+
   const isArchived = schedule?.status === 'archived';
   const isTrashed = schedule?.status === 'trashed';
   const isViewOnly = isArchived || isTrashed;
@@ -309,6 +316,90 @@ export default function SchedulePage() {
     navigator.clipboard.writeText(link);
     setIsCopied(true);
     setTimeout(() => setIsCopied(false), 2000);
+  };
+
+  // Title editing handlers
+  const handleTitleClick = () => {
+    if (isViewOnly) return;
+    setEditedTitle(schedule?.label || '');
+    setIsEditingTitle(true);
+  };
+
+  const handleTitleSave = async () => {
+    if (!scheduleId || !schedule || !editedTitle.trim()) {
+      setIsEditingTitle(false);
+      return;
+    }
+    if (editedTitle.trim() === schedule.label) {
+      setIsEditingTitle(false);
+      return;
+    }
+    try {
+      await updateSchedule(scheduleId, { label: editedTitle.trim() });
+      setSchedule({ ...schedule, label: editedTitle.trim() });
+      setIsEditingTitle(false);
+    } catch (err) {
+      console.error('Failed to update title:', err);
+      alert(err instanceof Error ? err.message : 'Failed to update title');
+    }
+  };
+
+  const handleTitleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      handleTitleSave();
+    } else if (e.key === 'Escape') {
+      setIsEditingTitle(false);
+    }
+  };
+
+  // Date range editing handlers
+  const handleDatesClick = () => {
+    if (isViewOnly) return;
+    setEditedStartDate(schedule?.start_date || '');
+    setEditedEndDate(schedule?.end_date || '');
+    setIsEditingDates(true);
+  };
+
+  const handleDatesSave = async () => {
+    if (!scheduleId || !schedule || !editedStartDate || !editedEndDate) {
+      setIsEditingDates(false);
+      return;
+    }
+    if (editedStartDate === schedule.start_date && editedEndDate === schedule.end_date) {
+      setIsEditingDates(false);
+      return;
+    }
+    // Validate date range
+    if (new Date(editedStartDate) >= new Date(editedEndDate)) {
+      alert('End date must be after start date');
+      return;
+    }
+    try {
+      await updateSchedule(scheduleId, { start_date: editedStartDate, end_date: editedEndDate });
+      setSchedule({ ...schedule, start_date: editedStartDate, end_date: editedEndDate });
+      setIsEditingDates(false);
+      setCurrentWeekOffset(0); // Reset to first week after date change
+    } catch (err) {
+      console.error('Failed to update dates:', err);
+      alert(err instanceof Error ? err.message : 'Failed to update dates');
+    }
+  };
+
+  const handleDatesBlur = (e: React.FocusEvent) => {
+    // Check if focus is moving to another element within the date input row
+    const relatedTarget = e.relatedTarget as HTMLElement;
+    if (relatedTarget?.classList.contains(s.dateInput)) {
+      return; // Don't save yet, user is clicking between date inputs
+    }
+    handleDatesSave();
+  };
+
+  const handleDatesKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      handleDatesSave();
+    } else if (e.key === 'Escape') {
+      setIsEditingDates(false);
+    }
   };
 
 
@@ -844,10 +935,55 @@ export default function SchedulePage() {
                 <ArrowLeft size={18} />
               </button>
               <div className={s.titleArea}>
-                <h1 className={s.title}>{schedule.label}</h1>
-                <div className={s.subtitle}>
-                  {formatLocalDate(parseLocalDate(schedule.start_date))} – {formatLocalDate(parseLocalDate(schedule.end_date))}
-                </div>
+                {isEditingTitle ? (
+                  <input
+                    type="text"
+                    value={editedTitle}
+                    onChange={(e) => setEditedTitle(e.target.value)}
+                    onBlur={handleTitleSave}
+                    onKeyDown={handleTitleKeyDown}
+                    className={s.titleInput}
+                    autoFocus
+                  />
+                ) : (
+                  <h1
+                    className={`${s.title} ${!isViewOnly ? s.editable : ''}`}
+                    onClick={handleTitleClick}
+                    title={!isViewOnly ? 'Click to edit' : undefined}
+                  >
+                    {schedule.label}
+                  </h1>
+                )}
+                {isEditingDates ? (
+                  <div className={s.dateInputRow}>
+                    <input
+                      type="date"
+                      value={editedStartDate}
+                      onChange={(e) => setEditedStartDate(e.target.value)}
+                      onBlur={handleDatesBlur}
+                      onKeyDown={handleDatesKeyDown}
+                      className={s.dateInput}
+                      autoFocus
+                    />
+                    <span className={s.dateSeparator}>–</span>
+                    <input
+                      type="date"
+                      value={editedEndDate}
+                      onChange={(e) => setEditedEndDate(e.target.value)}
+                      onBlur={handleDatesBlur}
+                      onKeyDown={handleDatesKeyDown}
+                      className={s.dateInput}
+                    />
+                  </div>
+                ) : (
+                  <div
+                    className={`${s.subtitle} ${!isViewOnly ? s.editable : ''}`}
+                    onClick={handleDatesClick}
+                    title={!isViewOnly ? 'Click to edit' : undefined}
+                  >
+                    {formatLocalDate(parseLocalDate(schedule.start_date))} – {formatLocalDate(parseLocalDate(schedule.end_date))}
+                  </div>
+                )}
               </div>
             </div>
 
