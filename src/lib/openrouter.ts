@@ -103,6 +103,12 @@ export async function sendChatMessage(
     const assistantMessage = data.choices[0].message.content;
     console.log('[Aria Debug] Raw assistant message:', assistantMessage);
 
+    // Strip <think>...</think> reasoning tags from R1-style models (DeepSeek R1, etc.)
+    // These models output chain-of-thought reasoning that should not be shown to users
+    // or interfere with function call parsing
+    const cleanedMessage = assistantMessage.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
+    console.log('[Aria Debug] Cleaned message (think tags removed):', cleanedMessage);
+
     // Helper: Strip ALL function call syntax from message for display
     const stripFunctionCalls = (msg: string): string => {
       // Robustly truncate at the first sign of a function call to ensure clean UI
@@ -119,19 +125,19 @@ export async function sendChatMessage(
       return msg.trim();
     };
 
-    const textResponse = stripFunctionCalls(assistantMessage);
+    const textResponse = stripFunctionCalls(cleanedMessage);
 
-    // 1. Look for FUNCTION_CALL: pattern
+    // 1. Look for FUNCTION_CALL: pattern (in cleaned message, not raw)
     const functionCallMarker = 'FUNCTION_CALL:';
-    const firstCallIndex = assistantMessage.indexOf(functionCallMarker);
+    const firstCallIndex = cleanedMessage.indexOf(functionCallMarker);
 
-    // 2. Look for <tool_call> pattern
-    const toolCallMatch = assistantMessage.match(/<tool_call>\s*(\{[\s\S]*?\})\s*<\/tool_call>/);
+    // 2. Look for <tool_call> pattern (in cleaned message)
+    const toolCallMatch = cleanedMessage.match(/<tool_call>\s*(\{[\s\S]*?\})\s*<\/tool_call>/);
 
     if (firstCallIndex !== -1) {
       try {
         const start = firstCallIndex + functionCallMarker.length;
-        const potentialJson = assistantMessage.substring(start).trim();
+        const potentialJson = cleanedMessage.substring(start).trim();
 
         let jsonString = '';
         let braceCount = 0;
@@ -170,7 +176,7 @@ export async function sendChatMessage(
 
         return {
           message: textResponse || 'Processing...',
-          rawContent: assistantMessage, // Keep raw message for history
+          rawContent: cleanedMessage, // Keep cleaned message for history (think tags removed, FUNCTION_CALL preserved)
           functionCall: {
             name: functionCall.name,
             arguments: functionCall.arguments || {},
@@ -180,7 +186,7 @@ export async function sendChatMessage(
         console.error('Failed to parse function call:', parseError);
         return {
           message: textResponse || 'I encountered an issue processing that request.',
-          rawContent: assistantMessage, // Keep raw message for history
+          rawContent: cleanedMessage, // Keep cleaned message for history
           functionCall: undefined,
         };
       }
@@ -194,7 +200,7 @@ export async function sendChatMessage(
         const functionCall = JSON.parse(toolCallMatch[1]);
         return {
           message: textResponse || 'Processing...',
-          rawContent: assistantMessage, // Keep raw message for history
+          rawContent: cleanedMessage, // Keep cleaned message for history
           functionCall: {
             name: functionCall.name,
             arguments: functionCall.arguments || {},
@@ -208,7 +214,7 @@ export async function sendChatMessage(
     console.log('[Aria Debug] No function call detected, returning plain message');
     return {
       message: textResponse,
-      rawContent: assistantMessage, // Keep raw message for history
+      rawContent: cleanedMessage, // Keep cleaned message for history
       functionCall: undefined,
     };
   } catch (error) {
