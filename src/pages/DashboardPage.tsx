@@ -1,7 +1,7 @@
 // src/pages/DashboardPage.tsx
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { getAllSchedules, type Schedule, restoreSchedule, permanentDeleteAllTrashed, updateSchedule, permanentDeleteSchedule } from '../lib/api/schedules';
+import { getAllSchedules, type Schedule, restoreSchedule, permanentDeleteAllTrashed, updateSchedule, permanentDeleteSchedule, trashSchedule } from '../lib/api/schedules';
 import { supabase } from '../lib/supabase';
 import { Plus, Calendar, Clock, Archive, Trash2, FileText, RotateCcw, XCircle, Sparkles } from 'lucide-react';
 import CreateScheduleModal from '../components/CreateScheduleModal';
@@ -272,23 +272,57 @@ function ScheduleCard({
 	);
 }
 
-function EmptyState({ onCreateSchedule }: { onCreateSchedule: () => void }) {
-	return (
-		<div className={s.emptyState}>
-			<div className={s.emptyIcon}>
-				<Calendar size={40} color='white' />
+function EmptyState({ onCreateSchedule, filter, hasAnySchedules }: { onCreateSchedule: () => void; filter: string; hasAnySchedules: boolean }) {
+	if (!hasAnySchedules) {
+		return (
+			<div className={s.emptyState}>
+				<div className={s.emptyIcon}>
+					<Calendar size={40} color='white' />
+				</div>
+				<h2 className={s.emptyTitle}>Welcome to Aria!</h2>
+				<p className={s.emptyText}>
+					Let's create your first schedule. It only takes a moment to get started.
+				</p>
+				<button
+					onClick={onCreateSchedule}
+					className={s.button}
+				>
+					<Plus size={20} />
+					Create Schedule
+				</button>
 			</div>
-			<h2 className={s.emptyTitle}>Welcome to Aria!</h2>
+		);
+	}
+
+	const sectionLabels: Record<string, string> = {
+		all: 'Schedules',
+		draft: 'Drafts',
+		collecting: 'Active Schedules',
+		archived: 'Archived Schedules',
+		trashed: 'Trashed Items'
+	};
+
+	const label = sectionLabels[filter] || 'Schedules';
+
+	return (
+		<div className={s.emptyState} style={{ opacity: 0.8 }}>
+			<div className={s.emptyIcon} style={{ background: '#f3f4f6' }}>
+				<Calendar size={40} color='#9ca3af' />
+			</div>
+			<h2 className={s.emptyTitle}>No {label} Found</h2>
 			<p className={s.emptyText}>
-				Let's create your first schedule. It only takes a moment to get started.
+				You don't have any {label.toLowerCase()} at the moment.
 			</p>
-			<button
-				onClick={onCreateSchedule}
-				className={s.button}
-			>
-				<Plus size={20} />
-				Create Schedule
-			</button>
+			{filter !== 'all' && (
+				<button
+					onClick={onCreateSchedule}
+					className={s.button}
+					style={{ background: 'white', color: '#f97316', border: '1px solid #fed7aa' }}
+				>
+					<Plus size={20} />
+					Create New
+				</button>
+			)}
 		</div>
 	);
 }
@@ -449,14 +483,6 @@ export default function DashboardPage() {
 		}
 	};
 
-	const trashSchedule = async (id: string) => {
-		const { error } = await supabase
-			.from('schedules')
-			.update({ status: 'trashed' })
-			.eq('id', id);
-		if (error) throw error;
-	};
-
 	const getTimeBasedGreeting = () => {
 		const hour = new Date().getHours();
 		if (hour < 12) return 'Good morning';
@@ -611,7 +637,11 @@ export default function DashboardPage() {
 				</div>
 
 				{visibleSchedules.length === 0 && !showAllTrashedEmptyState && (
-					<EmptyState onCreateSchedule={handleCreateSchedule} />
+					<EmptyState
+						onCreateSchedule={handleCreateSchedule}
+						filter={filter}
+						hasAnySchedules={schedules.length > 0}
+					/>
 				)}
 
 				{showAllTrashedEmptyState && (
