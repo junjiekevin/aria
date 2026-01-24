@@ -1,7 +1,7 @@
 // src/pages/SchedulePage.tsx
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, ChevronLeft, ChevronRight, Trash2, Copy, Check, Sparkles, Archive, FileText, Clock } from 'lucide-react';
+import { ArrowLeft, ChevronLeft, ChevronRight, Trash2 } from 'lucide-react';
 import { getSchedule, updateSchedule, type Schedule } from '../lib/api/schedules';
 import { getScheduleEntries, createScheduleEntry, updateScheduleEntry, deleteScheduleEntry, type ScheduleEntry } from '../lib/api/schedule-entries';
 import { getFormResponses, deleteFormResponse, updateFormResponseAssigned, getPreferredTimings, type FormResponse } from '../lib/api/form-responses';
@@ -9,6 +9,7 @@ import AddEventModal from '../components/AddEventModal';
 import Modal from '../components/Modal';
 import SchedulingPreviewModal from '../components/SchedulingPreviewModal';
 import ConfigureFormModal from '../components/ConfigureFormModal';
+import SidePanel from '../components/ScheduleSidePanel';
 import { DndContext, DragOverlay, useDraggable, useDroppable, PointerSensor, useSensor, useSensors, type DragEndEvent, type DragStartEvent } from '@dnd-kit/core';
 
 const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
@@ -393,90 +394,7 @@ const styles = {
   },
 };
 
-function FormLink({ scheduleId }: { scheduleId: string }) {
-  const [copied, setCopied] = useState(false);
-  const formUrl = `${window.location.origin}/form/${scheduleId}`;
 
-  const copyToClipboard = async () => {
-    try {
-      await navigator.clipboard.writeText(formUrl);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    } catch (err) {
-      console.error('Failed to copy:', err);
-    }
-  };
-
-  return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-      <input
-        readOnly
-        value={formUrl}
-        style={{
-          flex: 1,
-          padding: '0.5rem 0.75rem',
-          border: '1px solid #d1d5db',
-          borderRadius: '0.375rem',
-          fontSize: '0.75rem',
-          backgroundColor: '#f9fafb',
-          color: '#6b7280',
-        }}
-      />
-      <button
-        onClick={copyToClipboard}
-        style={{
-          padding: '0.5rem',
-          backgroundColor: copied ? '#22c55e' : '#f97316',
-          color: 'white',
-          border: 'none',
-          borderRadius: '0.375rem',
-          cursor: 'pointer',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          transition: 'background-color 0.2s',
-        }}
-      >
-        {copied ? <Check size={16} /> : <Copy size={16} />}
-      </button>
-    </div>
-  );
-}
-
-function StatusBadge({ status }: { status: string }) {
-  const statusConfig: Record<string, { label: string; icon: typeof FileText; style: React.CSSProperties }> = {
-    draft: {
-      label: 'Draft',
-      icon: FileText,
-      style: { ...styles.statusBadge, backgroundColor: '#fef3c7', color: '#92400e', borderColor: '#fed7aa' }
-    },
-    collecting: {
-      label: 'Active',
-      icon: Clock,
-      style: { ...styles.statusBadge, backgroundColor: '#d1fae5', color: '#065f46', borderColor: '#a7f3d0' }
-    },
-    archived: {
-      label: 'Archived',
-      icon: Archive,
-      style: { ...styles.statusBadge, backgroundColor: '#f1f5f9', color: '#475569', borderColor: '#e2e8f0' }
-    },
-    trashed: {
-      label: 'Trashed',
-      icon: Trash2,
-      style: { ...styles.statusBadge, backgroundColor: '#fee2e2', color: '#991b1b', borderColor: '#fecaca' }
-    }
-  };
-
-  const config = statusConfig[status] || statusConfig.draft;
-  const Icon = config.icon;
-
-  return (
-    <div style={config.style}>
-      <Icon size={14} />
-      {config.label}
-    </div>
-  );
-}
 
 export default function SchedulePage() {
   const sensors = useSensors(
@@ -500,17 +418,17 @@ export default function SchedulePage() {
   const [isDragging, setIsDragging] = useState(false);
   const [activeDragId, setActiveDragId] = useState<string | null>(null);
   const [currentWeekOffset, setCurrentWeekOffset] = useState(0);
-    
+
   const [participantToDelete, setParticipantToDelete] = useState<FormResponse | null>(null);
   const [entryToDelete, setEntryToDelete] = useState<ScheduleEntry | null>(null);
-  
+
   const [showSchedulingPreview, setShowSchedulingPreview] = useState(false);
-  
+
   const [responseToView, setResponseToView] = useState<FormResponse | null>(null);
   const [expandedResponseIds, setExpandedResponseIds] = useState<Set<string>>(new Set());
-  
+
   const [showUnassignedModal, setShowUnassignedModal] = useState(false);
-  
+
   const [showConfigureFormModal, setShowConfigureFormModal] = useState(false);
   const [showTrashConfirm, setShowTrashConfirm] = useState(false);
 
@@ -553,27 +471,27 @@ export default function SchedulePage() {
 
   const { weekStart, weekEnd, weekNumber, totalWeeks } = useMemo(() => {
     if (!schedule) return { weekStart: null, weekEnd: null, weekNumber: 0, totalWeeks: 0 };
-    
+
     const start = parseLocalDate(schedule.start_date);
     const end = parseLocalDate(schedule.end_date);
-    
+
     // Find the Sunday that starts the week containing schedule.start_date (for timetable headers)
     const startDayOfWeek = start.getDay();
     const timetableWeekStart = new Date(start);
     timetableWeekStart.setDate(start.getDate() - startDayOfWeek); // Go back to Sunday
-    
+
     // Calculate total weeks from timetable start (Sunday) to end
     const totalMs = end.getTime() - timetableWeekStart.getTime();
     const totalDays = Math.ceil(totalMs / (1000 * 60 * 60 * 24));
     const total = Math.ceil(totalDays / 7);
-    
+
     // Current week (for navigation)
     const currentWeekStart = new Date(timetableWeekStart);
     currentWeekStart.setDate(timetableWeekStart.getDate() + (currentWeekOffset * 7));
-    
+
     const currentWeekEnd = new Date(currentWeekStart);
     currentWeekEnd.setDate(currentWeekStart.getDate() + 6);
-    
+
     return {
       weekStart: currentWeekStart,
       weekEnd: currentWeekEnd,
@@ -585,8 +503,8 @@ export default function SchedulePage() {
   }, [schedule, currentWeekOffset]);
 
   const formatLocalDate = (date: Date) => {
-    return date.toLocaleDateString(undefined, { 
-      month: 'short', 
+    return date.toLocaleDateString(undefined, {
+      month: 'short',
       day: 'numeric',
       year: 'numeric',
     });
@@ -594,8 +512,8 @@ export default function SchedulePage() {
 
   const formatLocalTime = (isoString: string) => {
     const date = new Date(isoString);
-    return date.toLocaleTimeString(undefined, { 
-      hour: '2-digit', 
+    return date.toLocaleTimeString(undefined, {
+      hour: '2-digit',
       minute: '2-digit',
     });
   };
@@ -665,17 +583,17 @@ export default function SchedulePage() {
 
   const getEntriesForSlot = (day: string, hour: number) => {
     const dayIndex = DAYS.indexOf(day);
-    
+
     return entries.filter(entry => {
       if (!isEntryInCurrentWeek(entry)) return false;
-      
+
       // Get the day of week for this entry from recurrence rule BYDAY, or from actual date
       const rule = parseRecurrenceRule(entry.recurrence_rule);
       const entryDayIndex = rule?.dayIndex ?? new Date(entry.start_time).getDay();
-      
+
       // Get the hour from the entry
       const entryHour = new Date(entry.start_time).getHours();
-      
+
       return entryDayIndex === dayIndex && entryHour === hour;
     });
   };
@@ -698,7 +616,7 @@ export default function SchedulePage() {
   const handleNameBlur = async () => {
     setIsEditingName(false);
     if (!schedule) return;
-    
+
     const trimmedName = editingName.trim();
     if (trimmedName && trimmedName !== schedule.label) {
       try {
@@ -749,7 +667,7 @@ export default function SchedulePage() {
 
   const handleDatesBlur = async () => {
     if (!schedule) return;
-    
+
     if (dateError) {
       setIsEditingDates(false);
       setEditingStartDate(schedule.start_date);
@@ -757,18 +675,18 @@ export default function SchedulePage() {
       setDateError(null);
       return;
     }
-    
-    if (editingStartDate && editingEndDate && 
-        (editingStartDate !== schedule.start_date || editingEndDate !== schedule.end_date)) {
+
+    if (editingStartDate && editingEndDate &&
+      (editingStartDate !== schedule.start_date || editingEndDate !== schedule.end_date)) {
       try {
-        await updateSchedule(schedule.id, { 
-          start_date: editingStartDate, 
-          end_date: editingEndDate 
+        await updateSchedule(schedule.id, {
+          start_date: editingStartDate,
+          end_date: editingEndDate
         });
-        setSchedule({ 
-          ...schedule, 
-          start_date: editingStartDate, 
-          end_date: editingEndDate 
+        setSchedule({
+          ...schedule,
+          start_date: editingStartDate,
+          end_date: editingEndDate
         });
       } catch (err) {
         console.error('Failed to update dates:', err);
@@ -776,7 +694,7 @@ export default function SchedulePage() {
         setEditingEndDate(schedule.end_date);
       }
     }
-    
+
     setIsEditingDates(false);
     setDateError(null);
   };
@@ -792,19 +710,19 @@ export default function SchedulePage() {
 
   const loadScheduleData = async () => {
     if (!scheduleId) return;
-    
+
     try {
       setLoading(true);
       setError(null);
-      
+
       const [scheduleData, entriesData] = await Promise.all([
         getSchedule(scheduleId),
         getScheduleEntries(scheduleId)
       ]);
-      
+
       setSchedule(scheduleData);
       setEntries(entriesData);
-      
+
       try {
         const responsesData = await getFormResponses(scheduleId);
         setResponses(responsesData);
@@ -873,7 +791,7 @@ export default function SchedulePage() {
 
   const handleArchive = async () => {
     if (!scheduleId || !schedule) return;
-    
+
     try {
       await updateSchedule(scheduleId, { status: 'archived' });
       loadScheduleData();
@@ -885,7 +803,7 @@ export default function SchedulePage() {
 
   const handleTrashWithRedirect = async () => {
     if (!scheduleId || !schedule) return;
-    
+
     try {
       await updateSchedule(scheduleId, { status: 'trashed' });
       setShowTrashConfirm(false);
@@ -911,13 +829,13 @@ export default function SchedulePage() {
     }
 
     const dropId = over.id as string;
-    
+
     if (typeof active.id === 'string' && active.id.startsWith('unassigned-')) {
       const responseId = active.id.replace('unassigned-', '');
       const response = responses.find(r => r.id === responseId);
-      
+
       if (!response || !dropId.startsWith('slot-')) return;
-      
+
       const [, day, hourStr] = dropId.split('-');
       const hour = parseInt(hourStr);
 
@@ -927,36 +845,36 @@ export default function SchedulePage() {
       const firstOccurrence = new Date(weekStart!);
       firstOccurrence.setDate(weekStart!.getDate() + dayIndex);
       firstOccurrence.setHours(hour, 0, 0, 0);
-      
+
       const preferredStart = response.preferred_1_start;
       const preferredEnd = response.preferred_1_end;
-      
+
       if (preferredStart && preferredEnd) {
         const [startH, startM] = preferredStart.split(':').map(Number);
         const [endH, endM] = preferredEnd.split(':').map(Number);
         const durationMs = (endH * 60 + endM) - (startH * 60 + startM);
-        
+
         const newEnd = new Date(firstOccurrence.getTime() + durationMs * 60 * 1000);
-        
+
         const overlappingEntry = entries.find(entry => {
           const entryStart = new Date(entry.start_time);
           const entryEnd = new Date(entry.end_time);
           if (entryStart.getDay() !== dayIndex) return false;
           return (firstOccurrence < entryEnd && newEnd > entryStart);
         });
-        
+
         if (overlappingEntry) {
           alert(`Cannot schedule - slot conflicts with "${overlappingEntry.student_name}"`);
           return;
         }
-        
+
         const dayAbbrev = ['SU', 'MO', 'TU', 'WE', 'TH', 'FR', 'SA'][dayIndex];
         const frequency = response.preferred_1_frequency || 'weekly';
-        const recurrenceRule = frequency === 'once' ? '' : 
+        const recurrenceRule = frequency === 'once' ? '' :
           frequency === '2weekly' ? `FREQ=WEEKLY;INTERVAL=2;BYDAY=${dayAbbrev}` :
-          frequency === 'monthly' ? `FREQ=WEEKLY;INTERVAL=4;BYDAY=${dayAbbrev}` :
-          `FREQ=WEEKLY;BYDAY=${dayAbbrev}`;
-        
+            frequency === 'monthly' ? `FREQ=WEEKLY;INTERVAL=4;BYDAY=${dayAbbrev}` :
+              `FREQ=WEEKLY;BYDAY=${dayAbbrev}`;
+
         try {
           const newEntry = await createScheduleEntry({
             schedule_id: scheduleId!,
@@ -965,7 +883,7 @@ export default function SchedulePage() {
             end_time: newEnd.toISOString(),
             recurrence_rule: recurrenceRule,
           });
-          
+
           await updateFormResponseAssigned(responseId, true);
           setResponses(responses.filter(r => r.id !== responseId));
           setEntries([...entries, newEntry]);
@@ -979,7 +897,7 @@ export default function SchedulePage() {
 
     const draggedEntry = entries.find(e => e.id === active.id);
     if (!draggedEntry) return;
-    
+
     if (dropId.startsWith('slot-')) {
       const [, day, hourStr] = dropId.split('-');
       const hour = parseInt(hourStr);
@@ -1009,9 +927,9 @@ export default function SchedulePage() {
         const confirmSwap = window.confirm(
           `"${draggedEntry.student_name}" conflicts with "${overlappingEntry.student_name}". Swap them?`
         );
-        
+
         if (!confirmSwap) return;
-        
+
         const dayAbbrev = ['SU', 'MO', 'TU', 'WE', 'TH', 'FR', 'SA'][dayIndex];
 
         // Get the original day of the dragged entry for the swap
@@ -1067,7 +985,7 @@ export default function SchedulePage() {
             end_time: overlappingNewEnd.toISOString(),
             recurrence_rule: newOverlappingRecurrence,
           });
-          
+
           setActiveDragId(null);
         } catch (err) {
           console.error('Failed to swap events:', err);
@@ -1078,11 +996,11 @@ export default function SchedulePage() {
       }
 
       const dayAbbrev = ['SU', 'MO', 'TU', 'WE', 'TH', 'FR', 'SA'][dayIndex];
-      
+
       // Preserve original frequency, just update the day
       const originalRule = draggedEntry.recurrence_rule || '';
       let recurrenceRule = originalRule;
-      
+
       if (!originalRule) {
         // "Once" frequency - keep empty (no recurrence)
         recurrenceRule = '';
@@ -1100,7 +1018,7 @@ export default function SchedulePage() {
         // Check for INTERVAL
         const intervalMatch = originalRule.match(/INTERVAL=(\d+)/);
         const interval = intervalMatch ? intervalMatch[1] : '';
-        recurrenceRule = interval 
+        recurrenceRule = interval
           ? `FREQ=WEEKLY;INTERVAL=${interval};BYDAY=${dayAbbrev}`
           : `FREQ=WEEKLY;BYDAY=${dayAbbrev}`;
       } else {
@@ -1127,7 +1045,7 @@ export default function SchedulePage() {
           }
           return e;
         }));
-        
+
         setActiveDragId(null);
       } catch (err) {
         console.error('Failed to move event:', err);
@@ -1138,7 +1056,7 @@ export default function SchedulePage() {
       // Cancel drag first (clean transition)
       setActiveDragId(null);
       setIsDragging(false);
-      
+
       // Then open delete confirmation
       if (draggedEntry.recurrence_rule && draggedEntry.recurrence_rule !== '') {
         setEntryToDelete(draggedEntry);
@@ -1154,7 +1072,7 @@ export default function SchedulePage() {
     } else if (dropId.startsWith('entry-')) {
       const targetEntryId = dropId.replace('entry-', '');
       const targetEntry = entries.find(e => e.id === targetEntryId);
-      
+
       if (!targetEntry || targetEntry.id === draggedEntry.id) return;
 
       const confirmSwap = window.confirm(
@@ -1187,10 +1105,10 @@ export default function SchedulePage() {
         const updateRecurrenceDay = (rule: string, newDate: Date): string => {
           const dayAbbrevs = ['SU', 'MO', 'TU', 'WE', 'TH', 'FR', 'SA'];
           const newDayAbbrev = dayAbbrevs[newDate.getDay()];
-          
+
           // Extract frequency and rebuild rule
           const freq = getFrequency(rule);
-          
+
           if (freq === 'once') return '';
           if (freq === '2weekly') return `FREQ=WEEKLY;INTERVAL=2;BYDAY=${newDayAbbrev}`;
           if (freq === 'monthly') return `FREQ=WEEKLY;INTERVAL=4;BYDAY=${newDayAbbrev}`;
@@ -1234,7 +1152,7 @@ export default function SchedulePage() {
           }
           return e;
         }));
-        
+
         setActiveDragId(null);
       } catch (err) {
         console.error('Failed to swap events:', err);
@@ -1242,159 +1160,83 @@ export default function SchedulePage() {
         alert('Failed to swap events. Please try again.');
       }
     }
-   };
+  };
 
-    const getLessonBlockStyle = (entry: ScheduleEntry) => {
-      const startTime = new Date(entry.start_time);
-      const endTime = new Date(entry.end_time);
-      
-      const startMinutes = startTime.getMinutes();
-      const durationMinutes = (endTime.getTime() - startTime.getTime()) / (1000 * 60);
-      
-      const topOffset = (startMinutes / 60) * 40;
-      const height = (durationMinutes / 60) * 40;
-      
-      return {
-        ...styles.lessonBlock,
-        top: `${topOffset}px`,
-        height: `${height}px`,
-      };
-      };
+  const getLessonBlockStyle = (entry: ScheduleEntry) => {
+    const startTime = new Date(entry.start_time);
+    const endTime = new Date(entry.end_time);
 
-    function DraggableLessonBlock({ entry, children }: { entry: ScheduleEntry; children: React.ReactNode }) {
-      const { attributes, listeners, setNodeRef } = useDraggable({
-        id: entry.id,
-        data: entry,
-        disabled: isViewOnly,
-      });
+    const startMinutes = startTime.getMinutes();
+    const durationMinutes = (endTime.getTime() - startTime.getTime()) / (1000 * 60);
 
-      const isBeingDragged = activeDragId === entry.id;
+    const topOffset = (startMinutes / 60) * 40;
+    const height = (durationMinutes / 60) * 40;
 
-      return (
-        <div
-          ref={setNodeRef}
-          style={{
-            ...getLessonBlockStyle(entry),
-            opacity: isBeingDragged ? 0 : 1,
-            visibility: isBeingDragged ? 'hidden' : 'visible',
-            pointerEvents: isBeingDragged ? 'none' : 'auto',
-            cursor: isViewOnly ? 'default' : 'grab',
-          }}
-          onClick={(e) => {
-            if (!isDragging && !isViewOnly) {
-              handleEntryClick(entry, e);
-            }
-          }}
-          {...(!isViewOnly ? { ...attributes, ...listeners } : {})}
-          onMouseEnter={(e) => { if (!isViewOnly) { e.currentTarget.style.backgroundColor = '#ea580c'; } }}
-          onMouseLeave={(e) => { if (!isViewOnly) { e.currentTarget.style.backgroundColor = '#fb923c'; } }}
-        >
-          {children}
-        </div>
-      );
-    }
+    return {
+      ...styles.lessonBlock,
+      top: `${topOffset}px`,
+      height: `${height}px`,
+    };
+  };
 
-    function DraggableUnassignedCard({ response }: { response: FormResponse }) {
-      const { attributes, listeners, setNodeRef } = useDraggable({
-        id: `unassigned-${response.id}`,
-        data: { ...response, isUnassigned: true },
-        disabled: isViewOnly,
-      });
+  function DraggableLessonBlock({ entry, children }: { entry: ScheduleEntry; children: React.ReactNode }) {
+    const { attributes, listeners, setNodeRef } = useDraggable({
+      id: entry.id,
+      data: entry,
+      disabled: isViewOnly,
+    });
 
-      const isBeingDragged = activeDragId === `unassigned-${response.id}`;
+    const isBeingDragged = activeDragId === entry.id;
 
-      return (
-        <div
-          ref={setNodeRef}
-          style={{
-            ...styles.unassignedCard,
-            ...(isBeingDragged ? styles.unassignedCardDragging : {}),
-            cursor: isViewOnly ? 'default' : 'grab',
-          }}
-          {...(!isViewOnly ? { ...attributes, ...listeners } : {})}
-          onClick={() => setResponseToView(response)}
-          onMouseEnter={(e) => {
-            if (!isBeingDragged && !isViewOnly) {
-              e.currentTarget.style.backgroundColor = '#fde68a';
-              e.currentTarget.style.borderColor = '#f59e0b';
-            }
-          }}
-          onMouseLeave={(e) => {
-            if (!isBeingDragged && !isViewOnly) {
-              e.currentTarget.style.backgroundColor = '#fef3c7';
-              e.currentTarget.style.borderColor = '#fde68a';
-            }
-          }}
-        >
-          <div style={styles.unassignedCardName}>{response.student_name}</div>
-          <div style={styles.unassignedCardActions}>
-            <Trash2
-              size={16}
-              style={{ ...styles.unassignedCardIcon, cursor: isViewOnly ? 'default' : 'pointer' }}
-              onClick={(e: React.MouseEvent) => {
-                if (isViewOnly) return;
-                e.stopPropagation();
-                setParticipantToDelete(response);
-              }}
-              onMouseEnter={(e: React.MouseEvent) => { if (!isViewOnly) { (e.target as HTMLElement).style.color = '#dc2626'; } }}
-              onMouseLeave={(e: React.MouseEvent) => { if (!isViewOnly) { (e.target as HTMLElement).style.color = '#9ca3af'; } }}
-            />
-          </div>
-        </div>
-      );
-    }
-    
-    function DroppableSlot({ children, day, hour }: { children: React.ReactNode; day: string; hour: number }) {
-      const { setNodeRef: setSlotRef, isOver } = useDroppable({
-        id: `slot-${day}-${hour}`,
-      });
-      
-      return (
-        <div
-          ref={setSlotRef}
-          style={{
-            ...styles.timeSlot,
-            backgroundColor: isOver ? '#ffedd5' : 'white',
-            cursor: isViewOnly ? 'default' : 'pointer',
-          }}
-          onClick={() => handleSlotClick(day, hour)}
-          onMouseEnter={(e) => { if (!isViewOnly) { e.currentTarget.style.backgroundColor = '#ffedd5'; e.currentTarget.style.cursor = 'pointer'; } }}
-          onMouseLeave={(e) => { if (!isViewOnly) { e.currentTarget.style.backgroundColor = 'white'; } }}
-        >
-          {children}
-        </div>
-      );
-    }
+    return (
+      <div
+        ref={setNodeRef}
+        style={{
+          ...getLessonBlockStyle(entry),
+          opacity: isBeingDragged ? 0 : 1,
+          visibility: isBeingDragged ? 'hidden' : 'visible',
+          pointerEvents: isBeingDragged ? 'none' : 'auto',
+          cursor: isViewOnly ? 'default' : 'grab',
+        }}
+        onClick={(e) => {
+          if (!isDragging && !isViewOnly) {
+            handleEntryClick(entry, e);
+          }
+        }}
+        {...(!isViewOnly ? { ...attributes, ...listeners } : {})}
+        onMouseEnter={(e) => { if (!isViewOnly) { e.currentTarget.style.backgroundColor = '#ea580c'; } }}
+        onMouseLeave={(e) => { if (!isViewOnly) { e.currentTarget.style.backgroundColor = '#fb923c'; } }}
+      >
+        {children}
+      </div>
+    );
+  }
 
-   function TrashDroppable() {
-     const { setNodeRef, isOver } = useDroppable({
-       id: 'trash',
-     });
-     
-     return (
-       <div
-         ref={setNodeRef}
-         style={{
-           display: 'flex',
-           alignItems: 'center',
-           justifyContent: 'center',
-           padding: '0.6rem',
-           border: '2px dashed',
-           borderColor: isOver ? '#dc2626' : '#d1d5db',
-           borderRadius: '0.3rem',
-           backgroundColor: isOver ? '#fef2f2' : 'white',
-           color: isOver ? '#dc2626' : '#6b7280',
-           fontSize: '0.7rem',
-           fontWeight: '500',
-           transition: 'all 0.2s',
-           cursor: 'pointer',
-           marginTop: '0.6rem',
-         }}
-       >
-         {isOver ? 'Drop here to delete' : 'Drag here to delete'}
-       </div>
-     );
-   }
+
+
+  function DroppableSlot({ children, day, hour }: { children: React.ReactNode; day: string; hour: number }) {
+    const { setNodeRef: setSlotRef, isOver } = useDroppable({
+      id: `slot-${day}-${hour}`,
+    });
+
+    return (
+      <div
+        ref={setSlotRef}
+        style={{
+          ...styles.timeSlot,
+          backgroundColor: isOver ? '#ffedd5' : 'white',
+          cursor: isViewOnly ? 'default' : 'pointer',
+        }}
+        onClick={() => handleSlotClick(day, hour)}
+        onMouseEnter={(e) => { if (!isViewOnly) { e.currentTarget.style.backgroundColor = '#ffedd5'; e.currentTarget.style.cursor = 'pointer'; } }}
+        onMouseLeave={(e) => { if (!isViewOnly) { e.currentTarget.style.backgroundColor = 'white'; } }}
+      >
+        {children}
+      </div>
+    );
+  }
+
+
 
   if (loading) {
     return (
@@ -1434,715 +1276,532 @@ export default function SchedulePage() {
         }}
         autoScroll={false}
       >
-      <header style={styles.header}>
-        <div style={styles.headerContent}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
-            <button
-              onClick={() => navigate('/dashboard')}
-              style={styles.backButton}
-            >
-              <ArrowLeft size={18} />
-              Back
-            </button>
-            
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.15rem' }}>
-              {isEditingName ? (
-                <input
-                  ref={nameInputRef}
-                  type="text"
-                  value={editingName}
-                  onChange={(e) => setEditingName(e.target.value)}
-                  onBlur={handleNameBlur}
-                  onKeyDown={handleNameKeyDown}
-                  style={{
-                    fontSize: '1.1rem',
-                    fontWeight: '600',
-                    color: '#111827',
-                    padding: '0.25rem 0.5rem',
-                    border: '1px solid #f97316',
-                    borderRadius: '0.375rem',
-                    outline: 'none',
-                    maxWidth: '200px',
-                  }}
-                />
-              ) : (
-                <h1 
-                  style={{ ...styles.title, cursor: 'pointer', margin: 0 }}
-                  onClick={handleNameClick}
-                >
-                  {schedule.label}
-                </h1>
-              )}
-              
-              <span style={{ color: '#6b7280', fontSize: '0.8rem' }}>
-                {isEditingDates ? (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                    <input
-                      ref={startDateInputRef}
-                      type="date"
-                      value={editingStartDate}
-                      onChange={handleStartDateChange}
-                      onBlur={handleDatesBlur}
-                      onKeyDown={handleDatesKeyDown}
-                      style={{
-                        fontSize: '0.75rem',
-                        padding: '0.15rem 0.35rem',
-                        border: dateError ? '1px solid #dc2626' : '1px solid #d1d5db',
-                        borderRadius: '0.375rem',
-                        outline: 'none',
-                      }}
-                    />
-                    <span style={{ color: '#9ca3af' }}>-</span>
-                    <input
-                      ref={endDateInputRef}
-                      type="date"
-                      value={editingEndDate}
-                      onChange={handleEndDateChange}
-                      onBlur={handleDatesBlur}
-                      onKeyDown={handleDatesKeyDown}
-                      style={{
-                        fontSize: '0.75rem',
-                        padding: '0.15rem 0.35rem',
-                        border: dateError ? '1px solid #dc2626' : '1px solid #d1d5db',
-                        borderRadius: '0.375rem',
-                        outline: 'none',
-                      }}
-                    />
-                    {dateError && (
-                      <span style={{ color: '#dc2626', fontSize: '0.7rem' }}>{dateError}</span>
-                    )}
-                  </div>
+        <header style={styles.header}>
+          <div style={styles.headerContent}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
+              <button
+                onClick={() => navigate('/dashboard')}
+                style={styles.backButton}
+              >
+                <ArrowLeft size={18} />
+                Back
+              </button>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.15rem' }}>
+                {isEditingName ? (
+                  <input
+                    ref={nameInputRef}
+                    type="text"
+                    value={editingName}
+                    onChange={(e) => setEditingName(e.target.value)}
+                    onBlur={handleNameBlur}
+                    onKeyDown={handleNameKeyDown}
+                    style={{
+                      fontSize: '1.1rem',
+                      fontWeight: '600',
+                      color: '#111827',
+                      padding: '0.25rem 0.5rem',
+                      border: '1px solid #f97316',
+                      borderRadius: '0.375rem',
+                      outline: 'none',
+                      maxWidth: '200px',
+                    }}
+                  />
                 ) : (
-                  <span 
-                    style={{ cursor: 'pointer' }}
-                    onClick={handleDatesClick}
+                  <h1
+                    style={{ ...styles.title, cursor: 'pointer', margin: 0 }}
+                    onClick={handleNameClick}
                   >
-                    {formatLocalDate(parseLocalDate(schedule.start_date))} - {formatLocalDate(parseLocalDate(schedule.end_date))}
-                  </span>
+                    {schedule.label}
+                  </h1>
                 )}
-              </span>
-            </div>
-          </div>
-          
-          <div style={{ 
-            display: 'flex', 
-            flexDirection: 'column' as const,
-            alignItems: 'center',
-            flex: 1,
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-              <button
-                onClick={goToPreviousWeek}
-                disabled={currentWeekOffset === 0}
-                style={{ ...styles.backButton, opacity: currentWeekOffset === 0 ? 0.5 : 1 }}
-              >
-                <ChevronLeft size={20} />
-              </button>
-              
-              <div style={{ textAlign: 'center' }}>
-                <p style={{ fontSize: '1.1rem', fontWeight: '600', color: '#111827', margin: 0 }}>
-                  {weekStart && weekEnd ? `${formatLocalDate(weekStart)} - ${formatLocalDate(weekEnd)}` : ''}
-                </p>
-              </div>
-              
-              <button
-                onClick={goToNextWeek}
-                disabled={currentWeekOffset >= totalWeeks - 1}
-                style={{ ...styles.backButton, opacity: currentWeekOffset >= totalWeeks - 1 ? 0.5 : 1 }}
-              >
-                <ChevronRight size={20} />
-              </button>
-            </div>
-            
-            <span style={{ marginTop: '0.35rem', fontSize: '0.85rem', fontWeight: '500', color: '#f97316' }}>
-              Week {weekNumber} of {totalWeeks}
-            </span>
-          </div>
-          
-          <div style={{ width: '100px' }}></div>
-        </div>
-      </header>
 
-      <main style={styles.main}>
-        <div style={styles.timetableContainer}>
-          <div style={styles.timetableHeader}>
-            <div style={styles.dayHeader}></div>
-            {DAYS.map((day, index) => {
-              const date = weekStart ? new Date(weekStart) : null;
-              if (date) date.setDate(date.getDate() + index);
-              const dateStr = date ? date.getDate() : '';
-              return (
-                <div key={day} style={styles.dayHeader}>
-                  <span>{day}</span>
-                  <span style={styles.dayHeaderDate}>{dateStr}</span>
-                </div>
-              );
-            })}
-          </div>
-
-           {HOURS.map((hour) => (
-             <div key={hour} style={styles.timetableGrid}>
-               <div style={styles.timeLabel}>
-                 {hour === 12 ? '12 PM' : hour > 12 ? `${hour - 12} PM` : `${hour} AM`}
-               </div>
-                {DAYS.map((day) => {
-                 const slotEntries = getEntriesForSlot(day, hour);
-                 
-                 return (
-                   <DroppableSlot key={`${day}-${hour}`} day={day} hour={hour}>
-                     {slotEntries.map((entry) => (
-                       <DraggableLessonBlock key={entry.id} entry={entry}>
-                         <div style={{ fontWeight: '600' }}>{entry.student_name}</div>
-                         <div style={{ fontSize: '0.625rem', opacity: 0.9 }}>
-                           {formatLocalTime(entry.start_time)}
-                           {' - '}
-                           {formatLocalTime(entry.end_time)}
-                         </div>
-                       </DraggableLessonBlock>
-                     ))}
-                   </DroppableSlot>
-                 );
-               })}
-             </div>
-           ))}
-        </div>
-
-        <div style={styles.sidePanel}>
-          <div style={styles.panel}>
-            <h3 style={styles.panelTitle}>Schedule Info</h3>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', fontSize: '0.875rem' }}>
-              <div>
-                <span style={{ color: '#6b7280', display: 'block', marginBottom: '0.5rem' }}>Status:</span>
-                <StatusBadge status={schedule.status} />
-              </div>
-              <div>
-                <span style={{ color: '#6b7280' }}>Duration: </span>
-                <span style={{ fontWeight: '500', color: '#111827' }}>
-                  {totalWeeks} weeks
+                <span style={{ color: '#6b7280', fontSize: '0.8rem' }}>
+                  {isEditingDates ? (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                      <input
+                        ref={startDateInputRef}
+                        type="date"
+                        value={editingStartDate}
+                        onChange={handleStartDateChange}
+                        onBlur={handleDatesBlur}
+                        onKeyDown={handleDatesKeyDown}
+                        style={{
+                          fontSize: '0.75rem',
+                          padding: '0.15rem 0.35rem',
+                          border: dateError ? '1px solid #dc2626' : '1px solid #d1d5db',
+                          borderRadius: '0.375rem',
+                          outline: 'none',
+                        }}
+                      />
+                      <span style={{ color: '#9ca3af' }}>-</span>
+                      <input
+                        ref={endDateInputRef}
+                        type="date"
+                        value={editingEndDate}
+                        onChange={handleEndDateChange}
+                        onBlur={handleDatesBlur}
+                        onKeyDown={handleDatesKeyDown}
+                        style={{
+                          fontSize: '0.75rem',
+                          padding: '0.15rem 0.35rem',
+                          border: dateError ? '1px solid #dc2626' : '1px solid #d1d5db',
+                          borderRadius: '0.375rem',
+                          outline: 'none',
+                        }}
+                      />
+                      {dateError && (
+                        <span style={{ color: '#dc2626', fontSize: '0.7rem' }}>{dateError}</span>
+                      )}
+                    </div>
+                  ) : (
+                    <span
+                      style={{ cursor: 'pointer' }}
+                      onClick={handleDatesClick}
+                    >
+                      {formatLocalDate(parseLocalDate(schedule.start_date))} - {formatLocalDate(parseLocalDate(schedule.end_date))}
+                    </span>
+                  )}
                 </span>
               </div>
-              
-              {schedule.status === 'draft' && !isViewOnly && (
-                <div style={{ marginTop: '0.5rem' }}>
-                  <button
-                    onClick={() => setShowConfigureFormModal(true)}
-                    style={{
-                      width: '100%',
-                      padding: '0.75rem 1rem',
-                      backgroundColor: '#f97316',
-                      color: 'white',
-                      border: 'none',
-                      borderRadius: '0.5rem',
-                      fontSize: '0.875rem',
-                      fontWeight: '600',
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      gap: '0.5rem',
-                    }}
-                    onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#ea580c'; }}
-                    onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = '#f97316'; }}
-                  >
-                    <Sparkles size={16} />
-                    Configure & Activate Form
-                  </button>
-                </div>
-              )}
-              
-              {schedule.status === 'collecting' && (
-                <div style={{ marginTop: '0.5rem', paddingTop: '1rem', borderTop: '1px solid #e5e7eb' }}>
-                  {schedule.form_deadline && (
-                    <div style={{ marginBottom: '0.75rem' }}>
-                      <span style={{ color: '#6b7280', display: 'block', marginBottom: '0.25rem' }}>Deadline:</span>
-                      <span style={{ fontWeight: '500', color: '#111827' }}>
-                        {new Date(schedule.form_deadline).toLocaleDateString('en-US', {
-                          weekday: 'short',
-                          month: 'short',
-                          day: 'numeric',
-                          year: 'numeric',
-                        })}
-                      </span>
-                    </div>
-                  )}
-                  <div style={{ marginBottom: '0.75rem' }}>
-                    <span style={{ color: '#6b7280', display: 'block', marginBottom: '0.25rem' }}>
-                      {schedule.max_choices === 1 ? '1 choice' : `${schedule.max_choices} choices`} per student
-                    </span>
-                  </div>
-                  <span style={{ color: '#6b7280', display: 'block', marginBottom: '0.5rem' }}>Form Link:</span>
-                  <FormLink scheduleId={scheduleId!} />
-                  {!isViewOnly && (
-                    <button
-                      onClick={() => setShowConfigureFormModal(true)}
-                      style={{
-                        marginTop: '0.75rem',
-                        padding: '0.5rem 0.75rem',
-                        backgroundColor: 'white',
-                        color: '#6b7280',
-                        border: '1px solid #d1d5db',
-                        borderRadius: '0.375rem',
-                        fontSize: '0.75rem',
-                        cursor: 'pointer',
-                        width: '100%',
-                      }}
-                      onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#f9fafb'; }}
-                      onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'white'; }}
-                    >
-                      Edit Form Configuration
-                    </button>
-                  )}
-                </div>
-              )}
-              
-              {/* Archive and Trash buttons - visible based on status */}
-              {schedule.status !== 'trashed' && (
-                <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem', paddingTop: '1rem', borderTop: '1px solid #e5e7eb' }}>
-                  {schedule.status === 'collecting' && (
-                    <button
-                      onClick={handleArchive}
-                      style={{ ...styles.panelActionButton, flex: 1 }}
-                      title="Archive"
-                    >
-                      <Archive size={14} />
-                      Archive
-                    </button>
-                  )}
-                  <button
-                    onClick={() => setShowTrashConfirm(true)}
-                    style={{ ...styles.panelActionButton, flex: 1, color: '#dc2626', borderColor: '#fecaca' }}
-                    title="Trash"
-                  >
-                    <Trash2 size={14} />
-                    Trash
-                  </button>
-                </div>
-              )}
-
-              {/* Trash Confirmation Modal */}
-              <Modal
-                isOpen={showTrashConfirm}
-                onClose={() => setShowTrashConfirm(false)}
-                title="Move to Trash"
-                maxWidth="28rem"
-              >
-                <div style={{ padding: '0.5rem 0' }}>
-                  <p style={{ marginBottom: '1.5rem', color: '#374151', lineHeight: 1.5 }}>
-                    Are you sure you want to move <strong>{schedule.label}</strong> to trash? 
-                    This schedule can be restored later.
-                  </p>
-                  <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end' }}>
-                    <button
-                      onClick={() => setShowTrashConfirm(false)}
-                      style={{
-                        padding: '0.625rem 1.25rem',
-                        backgroundColor: 'white',
-                        color: '#374151',
-                        border: '1px solid #d1d5db',
-                        borderRadius: '0.5rem',
-                        fontSize: '0.875rem',
-                        fontWeight: '500',
-                        cursor: 'pointer',
-                      }}
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      onClick={handleTrashWithRedirect}
-                      style={{
-                        padding: '0.625rem 1.25rem',
-                        backgroundColor: '#dc2626',
-                        color: 'white',
-                        border: 'none',
-                        borderRadius: '0.5rem',
-                        fontSize: '0.875rem',
-                        fontWeight: '500',
-                        cursor: 'pointer',
-                      }}
-                    >
-                      Move to Trash
-                    </button>
-                  </div>
-                </div>
-              </Modal>
             </div>
-          </div>
 
-          {!isViewOnly && (
-            <div style={styles.unassignedPanel}>
-              <div style={styles.unassignedPanelHeader}>
-                <div style={styles.unassignedPanelTitle}>
-                  <h3 style={styles.unassignedPanelTitleText}>Unassigned Events</h3>
-                  {getUnassignedStudents().length > 0 && (
-                    <span 
-                      style={styles.unassignedBadge}
-                      onClick={() => setShowUnassignedModal(true)}
-                      onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#ea580c'; }}
-                      onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = '#f97316'; }}
-                    >
-                      {getUnassignedStudents().length}
-                    </span>
-                  )}
-                </div>
+            <div style={{
+              display: 'flex',
+              flexDirection: 'column' as const,
+              alignItems: 'center',
+              flex: 1,
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
                 <button
-                  onClick={() => getUnassignedStudents().length > 0 && setShowSchedulingPreview(true)}
-                  disabled={getUnassignedStudents().length === 0}
-                  style={{
-                    ...styles.scheduleButton,
-                    ...(getUnassignedStudents().length === 0 ? styles.scheduleButtonDisabled : {}),
-                  }}
-                  onMouseEnter={(e) => { if (getUnassignedStudents().length > 0) { e.currentTarget.style.backgroundColor = '#16a34a'; } }}
-                  onMouseLeave={(e) => { if (getUnassignedStudents().length > 0) { e.currentTarget.style.backgroundColor = '#22c55e'; } }}
+                  onClick={goToPreviousWeek}
+                  disabled={currentWeekOffset === 0}
+                  style={{ ...styles.backButton, opacity: currentWeekOffset === 0 ? 0.5 : 1 }}
                 >
-                  <Sparkles size={12} />
-                  Schedule All
+                  <ChevronLeft size={20} />
+                </button>
+
+                <div style={{ textAlign: 'center' }}>
+                  <p style={{ fontSize: '1.1rem', fontWeight: '600', color: '#111827', margin: 0 }}>
+                    {weekStart && weekEnd ? `${formatLocalDate(weekStart)} - ${formatLocalDate(weekEnd)}` : ''}
+                  </p>
+                </div>
+
+                <button
+                  onClick={goToNextWeek}
+                  disabled={currentWeekOffset >= totalWeeks - 1}
+                  style={{ ...styles.backButton, opacity: currentWeekOffset >= totalWeeks - 1 ? 0.5 : 1 }}
+                >
+                  <ChevronRight size={20} />
                 </button>
               </div>
-              <div style={styles.unassignedCardList}>
-                {getUnassignedStudents().map((response) => (
-                  <DraggableUnassignedCard key={response.id} response={response} />
-                ))}
-              </div>
+
+              <span style={{ marginTop: '0.35rem', fontSize: '0.85rem', fontWeight: '500', color: '#f97316' }}>
+                Week {weekNumber} of {totalWeeks}
+              </span>
             </div>
-          )}
-          
-          <div style={styles.panel}>
-            {!isViewOnly && <TrashDroppable />}
+
+            <div style={{ width: '100px' }}></div>
           </div>
-        </div>
-      </main>
+        </header>
 
-      <AddEventModal
-        isOpen={showAddModal}
-        onClose={() => {
-          setShowAddModal(false);
-          setSelectedEntry(null);
-          setSelectedSlot(null);
-        }}
-        onSuccess={handleEventSaved}
-        scheduleId={scheduleId!}
-        initialDay={selectedSlot?.day}
-        initialHour={selectedSlot?.hour}
-        scheduleStartDate={schedule.start_date}
-        existingEntry={selectedEntry}
-        onNeedDeleteConfirmation={() => {
-          setEntryToDelete(selectedEntry);
-        }}
-      />
-
-      <Modal
-        isOpen={!!participantToDelete}
-        onClose={() => setParticipantToDelete(null)}
-        title="Delete Participant"
-        maxWidth="30rem"
-      >
-        <div style={{ padding: '0.5rem 0' }}>
-          <p style={{ color: '#374151', marginBottom: '1rem' }}>
-            Delete <strong>{participantToDelete?.student_name}</strong>? This cannot be undone.
-          </p>
-          <div style={{ display: 'flex', gap: '0.75rem' }}>
-            <button
-              onClick={async () => {
-                if (!participantToDelete) return;
-                try {
-                  await deleteFormResponse(participantToDelete.id);
-                  setResponses(responses.filter(r => r.id !== participantToDelete.id));
-                  setParticipantToDelete(null);
-                } catch (err) {
-                  console.error('Failed to delete participant:', err);
-                }
-              }}
-              style={{ flex: 1, padding: '0.75rem', backgroundColor: '#dc2626', color: 'white', border: 'none', borderRadius: '0.5rem', cursor: 'pointer' }}
-            >
-              Delete
-            </button>
-            <button
-              onClick={() => setParticipantToDelete(null)}
-              style={{ flex: 1, padding: '0.75rem', backgroundColor: 'white', color: '#374151', border: '1px solid #d1d5db', borderRadius: '0.5rem', cursor: 'pointer' }}
-            >
-              Cancel
-            </button>
-          </div>
-        </div>
-      </Modal>
-
-      <Modal
-        isOpen={!!entryToDelete && (!entryToDelete.recurrence_rule || entryToDelete.recurrence_rule === '')}
-        onClose={() => setEntryToDelete(null)}
-        title="Delete Event"
-        maxWidth="35rem"
-      >
-        <div style={{ padding: '0.5rem 0' }}>
-          <p style={{ color: '#374151', marginBottom: '1rem' }}>
-            Delete <strong>{entryToDelete?.student_name}</strong>?
-          </p>
-          <div style={{ display: 'flex', gap: '0.75rem' }}>
-            <button
-              onClick={async () => {
-                if (!entryToDelete) return;
-                try {
-                  await deleteScheduleEntry(entryToDelete.id);
-                  setEntries(entries.filter(e => e.id !== entryToDelete.id));
-                  setEntryToDelete(null);
-                } catch (err) {
-                  console.error('Failed to delete event:', err);
-                }
-              }}
-              style={{ flex: 1, padding: '0.75rem', backgroundColor: '#dc2626', color: 'white', border: 'none', borderRadius: '0.5rem', cursor: 'pointer' }}
-            >
-              Delete
-            </button>
-            <button
-              onClick={() => setEntryToDelete(null)}
-              style={{ flex: 1, padding: '0.75rem', backgroundColor: 'white', color: '#374151', border: '1px solid #d1d5db', borderRadius: '0.5rem', cursor: 'pointer' }}
-            >
-              Cancel
-            </button>
-          </div>
-        </div>
-      </Modal>
-
-      <Modal
-        isOpen={!!entryToDelete}
-        onClose={() => {
-          setEntryToDelete(null);
-          setActiveDragId(null);
-          setIsDragging(false);
-        }}
-        title="Delete Event"
-        maxWidth="35rem"
-      >
-        <div style={{ padding: '0.5rem 0' }}>
-          <p style={{ color: '#374151', marginBottom: '1rem' }}>
-            Delete <strong>{entryToDelete?.student_name}</strong>? This cannot be undone.
-          </p>
-          <div style={{ display: 'flex', gap: '0.75rem' }}>
-            <button
-              onClick={async () => {
-                if (!entryToDelete) return;
-                try {
-                  await deleteScheduleEntry(entryToDelete.id);
-                  setEntries(entries.filter(e => e.id !== entryToDelete.id));
-                  setEntryToDelete(null);
-                  setActiveDragId(null);
-                  setIsDragging(false);
-                  // Also close the AddEventModal if open
-                  if (selectedEntry?.id === entryToDelete.id) {
-                    setShowAddModal(false);
-                    setSelectedEntry(null);
-                  }
-                } catch (err) {
-                  console.error('Failed to delete event:', err);
-                }
-              }}
-              style={{ flex: 1, padding: '0.75rem', backgroundColor: '#dc2626', color: 'white', border: 'none', borderRadius: '0.5rem', cursor: 'pointer' }}
-            >
-              Delete
-            </button>
-            <button
-              onClick={() => {
-                setEntryToDelete(null);
-                setActiveDragId(null);
-                setIsDragging(false);
-              }}
-              style={{ flex: 1, padding: '0.75rem', backgroundColor: 'white', color: '#374151', border: '1px solid #d1d5db', borderRadius: '0.5rem', cursor: 'pointer' }}
-            >
-              Cancel
-            </button>
-          </div>
-        </div>
-      </Modal>
-
-      <SchedulingPreviewModal
-        isOpen={showSchedulingPreview}
-        onClose={() => setShowSchedulingPreview(false)}
-        students={getUnassignedStudents()}
-        existingEntries={entries}
-        scheduleStart={new Date(schedule.start_date)}
-        scheduleId={scheduleId!}
-        onScheduled={loadScheduleData}
-      />
-
-      <ConfigureFormModal
-        isOpen={showConfigureFormModal}
-        onClose={() => setShowConfigureFormModal(false)}
-        onConfigured={loadScheduleData}
-        schedule={schedule}
-      />
-
-      <Modal
-        isOpen={!!responseToView}
-        onClose={() => setResponseToView(null)}
-        title="Event Details"
-        maxWidth="35rem"
-      >
-        {responseToView && (
-          <div style={{ padding: '0.25rem 0' }}>
-            <div style={styles.detailModalCard}>
-              <div style={{ padding: '1rem', backgroundColor: '#fef3c7', borderBottom: '1px solid #fde68a' }}>
-                <div style={{ fontWeight: '600', fontSize: '1.125rem', color: '#92400e' }}>{responseToView.student_name}</div>
-                {responseToView.email && (
-                  <div style={{ fontSize: '0.875rem', color: '#a16207', marginTop: '0.25rem' }}>{responseToView.email}</div>
-                )}
-              </div>
-              <div style={{ padding: '1rem' }}>
-                {getPreferredTimings(responseToView).map((timing, index) => (
-                  <div key={index} style={styles.detailModalPreferenceCard}>
-                    <div style={styles.detailModalPreferenceLabel}>
-                      {index === 0 ? '1st Choice' : index === 1 ? '2nd Choice' : '3rd Choice'}
-                    </div>
-                    <div style={styles.detailModalPreferenceValue}>
-                      {timing.day} {formatTime(timing.start)} - {formatTime(timing.end)}
-                      {timing.duration && ` (${timing.duration} min)`}
-                      <br />
-                      <span style={{ fontSize: '0.75rem', color: '#6b7280' }}>{formatFrequency(timing.frequency)}</span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-            <div style={{ display: 'flex', gap: '0.75rem', marginTop: '1.25rem' }}>
-              <button
-                onClick={() => {
-                  setResponseToView(null);
-                  setParticipantToDelete(responseToView);
-                }}
-                style={{ flex: 1, padding: '0.75rem', backgroundColor: '#dc2626', color: 'white', border: 'none', borderRadius: '0.5rem', cursor: 'pointer', fontWeight: '500' }}
-              >
-                Delete
-              </button>
-              <button
-                onClick={() => setResponseToView(null)}
-                style={{ flex: 1, padding: '0.75rem', backgroundColor: 'white', color: '#374151', border: '1px solid #d1d5db', borderRadius: '0.5rem', cursor: 'pointer', fontWeight: '500' }}
-              >
-                Close
-              </button>
-            </div>
-          </div>
-        )}
-      </Modal>
-
-      <Modal
-        isOpen={showUnassignedModal}
-        onClose={() => setShowUnassignedModal(false)}
-        title="Unassigned Events"
-        maxWidth="40rem"
-      >
-        <div style={{ maxHeight: '60vh', overflowY: 'auto' }}>
-          {getUnassignedStudents().length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '2rem', color: '#6b7280' }}>
-              No unassigned events
-            </div>
-          ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-              {getUnassignedStudents().map((response) => {
-                const isExpanded = expandedResponseIds.has(response.id);
-                const timings = getPreferredTimings(response);
-                
+        <main style={styles.main}>
+          <div style={styles.timetableContainer}>
+            <div style={styles.timetableHeader}>
+              <div style={styles.dayHeader}></div>
+              {DAYS.map((day, index) => {
+                const date = weekStart ? new Date(weekStart) : null;
+                if (date) date.setDate(date.getDate() + index);
+                const dateStr = date ? date.getDate() : '';
                 return (
-                  <div key={response.id} style={styles.detailModalCard}>
-                    <div 
-                      style={styles.detailModalCardHeader}
-                      onClick={() => toggleResponseExpanded(response.id)}
-                    >
-                      <div>
-                        <div style={styles.detailModalCardName}>{response.student_name}</div>
-                        {timings[0] && (
-                          <div style={{ fontSize: '0.8125rem', color: '#a16207', marginTop: '0.125rem' }}>
-                            {timings[0].day} {formatTime(timings[0].start)} - {formatTime(timings[0].end)}
-                            {timings[0].duration && ` (${timings[0].duration} min)`}
-                          </div>
-                        )}
-                      </div>
-                      <div style={styles.detailModalCardActions}>
-                        {isExpanded ? (
-                          <span style={{ fontSize: '0.875rem', color: '#f97316', fontWeight: '500' }}>Hide</span>
-                        ) : (
-                          <span style={{ fontSize: '0.875rem', color: '#f97316', fontWeight: '500' }}>Show</span>
-                        )}
-                        <Trash2
-                          size={16}
-                          style={{ color: '#9ca3af', cursor: 'pointer' }}
-                          onClick={(e: React.MouseEvent) => {
-                            e.stopPropagation();
-                            setShowUnassignedModal(false);
-                            setParticipantToDelete(response);
-                          }}
-                          onMouseEnter={(e: React.MouseEvent) => { (e.target as HTMLElement).style.color = '#dc2626'; }}
-                          onMouseLeave={(e: React.MouseEvent) => { (e.target as HTMLElement).style.color = '#9ca3af'; }}
-                        />
-                      </div>
-                    </div>
-                    {isExpanded && (
-                      <div style={styles.detailModalCardBody}>
-                        {response.email && (
-                          <div style={styles.detailModalField}>
-                            <span style={styles.detailModalFieldLabel}>Email</span>
-                            <span style={styles.detailModalFieldValue}>{response.email}</span>
-                          </div>
-                        )}
-                        <div style={styles.detailModalField}>
-                          <span style={styles.detailModalFieldLabel}>Preferences</span>
-                          {timings.map((timing, index) => (
-                            <div key={index} style={styles.detailModalPreferenceCard}>
-                              <div style={styles.detailModalPreferenceLabel}>
-                                {index === 0 ? '1st Choice' : index === 1 ? '2nd Choice' : '3rd Choice'}
-                              </div>
-                              <div style={styles.detailModalPreferenceValue}>
-                                {timing.day} {formatTime(timing.start)} - {formatTime(timing.end)}
-                                {timing.duration && ` (${timing.duration} min)`}
-                                <br />
-                                <span style={{ fontSize: '0.75rem', color: '#6b7280' }}>{formatFrequency(timing.frequency)}</span>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                        <button
-                          onClick={() => {
-                            setShowUnassignedModal(false);
-                            setResponseToView(response);
-                          }}
-                          style={{ marginTop: '1rem', width: '100%', padding: '0.625rem', backgroundColor: '#f97316', color: 'white', border: 'none', borderRadius: '0.375rem', cursor: 'pointer', fontWeight: '500' }}
-                        >
-                          View Full Details
-                        </button>
-                      </div>
-                    )}
+                  <div key={day} style={styles.dayHeader}>
+                    <span>{day}</span>
+                    <span style={styles.dayHeaderDate}>{dateStr}</span>
                   </div>
                 );
               })}
             </div>
-          )}
-        </div>
-      </Modal>
 
-      <DragOverlay>
-        {activeDragId && (() => {
-          if (typeof activeDragId === 'string' && activeDragId.startsWith('unassigned-')) {
-            const responseId = activeDragId.replace('unassigned-', '');
-            const response = responses.find(r => r.id === responseId);
-            if (!response) return null;
-            return (
-              <div style={{ padding: '0.6rem 0.75rem', backgroundColor: '#fbbf24', borderRadius: '0.5rem', border: '1px solid #f59e0b', fontSize: '0.875rem', opacity: 0.7, cursor: 'grabbing', zIndex: 9999 }}>
-                <div style={{ fontWeight: '600', color: '#92400e' }}>{response.student_name}</div>
+            {HOURS.map((hour) => (
+              <div key={hour} style={styles.timetableGrid}>
+                <div style={styles.timeLabel}>
+                  {hour === 12 ? '12 PM' : hour > 12 ? `${hour - 12} PM` : `${hour} AM`}
+                </div>
+                {DAYS.map((day) => {
+                  const slotEntries = getEntriesForSlot(day, hour);
+
+                  return (
+                    <DroppableSlot key={`${day}-${hour}`} day={day} hour={hour}>
+                      {slotEntries.map((entry) => (
+                        <DraggableLessonBlock key={entry.id} entry={entry}>
+                          <div style={{ fontWeight: '600' }}>{entry.student_name}</div>
+                          <div style={{ fontSize: '0.625rem', opacity: 0.9 }}>
+                            {formatLocalTime(entry.start_time)}
+                            {' - '}
+                            {formatLocalTime(entry.end_time)}
+                          </div>
+                        </DraggableLessonBlock>
+                      ))}
+                    </DroppableSlot>
+                  );
+                })}
               </div>
-            );
-          }
+            ))}
+          </div>
 
-          const entry = entries.find(e => e.id === activeDragId);
-          if (!entry) return null;
+          <SidePanel
+            schedule={schedule}
+            scheduleId={scheduleId!}
+            isViewOnly={isViewOnly}
+            totalWeeks={totalWeeks}
+            responses={responses}
+            unassignedStudents={getUnassignedStudents()}
+            onShowConfigure={() => setShowConfigureFormModal(true)}
+            onArchive={handleArchive}
+            onTrash={() => setShowTrashConfirm(true)}
+            onShowUnassignedModal={() => setShowUnassignedModal(true)}
+            onShowSchedulingPreview={() => setShowSchedulingPreview(true)}
+            onResponseClick={setResponseToView}
+            onDeleteResponse={(response) => setParticipantToDelete(response)}
+            showTrashConfirm={showTrashConfirm}
+            onCloseTrashConfirm={() => setShowTrashConfirm(false)}
+            onConfirmTrash={handleTrashWithRedirect}
+          />
+        </main>
 
-          return (
-            <div style={{ ...getLessonBlockStyle(entry), opacity: 0.7, cursor: 'grabbing', zIndex: 9999 }}>
-              <div style={{ fontWeight: '600' }}>{entry.student_name}</div>
-              <div style={{ fontSize: '0.625rem', opacity: 0.9 }}>
-                {formatLocalTime(entry.start_time)} - {formatLocalTime(entry.end_time)}
+        <AddEventModal
+          isOpen={showAddModal}
+          onClose={() => {
+            setShowAddModal(false);
+            setSelectedEntry(null);
+            setSelectedSlot(null);
+          }}
+          onSuccess={handleEventSaved}
+          scheduleId={scheduleId!}
+          initialDay={selectedSlot?.day}
+          initialHour={selectedSlot?.hour}
+          scheduleStartDate={schedule.start_date}
+          existingEntry={selectedEntry}
+          onNeedDeleteConfirmation={() => {
+            setEntryToDelete(selectedEntry);
+          }}
+        />
+
+        <Modal
+          isOpen={!!participantToDelete}
+          onClose={() => setParticipantToDelete(null)}
+          title="Delete Participant"
+          maxWidth="30rem"
+        >
+          <div style={{ padding: '0.5rem 0' }}>
+            <p style={{ color: '#374151', marginBottom: '1rem' }}>
+              Delete <strong>{participantToDelete?.student_name}</strong>? This cannot be undone.
+            </p>
+            <div style={{ display: 'flex', gap: '0.75rem' }}>
+              <button
+                onClick={async () => {
+                  if (!participantToDelete) return;
+                  try {
+                    await deleteFormResponse(participantToDelete.id);
+                    setResponses(responses.filter(r => r.id !== participantToDelete.id));
+                    setParticipantToDelete(null);
+                  } catch (err) {
+                    console.error('Failed to delete participant:', err);
+                  }
+                }}
+                style={{ flex: 1, padding: '0.75rem', backgroundColor: '#dc2626', color: 'white', border: 'none', borderRadius: '0.5rem', cursor: 'pointer' }}
+              >
+                Delete
+              </button>
+              <button
+                onClick={() => setParticipantToDelete(null)}
+                style={{ flex: 1, padding: '0.75rem', backgroundColor: 'white', color: '#374151', border: '1px solid #d1d5db', borderRadius: '0.5rem', cursor: 'pointer' }}
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </Modal>
+
+        <Modal
+          isOpen={!!entryToDelete && (!entryToDelete.recurrence_rule || entryToDelete.recurrence_rule === '')}
+          onClose={() => setEntryToDelete(null)}
+          title="Delete Event"
+          maxWidth="35rem"
+        >
+          <div style={{ padding: '0.5rem 0' }}>
+            <p style={{ color: '#374151', marginBottom: '1rem' }}>
+              Delete <strong>{entryToDelete?.student_name}</strong>?
+            </p>
+            <div style={{ display: 'flex', gap: '0.75rem' }}>
+              <button
+                onClick={async () => {
+                  if (!entryToDelete) return;
+                  try {
+                    await deleteScheduleEntry(entryToDelete.id);
+                    setEntries(entries.filter(e => e.id !== entryToDelete.id));
+                    setEntryToDelete(null);
+                  } catch (err) {
+                    console.error('Failed to delete event:', err);
+                  }
+                }}
+                style={{ flex: 1, padding: '0.75rem', backgroundColor: '#dc2626', color: 'white', border: 'none', borderRadius: '0.5rem', cursor: 'pointer' }}
+              >
+                Delete
+              </button>
+              <button
+                onClick={() => setEntryToDelete(null)}
+                style={{ flex: 1, padding: '0.75rem', backgroundColor: 'white', color: '#374151', border: '1px solid #d1d5db', borderRadius: '0.5rem', cursor: 'pointer' }}
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </Modal>
+
+        <Modal
+          isOpen={!!entryToDelete}
+          onClose={() => {
+            setEntryToDelete(null);
+            setActiveDragId(null);
+            setIsDragging(false);
+          }}
+          title="Delete Event"
+          maxWidth="35rem"
+        >
+          <div style={{ padding: '0.5rem 0' }}>
+            <p style={{ color: '#374151', marginBottom: '1rem' }}>
+              Delete <strong>{entryToDelete?.student_name}</strong>? This cannot be undone.
+            </p>
+            <div style={{ display: 'flex', gap: '0.75rem' }}>
+              <button
+                onClick={async () => {
+                  if (!entryToDelete) return;
+                  try {
+                    await deleteScheduleEntry(entryToDelete.id);
+                    setEntries(entries.filter(e => e.id !== entryToDelete.id));
+                    setEntryToDelete(null);
+                    setActiveDragId(null);
+                    setIsDragging(false);
+                    // Also close the AddEventModal if open
+                    if (selectedEntry?.id === entryToDelete.id) {
+                      setShowAddModal(false);
+                      setSelectedEntry(null);
+                    }
+                  } catch (err) {
+                    console.error('Failed to delete event:', err);
+                  }
+                }}
+                style={{ flex: 1, padding: '0.75rem', backgroundColor: '#dc2626', color: 'white', border: 'none', borderRadius: '0.5rem', cursor: 'pointer' }}
+              >
+                Delete
+              </button>
+              <button
+                onClick={() => {
+                  setEntryToDelete(null);
+                  setActiveDragId(null);
+                  setIsDragging(false);
+                }}
+                style={{ flex: 1, padding: '0.75rem', backgroundColor: 'white', color: '#374151', border: '1px solid #d1d5db', borderRadius: '0.5rem', cursor: 'pointer' }}
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </Modal>
+
+        <SchedulingPreviewModal
+          isOpen={showSchedulingPreview}
+          onClose={() => setShowSchedulingPreview(false)}
+          students={getUnassignedStudents()}
+          existingEntries={entries}
+          scheduleStart={new Date(schedule.start_date)}
+          scheduleId={scheduleId!}
+          onScheduled={loadScheduleData}
+        />
+
+        <ConfigureFormModal
+          isOpen={showConfigureFormModal}
+          onClose={() => setShowConfigureFormModal(false)}
+          onConfigured={loadScheduleData}
+          schedule={schedule}
+        />
+
+        <Modal
+          isOpen={!!responseToView}
+          onClose={() => setResponseToView(null)}
+          title="Event Details"
+          maxWidth="35rem"
+        >
+          {responseToView && (
+            <div style={{ padding: '0.25rem 0' }}>
+              <div style={styles.detailModalCard}>
+                <div style={{ padding: '1rem', backgroundColor: '#fef3c7', borderBottom: '1px solid #fde68a' }}>
+                  <div style={{ fontWeight: '600', fontSize: '1.125rem', color: '#92400e' }}>{responseToView.student_name}</div>
+                  {responseToView.email && (
+                    <div style={{ fontSize: '0.875rem', color: '#a16207', marginTop: '0.25rem' }}>{responseToView.email}</div>
+                  )}
+                </div>
+                <div style={{ padding: '1rem' }}>
+                  {getPreferredTimings(responseToView).map((timing, index) => (
+                    <div key={index} style={styles.detailModalPreferenceCard}>
+                      <div style={styles.detailModalPreferenceLabel}>
+                        {index === 0 ? '1st Choice' : index === 1 ? '2nd Choice' : '3rd Choice'}
+                      </div>
+                      <div style={styles.detailModalPreferenceValue}>
+                        {timing.day} {formatTime(timing.start)} - {formatTime(timing.end)}
+                        {timing.duration && ` (${timing.duration} min)`}
+                        <br />
+                        <span style={{ fontSize: '0.75rem', color: '#6b7280' }}>{formatFrequency(timing.frequency)}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <div style={{ display: 'flex', gap: '0.75rem', marginTop: '1.25rem' }}>
+                <button
+                  onClick={() => {
+                    setResponseToView(null);
+                    setParticipantToDelete(responseToView);
+                  }}
+                  style={{ flex: 1, padding: '0.75rem', backgroundColor: '#dc2626', color: 'white', border: 'none', borderRadius: '0.5rem', cursor: 'pointer', fontWeight: '500' }}
+                >
+                  Delete
+                </button>
+                <button
+                  onClick={() => setResponseToView(null)}
+                  style={{ flex: 1, padding: '0.75rem', backgroundColor: 'white', color: '#374151', border: '1px solid #d1d5db', borderRadius: '0.5rem', cursor: 'pointer', fontWeight: '500' }}
+                >
+                  Close
+                </button>
               </div>
             </div>
-          );
-        })()}
-      </DragOverlay>
-    </DndContext>
+          )}
+        </Modal>
+
+        <Modal
+          isOpen={showUnassignedModal}
+          onClose={() => setShowUnassignedModal(false)}
+          title="Unassigned Events"
+          maxWidth="40rem"
+        >
+          <div style={{ maxHeight: '60vh', overflowY: 'auto' }}>
+            {getUnassignedStudents().length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '2rem', color: '#6b7280' }}>
+                No unassigned events
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                {getUnassignedStudents().map((response) => {
+                  const isExpanded = expandedResponseIds.has(response.id);
+                  const timings = getPreferredTimings(response);
+
+                  return (
+                    <div key={response.id} style={styles.detailModalCard}>
+                      <div
+                        style={styles.detailModalCardHeader}
+                        onClick={() => toggleResponseExpanded(response.id)}
+                      >
+                        <div>
+                          <div style={styles.detailModalCardName}>{response.student_name}</div>
+                          {timings[0] && (
+                            <div style={{ fontSize: '0.8125rem', color: '#a16207', marginTop: '0.125rem' }}>
+                              {timings[0].day} {formatTime(timings[0].start)} - {formatTime(timings[0].end)}
+                              {timings[0].duration && ` (${timings[0].duration} min)`}
+                            </div>
+                          )}
+                        </div>
+                        <div style={styles.detailModalCardActions}>
+                          {isExpanded ? (
+                            <span style={{ fontSize: '0.875rem', color: '#f97316', fontWeight: '500' }}>Hide</span>
+                          ) : (
+                            <span style={{ fontSize: '0.875rem', color: '#f97316', fontWeight: '500' }}>Show</span>
+                          )}
+                          <Trash2
+                            size={16}
+                            style={{ color: '#9ca3af', cursor: 'pointer' }}
+                            onClick={(e: React.MouseEvent) => {
+                              e.stopPropagation();
+                              setShowUnassignedModal(false);
+                              setParticipantToDelete(response);
+                            }}
+                            onMouseEnter={(e: React.MouseEvent) => { (e.target as HTMLElement).style.color = '#dc2626'; }}
+                            onMouseLeave={(e: React.MouseEvent) => { (e.target as HTMLElement).style.color = '#9ca3af'; }}
+                          />
+                        </div>
+                      </div>
+                      {isExpanded && (
+                        <div style={styles.detailModalCardBody}>
+                          {response.email && (
+                            <div style={styles.detailModalField}>
+                              <span style={styles.detailModalFieldLabel}>Email</span>
+                              <span style={styles.detailModalFieldValue}>{response.email}</span>
+                            </div>
+                          )}
+                          <div style={styles.detailModalField}>
+                            <span style={styles.detailModalFieldLabel}>Preferences</span>
+                            {timings.map((timing, index) => (
+                              <div key={index} style={styles.detailModalPreferenceCard}>
+                                <div style={styles.detailModalPreferenceLabel}>
+                                  {index === 0 ? '1st Choice' : index === 1 ? '2nd Choice' : '3rd Choice'}
+                                </div>
+                                <div style={styles.detailModalPreferenceValue}>
+                                  {timing.day} {formatTime(timing.start)} - {formatTime(timing.end)}
+                                  {timing.duration && ` (${timing.duration} min)`}
+                                  <br />
+                                  <span style={{ fontSize: '0.75rem', color: '#6b7280' }}>{formatFrequency(timing.frequency)}</span>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                          <button
+                            onClick={() => {
+                              setShowUnassignedModal(false);
+                              setResponseToView(response);
+                            }}
+                            style={{ marginTop: '1rem', width: '100%', padding: '0.625rem', backgroundColor: '#f97316', color: 'white', border: 'none', borderRadius: '0.375rem', cursor: 'pointer', fontWeight: '500' }}
+                          >
+                            View Full Details
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </Modal>
+
+        <DragOverlay>
+          {activeDragId && (() => {
+            if (typeof activeDragId === 'string' && activeDragId.startsWith('unassigned-')) {
+              const responseId = activeDragId.replace('unassigned-', '');
+              const response = responses.find(r => r.id === responseId);
+              if (!response) return null;
+              return (
+                <div style={{ padding: '0.6rem 0.75rem', backgroundColor: '#fbbf24', borderRadius: '0.5rem', border: '1px solid #f59e0b', fontSize: '0.875rem', opacity: 0.7, cursor: 'grabbing', zIndex: 9999 }}>
+                  <div style={{ fontWeight: '600', color: '#92400e' }}>{response.student_name}</div>
+                </div>
+              );
+            }
+
+            const entry = entries.find(e => e.id === activeDragId);
+            if (!entry) return null;
+
+            return (
+              <div style={{ ...getLessonBlockStyle(entry), opacity: 0.7, cursor: 'grabbing', zIndex: 9999 }}>
+                <div style={{ fontWeight: '600' }}>{entry.student_name}</div>
+                <div style={{ fontSize: '0.625rem', opacity: 0.9 }}>
+                  {formatLocalTime(entry.start_time)} - {formatLocalTime(entry.end_time)}
+                </div>
+              </div>
+            );
+          })()}
+        </DragOverlay>
+      </DndContext>
     </div>
   );
 }
+
+
