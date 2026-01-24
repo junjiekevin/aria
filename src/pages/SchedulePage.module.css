@@ -362,6 +362,10 @@
     align-items: center;
     text-align: center;
     z-index: 10;
+    touch-action: none;
+    /* Prevents browser touch gestures from interfering with drag */
+    -webkit-user-select: none;
+    user-select: none;
 }
 
 /* Popover system */
@@ -437,6 +441,10 @@
     cursor: pointer;
     transition: var(--transition-fast);
     margin-bottom: 0.5rem;
+    touch-action: none;
+    /* Prevents browser touch gestures from interfering with drag */
+    -webkit-user-select: none;
+    user-select: none;
 }
 
 .unassignedCard:hover {
