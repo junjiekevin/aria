@@ -309,7 +309,7 @@ export default function ConfigureFormModal({
                     </div>
                     <div style={styles.previewItem}>
                         <span>•</span>
-                        {maxChoices} preferred timing{maxChoices !== 1 ? 's' : ''} per student
+                        {maxChoices} preferred timing{maxChoices !== 1 ? 's' : ''} per participant
                     </div>
                     {instructions && (
                         <div style={styles.previewItem}>

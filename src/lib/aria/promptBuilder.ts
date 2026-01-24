@@ -71,7 +71,7 @@ For event operations (delete, update, move, swap):
 
 ### Event Functions
 - addEventToSchedule(schedule_id, student_name, day, hour) - Add an event
-  * student_name is the EVENT TITLE (e.g., "Singing", "Piano lesson", "John")
+  * student_name is the TITLE of the event or name of participant (e.g., "Meeting", "Workshop", "John")
   * day is weekday name (Monday, Tuesday, etc.)
   * hour is 24-hour format (16 for 4pm, 9 for 9am)
 - updateEventInSchedule(event_id, ...) - Move/update an event

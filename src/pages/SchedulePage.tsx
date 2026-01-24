@@ -880,7 +880,7 @@ export default function SchedulePage() {
                     <div className={s.popoverOverlay} onClick={() => setIsEventsOpen(false)} />
                     <div className={s.popover}>
                       <div className={s.popoverHeader}>
-                        <h3 className={s.popoverTitle}>Unassigned Events</h3>
+                        <h3 className={s.popoverTitle}>Unassigned Participants</h3>
                         <button
                           onClick={() => getUnassignedStudents().length > 0 && setShowSchedulingPreview(true)}
                           disabled={getUnassignedStudents().length === 0}
@@ -908,7 +908,7 @@ export default function SchedulePage() {
                             </div>
                           ))}
                           {getUnassignedStudents().length === 0 && (
-                            <div className={s.emptyState}>No unassigned events</div>
+                            <div className={s.emptyState}>No unassigned participants</div>
                           )}
                         </div>
                       </div>

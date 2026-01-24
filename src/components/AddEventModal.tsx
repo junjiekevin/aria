@@ -109,7 +109,7 @@ export default function AddEventModal({
   onNeedDeleteConfirmation,
 }: AddEventModalProps) {
   const isEditMode = !!existingEntry;
-  
+
   const [studentName, setStudentName] = useState('');
   const [day, setDay] = useState(initialDay || 'Sunday');
   const [startHour, setStartHour] = useState('09');
@@ -123,20 +123,20 @@ export default function AddEventModal({
     if (existingEntry && isOpen) {
       const startDate = new Date(existingEntry.start_time);
       const endDate = new Date(existingEntry.end_time);
-      
+
       setStudentName(existingEntry.student_name);
-      
+
       const dayOfWeek = startDate.getDay();
       setDay(DAYS[dayOfWeek]);
-      
+
       const hours = startDate.getHours().toString().padStart(2, '0');
       const minutes = startDate.getMinutes().toString().padStart(2, '0');
       setStartHour(hours);
       setStartMinute(minutes);
-      
+
       const durationMinutes = (endDate.getTime() - startDate.getTime()) / (1000 * 60);
       setDuration(durationMinutes.toString());
-      
+
       const rule = existingEntry.recurrence_rule || '';
       if (!rule) {
         setFrequency('once');
@@ -198,7 +198,7 @@ export default function AddEventModal({
       const currentDay = scheduleStart.getDay();
       let daysToAdd = dayOfWeek - currentDay;
       if (daysToAdd < 0) daysToAdd += 7;
-      
+
       const firstOccurrence = new Date(scheduleStart);
       firstOccurrence.setDate(scheduleStart.getDate() + daysToAdd);
 
@@ -210,7 +210,7 @@ export default function AddEventModal({
       endTime.setMinutes(endTime.getMinutes() + parseInt(duration));
 
       const allEntries = await getScheduleEntries(scheduleId);
-      
+
       const overlappingEntry = allEntries.find(entry => {
         if (isEditMode && existingEntry && entry.id === existingEntry.id) {
           return false;
@@ -223,7 +223,7 @@ export default function AddEventModal({
           return false;
         }
 
-        const hasOverlap = 
+        const hasOverlap =
           (firstOccurrence < entryEnd && endTime > entryStart);
 
         return hasOverlap;
@@ -240,7 +240,7 @@ export default function AddEventModal({
       }
 
       const dayAbbrev = ['SU', 'MO', 'TU', 'WE', 'TH', 'FR', 'SA'][dayOfWeek];
-      
+
       let recurrenceRule = '';
       if (frequency === 'once') {
         recurrenceRule = '';
@@ -281,13 +281,13 @@ export default function AddEventModal({
 
   const handleDelete = async () => {
     if (!existingEntry) return;
-    
+
     // If recurring entry, show confirmation modal via callback
     if (existingEntry.recurrence_rule && existingEntry.recurrence_rule !== '' && onNeedDeleteConfirmation) {
       onNeedDeleteConfirmation();
       return;
     }
-    
+
     // Otherwise delete immediately
     try {
       setLoading(true);
@@ -307,7 +307,7 @@ export default function AddEventModal({
       <form onSubmit={handleSubmit} style={styles.form}>
         <div style={styles.formGroup}>
           <label style={styles.label}>
-            Name <span style={styles.required}>*</span>
+            Participant Name <span style={styles.required}>*</span>
           </label>
           <input
             type="text"
@@ -408,7 +408,7 @@ export default function AddEventModal({
         </div>
 
         <div style={styles.hint}>
-          {frequency === 'once' 
+          {frequency === 'once'
             ? `This is a single event on ${day} at ${startHour}:${startMinute}`
             : `This event will repeat on ${day}s at ${startHour}:${startMinute}`}
         </div>
@@ -423,7 +423,7 @@ export default function AddEventModal({
           >
             {loading ? (isEditMode ? 'Updating...' : 'Adding...') : (isEditMode ? 'Update Event' : 'Add Event')}
           </button>
-          
+
           {isEditMode && (
             <button
               type="button"
@@ -434,7 +434,7 @@ export default function AddEventModal({
               Delete
             </button>
           )}
-          
+
           <button
             type="button"
             onClick={onClose}

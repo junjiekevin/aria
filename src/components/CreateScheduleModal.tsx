@@ -208,7 +208,7 @@ export default function CreateScheduleModal({ isOpen, onClose, onSuccess }: Crea
               </select>
             </div>
           </div>
-          <p style={{ ...styles.helpText, fontSize: '0.7rem' }}>Restrict the schedule grid and student choices to this time range.</p>
+          <p style={{ ...styles.helpText, fontSize: '0.7rem' }}>Restrict schedule grid and event choices to this time range.</p>
         </div>
 
         <div style={styles.buttonGroup}>

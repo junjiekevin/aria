@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
 import Modal from './Modal';
 import { scheduleStudents, dayToIndex, type SchedulingResult, type ScheduledAssignment } from '../lib/scheduling';
-    import { createScheduleEntry, type ScheduleEntry } from '../lib/api/schedule-entries';
-    import { updateFormResponseAssigned, type FormResponse } from '../lib/api/form-responses';
+import { createScheduleEntry, type ScheduleEntry } from '../lib/api/schedule-entries';
+import { updateFormResponseAssigned, type FormResponse } from '../lib/api/form-responses';
 
 function formatTime(hour: number, minute: number): string {
     const period = hour >= 12 ? 'PM' : 'AM';
@@ -128,7 +128,7 @@ const styles = {
 function AssignmentCard({ assignment }: { assignment: ScheduledAssignment }) {
     const isScheduled = assignment.isScheduled;
     const choiceLabels = ['1st', '2nd', '3rd'];
-    
+
     return (
         <div style={{
             ...styles.assignmentCard,
@@ -176,7 +176,7 @@ export default function SchedulingPreviewModal({
             const scheduleEnd = new Date(scheduleStart);
             scheduleEnd.setMonth(scheduleEnd.getMonth() + 3); // Default fallback to 3 months
             const totalWeeks = Math.ceil((scheduleEnd.getTime() - scheduleStart.getTime()) / (7 * 24 * 60 * 60 * 1000));
-            
+
             const schedulingResult = scheduleStudents(students, existingEntries, scheduleStart, totalWeeks);
             setResult(schedulingResult);
             setLoading(false);
@@ -185,21 +185,21 @@ export default function SchedulingPreviewModal({
 
     const handleConfirm = async () => {
         if (!result) return;
-        
+
         setCreating(true);
         const scheduledAssignments = result.assignments.filter(a => a.isScheduled);
-        
+
         let created = 0;
-        
+
         for (const assignment of scheduledAssignments) {
             try {
                 // Build proper recurrence rule
                 const frequency = assignment.timing.frequency;
                 const interval = frequency === '2weekly' ? 2 : frequency === 'monthly' ? 4 : 1;
                 const dayAbbrev = ['SU', 'MO', 'TU', 'WE', 'TH', 'FR', 'SA'][dayToIndex(assignment.timing.day)];
-                
-                const recurrenceRule = frequency === 'once' 
-                    ? '' 
+
+                const recurrenceRule = frequency === 'once'
+                    ? ''
                     : `FREQ=WEEKLY${interval > 1 ? `;INTERVAL=${interval}` : ''};BYDAY=${dayAbbrev}`;
 
                 // Create first occurrence date/time
@@ -208,11 +208,11 @@ export default function SchedulingPreviewModal({
                 const dayIndex = dayToIndex(assignment.timing.day);
                 let daysToAdd = dayIndex - currentDay;
                 if (daysToAdd < 0) daysToAdd += 7;
-                
+
                 const occurrence = new Date(scheduleStartDate);
                 occurrence.setDate(scheduleStartDate.getDate() + daysToAdd);
                 occurrence.setHours(assignment.timing.startHour, assignment.timing.startMinute, 0, 0);
-                
+
                 const endTime = new Date(occurrence);
                 endTime.setHours(assignment.timing.endHour, assignment.timing.endMinute, 0, 0);
 
@@ -224,17 +224,17 @@ export default function SchedulingPreviewModal({
                     end_time: endTime.toISOString(),
                     recurrence_rule: recurrenceRule,
                 });
-                
+
                 created++;
                 setCreatedCount(created);
-                
+
                 // Mark form response as assigned instead of deleting (preserves audit trail)
                 await updateFormResponseAssigned(assignment.student.id, true);
             } catch (err) {
                 console.error('Failed to create entries:', err);
             }
         }
-        
+
         setCreating(false);
         onScheduled();
         onClose();
@@ -270,9 +270,9 @@ export default function SchedulingPreviewModal({
                 <div style={styles.summary}>
                     <div style={styles.summaryTitle}>Aria's Plan</div>
                     <div style={styles.summaryText}>
-                        {scheduledCount > 0 
-                            ? `I can schedule ${scheduledCount} of ${result.assignments.length} students.`
-                            : `I couldn't find available slots for any students.`
+                        {scheduledCount > 0
+                            ? `I can schedule ${scheduledCount} of ${result.assignments.length} participants.`
+                            : `I couldn't find available slots for any participants.`
                         }
                     </div>
                 </div>

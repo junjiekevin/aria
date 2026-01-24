@@ -220,10 +220,10 @@ export default function AboutPage() {
       <div style={styles.section} className="reveal">
         <h2 style={styles.sectionHeading}>Why Aria Exists</h2>
         <div style={styles.textBlock}>
-          Aria started with something simple I noticed when I was in music school.
+          Aria started with a simple observation about the weight of organization.
         </div>
         <div style={styles.textBlock}>
-          My teacher spent an enormous amount of time dealing with scheduling. Lesson conflicts, changes, initial placements, last minute switches. It often took more time and energy than the teaching itself. Over time, I realized this was not unique to her. The same frustration came up across faculty, administrators, and friends working in completely different fields.
+          I noticed that instructors and organizers spent an enormous amount of time dealing with scheduling. Slot conflicts, last-minute changes, initial placements, and constant coordination. It often took more time and energy than the actual work they were passionate about. Over time, I realized this was not unique to any one field. The same frustration came up across faculty, managers, and independent professionals everywhere.
         </div>
         <div style={styles.textBlock}>
           Capable, passionate people were spending hours managing logistics instead of doing the work they actually cared about.
@@ -242,10 +242,10 @@ export default function AboutPage() {
           <h2 style={{ ...styles.sectionHeading, marginBottom: 0 }}>Built With Simplicity in Mind</h2>
         </div>
         <div style={styles.textBlock}>
-          Music was my first world. I completed both my undergraduate and master’s degrees in music before transitioning into computer science, and that background shaped how I think about structure, flow, and clarity.
+          My background in music shaped how I think about structure, flow, and clarity. In that world, we often spoke about simplicity—about removing what was unnecessary so the intent could come through clearly and effortlessly.
         </div>
         <div style={styles.textBlock}>
-          In lessons, my teacher often spoke about simplicity in music making. About removing what was unnecessary so the intent could come through clearly and effortlessly. During one of those conversations, she shared a quote that stayed with me throughout my life and later became the guiding principle behind Aria:
+          During one of those experiences, I encountered a quote that later became the guiding principle behind Aria:
         </div>
         <blockquote style={styles.quote}>
           “Everything should be made as simple as possible, but not simpler.”
@@ -261,18 +261,18 @@ export default function AboutPage() {
       </div>
 
       <div style={styles.section} className="reveal">
-        <h2 style={styles.sectionHeading}>A Side Project With a Purpose</h2>
+        <h2 style={styles.sectionHeading}>A Purpose-Driven Tool</h2>
         <div style={styles.textBlock}>
-          Aria began as a side project, built specifically to help my teacher. The goal was straightforward. Reduce the time she spent scheduling so she could focus on teaching, which was the reason she chose that profession in the first place.
+          Aria began as a project built specifically to help practitioners. The goal was straightforward: reduce the time spent scheduling so they could focus on their expertise, which was the reason they chose their profession in the first place.
         </div>
         <div style={styles.textBlock}>
           It was never built for me. From the start, it was meant for others.
         </div>
         <div style={styles.textBlock}>
-          As development continued, it became clear that the same scheduling friction existed far beyond education. Different roles, different industries, same problem. Too much energy spent organizing instead of doing meaningful work.
+          As development continued, it became clear that the same scheduling friction existed far beyond its original scope. Different roles, different industries, same problem. Too much energy spent organizing instead of doing meaningful work.
         </div>
         <div style={styles.textBlock}>
-          That is when Aria started to grow beyond its original scope.
+          That is when Aria started to evolve into a tool for anyone who needs to manage time and people.
         </div>
       </div>
 
