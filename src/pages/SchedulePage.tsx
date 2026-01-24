@@ -271,8 +271,8 @@ export default function SchedulePage() {
     }
   };
 
-  const getUnassignedStudents = () => {
-    return responses.filter(r => r.assigned === false);
+  const getUnassignedParticipants = () => {
+    return responses.filter((r) => !r.assigned);
   };
 
   const formatTime = (timeStr: string) => {
@@ -706,44 +706,58 @@ export default function SchedulePage() {
     }
   };
 
-  const getLessonBlockStyle = (entry: ScheduleEntry) => {
+  const getEventBlockStyle = (entry: ScheduleEntry) => {
+    const workingHoursStart = schedule?.working_hours_start ?? 8; // Define workingHoursStart here
     const startTime = new Date(entry.start_time);
     const endTime = new Date(entry.end_time);
 
-    const startMinutes = startTime.getMinutes();
-    const durationMinutes = (endTime.getTime() - startTime.getTime()) / (1000 * 60);
+    const startHour = startTime.getHours();
+    const startMin = startTime.getMinutes();
+    const endHour = endTime.getHours();
+    const endMin = endTime.getMinutes();
 
-    const topOffset = (startMinutes / 60) * 40;
-    const height = (durationMinutes / 60) * 40;
+    const durationHrs = (endHour + endMin / 60) - (startHour + startMin / 60);
+    const top = (startHour - workingHoursStart + startMin / 60) * 80;
+    const height = durationHrs * 80;
 
     return {
-      top: `${topOffset}px`,
+      top: `${top}px`,
       height: `${height}px`,
     };
   };
 
-  function DraggableLessonBlock({ entry, children }: { entry: ScheduleEntry; children: React.ReactNode }) {
-    const { attributes, listeners, setNodeRef } = useDraggable({
+  function DraggableEventBlock({ entry, children }: { entry: ScheduleEntry; children: React.ReactNode }) {
+    const {
+      attributes,
+      listeners,
+      setNodeRef,
+      transform,
+      isDragging: isBeingDragged, // Renamed to avoid conflict with component-level isDragging
+    } = useDraggable({
       id: entry.id,
       data: entry,
       disabled: isViewOnly,
     });
 
-    const isBeingDragged = activeDragId === entry.id;
+    const style = transform ? {
+      transform: `translate3d(${transform.x}px, ${transform.y}px, 0)`,
+      zIndex: 1000,
+      opacity: isBeingDragged ? 0 : 1,
+    } : undefined;
 
     return (
       <div
         ref={setNodeRef}
-        className={s.lessonBlock}
+        className={s.eventBlock}
         style={{
-          ...getLessonBlockStyle(entry),
-          opacity: isBeingDragged ? 0 : 1,
+          ...getEventBlockStyle(entry),
+          ...style, // Apply transform and opacity from useDraggable
           visibility: isBeingDragged ? 'hidden' : 'visible',
           pointerEvents: isBeingDragged ? 'none' : 'auto',
           cursor: isViewOnly ? 'default' : 'grab',
         }}
         onClick={(e) => {
-          if (!isDragging && !isViewOnly) {
+          if (!isDragging && !isViewOnly) { // Use component-level isDragging here
             handleEntryClick(entry, e);
           }
         }}
@@ -870,8 +884,8 @@ export default function SchedulePage() {
                 >
                   <List size={16} />
                   <span>Events</span>
-                  {getUnassignedStudents().length > 0 && (
-                    <div className={s.badge}>{getUnassignedStudents().length}</div>
+                  {getUnassignedParticipants().length > 0 && (
+                    <div className={s.badge}>{getUnassignedParticipants().length}</div>
                   )}
                 </button>
 
@@ -882,8 +896,8 @@ export default function SchedulePage() {
                       <div className={s.popoverHeader}>
                         <h3 className={s.popoverTitle}>Unassigned Participants</h3>
                         <button
-                          onClick={() => getUnassignedStudents().length > 0 && setShowSchedulingPreview(true)}
-                          disabled={getUnassignedStudents().length === 0}
+                          onClick={() => getUnassignedParticipants().length > 0 && setShowSchedulingPreview(true)}
+                          disabled={getUnassignedParticipants().length === 0}
                           className={s.activateButton}
                           style={{ padding: '4px 10px', fontSize: '0.75rem' }}
                         >
@@ -893,7 +907,7 @@ export default function SchedulePage() {
                       </div>
                       <div className={s.popoverContent}>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                          {getUnassignedStudents().map((response) => (
+                          {getUnassignedParticipants().map((response) => (
                             <div
                               key={response.id}
                               className={s.unassignedCard}
@@ -907,7 +921,7 @@ export default function SchedulePage() {
                               />
                             </div>
                           ))}
-                          {getUnassignedStudents().length === 0 && (
+                          {getUnassignedParticipants().length === 0 && (
                             <div className={s.emptyState}>No unassigned participants</div>
                           )}
                         </div>
@@ -1037,14 +1051,14 @@ export default function SchedulePage() {
                   return (
                     <DroppableSlot key={`${day}-${hour}`} day={day} hour={hour}>
                       {slotEntries.map((entry) => (
-                        <DraggableLessonBlock key={entry.id} entry={entry}>
+                        <DraggableEventBlock key={entry.id} entry={entry}>
                           <div style={{ fontWeight: '600' }}>{entry.student_name}</div>
                           <div style={{ fontSize: '0.625rem', opacity: 0.9 }}>
                             {formatLocalTime(entry.start_time)}
                             {' - '}
                             {formatLocalTime(entry.end_time)}
                           </div>
-                        </DraggableLessonBlock>
+                        </DraggableEventBlock>
                       ))}
                     </DroppableSlot>
                   );
@@ -1210,7 +1224,7 @@ export default function SchedulePage() {
         <SchedulingPreviewModal
           isOpen={showSchedulingPreview}
           onClose={() => setShowSchedulingPreview(false)}
-          students={getUnassignedStudents()}
+          participants={getUnassignedParticipants()}
           existingEntries={entries}
           scheduleStart={new Date(schedule.start_date)}
           scheduleId={scheduleId!}
@@ -1321,7 +1335,7 @@ export default function SchedulePage() {
             if (!entry) return null;
 
             return (
-              <div style={{ ...getLessonBlockStyle(entry), opacity: 0.7, cursor: 'grabbing', zIndex: 9999 }}>
+              <div style={{ ...getEventBlockStyle(entry), opacity: 0.7, cursor: 'grabbing', zIndex: 9999 }}>
                 <div style={{ fontWeight: '600' }}>{entry.student_name}</div>
                 <div style={{ fontSize: '0.625rem', opacity: 0.9 }}>
                   {formatLocalTime(entry.start_time)} - {formatLocalTime(entry.end_time)}

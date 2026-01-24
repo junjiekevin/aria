@@ -292,7 +292,7 @@
     transition: background-color 0.2s;
 }
 
-.lessonBlock {
+.eventBlock {
     position: absolute;
     top: 0;
     left: 2px;

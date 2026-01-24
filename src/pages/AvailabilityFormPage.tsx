@@ -323,7 +323,7 @@ function TimingSelector({
     );
 }
 
-export default function StudentFormPage() {
+export default function AvailabilityFormPage() {
     const { scheduleId } = useParams<{ scheduleId: string }>();
 
     const [schedule, setSchedule] = useState<Schedule | null>(null);

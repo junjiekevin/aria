@@ -7,7 +7,7 @@ import { supabase } from './lib/supabase'
 
 const CHAT_STORAGE_KEY = 'aria_chat_messages';
 
-const StudentFormPage = React.lazy(() => import('./pages/StudentFormPage.tsx'))
+const AvailabilityFormPage = React.lazy(() => import('./pages/AvailabilityFormPage.tsx'))
 const DashboardPage = React.lazy(() => import('./pages/DashboardPage.tsx'))
 const SchedulePage = React.lazy(() => import('./pages/SchedulePage.tsx'))
 const AccountPage = React.lazy(() => import('./pages/AccountPage.tsx'))
@@ -51,7 +51,7 @@ const App = () => {
         <React.Suspense fallback={<div>Loading...</div>}>
             <Routes>
                 <Route path="/" element={<AuthPage />} />
-                <Route path="/form/:scheduleId" element={<StudentFormPage />} />
+                <Route path="/form/:scheduleId" element={<AvailabilityFormPage />} />
                 <Route path="/dashboard" element={<ProtectedRoute><DashboardPage /></ProtectedRoute>} />
                 <Route path="/schedule/:scheduleId" element={<ProtectedRoute><SchedulePage /></ProtectedRoute>} />
                 <Route path="/account" element={<ProtectedRoute><AccountPage /></ProtectedRoute>} />

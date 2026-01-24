@@ -128,7 +128,7 @@ export default function CreateScheduleModal({ isOpen, onClose, onSuccess }: Crea
             type="text"
             value={formData.label}
             onChange={(e) => setFormData({ ...formData, label: e.target.value })}
-            placeholder="e.g., Fall 2026 Piano Lessons"
+            placeholder="e.g., Fall 2026 Team Appointments"
             required
             style={styles.input}
             onFocus={(e) => { e.currentTarget.style.borderColor = '#f97316'; }}

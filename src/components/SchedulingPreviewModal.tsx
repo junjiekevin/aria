@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import Modal from './Modal';
-import { scheduleStudents, dayToIndex, type SchedulingResult, type ScheduledAssignment } from '../lib/scheduling';
+import { scheduleParticipants, dayToIndex, type SchedulingResult, type ScheduledAssignment } from '../lib/scheduling';
 import { createScheduleEntry, type ScheduleEntry } from '../lib/api/schedule-entries';
 import { updateFormResponseAssigned, type FormResponse } from '../lib/api/form-responses';
 
@@ -17,7 +17,7 @@ function formatDay(day: string): string {
 interface SchedulingPreviewModalProps {
     isOpen: boolean;
     onClose: () => void;
-    students: FormResponse[];
+    participants: FormResponse[];
     existingEntries: ScheduleEntry[];
     scheduleStart: Date;
     scheduleId: string;
@@ -141,7 +141,7 @@ function AssignmentCard({ assignment }: { assignment: ScheduledAssignment }) {
                 {isScheduled ? choiceLabels[assignment.choiceRank - 1] : '✗'}
             </span>
             <div>
-                <div style={styles.studentName}>{assignment.student.student_name}</div>
+                <div style={styles.studentName}>{assignment.participant.student_name}</div>
                 {isScheduled ? (
                     <div style={styles.timing}>
                         {formatDay(assignment.timing.day)} {formatTime(assignment.timing.startHour, assignment.timing.startMinute)} - {formatTime(assignment.timing.endHour, assignment.timing.endMinute)}
@@ -157,7 +157,7 @@ function AssignmentCard({ assignment }: { assignment: ScheduledAssignment }) {
 export default function SchedulingPreviewModal({
     isOpen,
     onClose,
-    students,
+    participants,
     existingEntries,
     scheduleStart,
     scheduleId,
@@ -170,18 +170,18 @@ export default function SchedulingPreviewModal({
 
     // Run scheduling algorithm when modal opens
     useEffect(() => {
-        if (isOpen && students.length > 0 && scheduleStart) {
+        if (isOpen && participants.length > 0 && scheduleStart) {
             setLoading(true);
             // Calculate total weeks from actual schedule dates
             const scheduleEnd = new Date(scheduleStart);
             scheduleEnd.setMonth(scheduleEnd.getMonth() + 3); // Default fallback to 3 months
             const totalWeeks = Math.ceil((scheduleEnd.getTime() - scheduleStart.getTime()) / (7 * 24 * 60 * 60 * 1000));
 
-            const schedulingResult = scheduleStudents(students, existingEntries, scheduleStart, totalWeeks);
+            const schedulingResult = scheduleParticipants(participants, existingEntries, scheduleStart, totalWeeks);
             setResult(schedulingResult);
             setLoading(false);
         }
-    }, [isOpen, students, existingEntries, scheduleStart]);
+    }, [isOpen, participants, existingEntries, scheduleStart]);
 
     const handleConfirm = async () => {
         if (!result) return;
@@ -219,7 +219,7 @@ export default function SchedulingPreviewModal({
                 // Create single entry with recurrence rule
                 await createScheduleEntry({
                     schedule_id: scheduleId,
-                    student_name: assignment.student.student_name,
+                    student_name: assignment.participant.student_name,
                     start_time: occurrence.toISOString(),
                     end_time: endTime.toISOString(),
                     recurrence_rule: recurrenceRule,
@@ -229,7 +229,7 @@ export default function SchedulingPreviewModal({
                 setCreatedCount(created);
 
                 // Mark form response as assigned instead of deleting (preserves audit trail)
-                await updateFormResponseAssigned(assignment.student.id, true);
+                await updateFormResponseAssigned(assignment.participant.id, true);
             } catch (err) {
                 console.error('Failed to create entries:', err);
             }
