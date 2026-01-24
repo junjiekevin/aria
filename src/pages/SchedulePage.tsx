@@ -71,19 +71,24 @@ const styles = {
     margin: '0 auto',
     padding: '0.6rem',
     display: 'grid',
-    gridTemplateColumns: '1fr 280px',
+    gridTemplateColumns: 'minmax(0, 1fr) 280px',
     gap: '0.85rem',
+  },
+  mainMobile: {
+    gridTemplateColumns: '1fr',
   },
   timetableContainer: {
     backgroundColor: 'white',
     borderRadius: '0.5rem',
     boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
     border: '1px solid #e5e7eb',
-    overflow: 'hidden',
+    overflow: 'auto',
+    WebkitOverflowScrolling: 'touch' as const,
   },
   timetableHeader: {
     display: 'grid',
     gridTemplateColumns: '55px repeat(7, 1fr)',
+    minWidth: '700px',
     borderBottom: '2px solid #f97316',
     backgroundColor: '#fff7ed',
   },
@@ -118,6 +123,7 @@ const styles = {
   timetableGrid: {
     display: 'grid',
     gridTemplateColumns: '55px repeat(7, 1fr)',
+    minWidth: '700px',
   },
   timeSlot: {
     height: '40px',
@@ -431,6 +437,7 @@ export default function SchedulePage() {
 
   const [showConfigureFormModal, setShowConfigureFormModal] = useState(false);
   const [showTrashConfirm, setShowTrashConfirm] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
 
   const [isEditingName, setIsEditingName] = useState(false);
   const [editingName, setEditingName] = useState('');
@@ -462,6 +469,16 @@ export default function SchedulePage() {
     window.addEventListener('aria-schedule-change', handleScheduleChange);
     return () => window.removeEventListener('aria-schedule-change', handleScheduleChange);
   }, [scheduleId]);
+
+  // Detect mobile viewport
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 1024); // Use 1024 as breakpoint for side panel stacking
+    };
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
 
   // Helper to parse YYYY-MM-DD in local timezone (not UTC)
   const parseLocalDate = (dateStr: string): Date => {
@@ -1405,7 +1422,7 @@ export default function SchedulePage() {
           </div>
         </header>
 
-        <main style={styles.main}>
+        <main style={{ ...styles.main, ...(isMobile ? styles.mainMobile : {}) }}>
           <div style={styles.timetableContainer}>
             <div style={styles.timetableHeader}>
               <div style={styles.dayHeader}></div>

@@ -1,0 +1,118 @@
+/* src/components/ProfileDropdown.module.css */
+@import '../styles/variables.css';
+
+.container {
+    position: relative;
+}
+
+.trigger {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem;
+    background: none;
+    border: 1px solid var(--border-gray-200);
+    border-radius: var(--radius-full);
+    cursor: pointer;
+    transition: var(--transition-fast);
+}
+
+.trigger:hover {
+    border-color: var(--brand-primary);
+}
+
+.avatar {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background-color: var(--brand-primary);
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.875rem;
+    font-weight: 600;
+}
+
+.avatarImage {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    object-fit: cover;
+}
+
+.dropdown {
+    position: absolute;
+    top: calc(100% + 0.5rem);
+    right: 0;
+    min-width: 200px;
+    background-color: white;
+    border-radius: var(--radius-sm);
+    box-shadow: var(--shadow-lg);
+    border: 1px solid var(--border-gray-200);
+    overflow: hidden;
+    z-index: 1000;
+}
+
+.userInfo {
+    padding: 0.75rem 1rem;
+    border-bottom: 1px solid var(--border-gray-200);
+    background-color: #fffcf9;
+}
+
+.userName {
+    font-weight: 600;
+    color: var(--text-900);
+    font-size: 0.875rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.userEmail {
+    color: var(--text-500);
+    font-size: 0.75rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.dropdownItem {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.75rem 1rem;
+    width: 100%;
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: 0.875rem;
+    color: var(--text-700);
+    transition: var(--transition-fast);
+    text-align: left;
+}
+
+.dropdownItem:hover {
+    background-color: var(--bg-gray-50);
+}
+
+.dropdownItemSignOut {
+    color: var(--brand-error);
+}
+
+.dropdownItemSignOut:hover {
+    background-color: #fee2e2;
+}
+
+.divider {
+    height: 1px;
+    background-color: var(--border-gray-200);
+    margin: 0.25rem 0;
+}
+
+@media (max-width: 480px) {
+    .dropdown {
+        right: -10px;
+        max-width: calc(100vw - 20px);
+    }
+}

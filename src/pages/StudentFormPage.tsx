@@ -89,6 +89,7 @@ const styles: Record<string, React.CSSProperties> = {
     row: {
         display: 'flex',
         gap: '0.75rem',
+        flexWrap: 'wrap' as const,
     },
     select: {
         flex: 1,
@@ -215,13 +216,13 @@ function formatDate(dateStr: string): string {
     return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
-function TimingSelector({ 
-    timing, 
-    onChange, 
-    index, 
-    errors 
-}: { 
-    timing: TimingSlot; 
+function TimingSelector({
+    timing,
+    onChange,
+    index,
+    errors
+}: {
+    timing: TimingSlot;
     onChange: (timing: TimingSlot) => void;
     index: number;
     errors: string[];
@@ -233,67 +234,71 @@ function TimingSelector({
             <div style={styles.timingHeader}>
                 <span style={styles.badge}>Choice {index + 1}</span>
             </div>
-            
+
             <div style={styles.row}>
                 <select
                     value={timing.day}
                     onChange={(e) => onChange({ ...timing, day: e.target.value })}
-                    style={styles.select}
+                    style={{ ...styles.select, minWidth: '100%' }}
                 >
                     {DAYS.map(day => (
                         <option key={day} value={day}>{day}</option>
                     ))}
                 </select>
             </div>
-            
-            <div style={{ ...styles.row, marginTop: '0.75rem' }}>
-                <select
-                    value={timing.startHour}
-                    onChange={(e) => onChange({ ...timing, startHour: e.target.value })}
-                    style={styles.select}
-                >
-                    {HOURS.map(hour => (
-                        <option key={hour} value={hour.toString().padStart(2, '0')}>
-                            {hour > 12 ? `${hour - 12} PM` : hour === 12 ? '12 PM' : `${hour} AM`}
-                        </option>
-                    ))}
-                </select>
-                <span style={{ display: 'flex', alignItems: 'center', color: '#6b7280' }}>:</span>
-                <select
-                    value={timing.startMinute}
-                    onChange={(e) => onChange({ ...timing, startMinute: e.target.value })}
-                    style={styles.select}
-                >
-                    {['00', '15', '30', '45'].map(min => (
-                        <option key={min} value={min}>{min}</option>
-                    ))}
-                </select>
-                
-                <span style={{ display: 'flex', alignItems: 'center', color: '#6b7280' }}>to</span>
-                
-                <select
-                    value={timing.endHour}
-                    onChange={(e) => onChange({ ...timing, endHour: e.target.value })}
-                    style={styles.select}
-                >
-                    {HOURS.map(hour => (
-                        <option key={hour} value={hour.toString().padStart(2, '0')}>
-                            {hour > 12 ? `${hour - 12} PM` : hour === 12 ? '12 PM' : `${hour} AM`}
-                        </option>
-                    ))}
-                </select>
-                <span style={{ display: 'flex', alignItems: 'center', color: '#6b7280' }}>:</span>
-                <select
-                    value={timing.endMinute}
-                    onChange={(e) => onChange({ ...timing, endMinute: e.target.value })}
-                    style={styles.select}
-                >
-                    {['00', '15', '30', '45'].map(min => (
-                        <option key={min} value={min}>{min}</option>
-                    ))}
-                </select>
+
+            <div style={{ ...styles.row, marginTop: '0.75rem', alignItems: 'center' }}>
+                <div style={{ display: 'flex', gap: '0.5rem', flex: 1, minWidth: '140px' }}>
+                    <select
+                        value={timing.startHour}
+                        onChange={(e) => onChange({ ...timing, startHour: e.target.value })}
+                        style={styles.select}
+                    >
+                        {HOURS.map(hour => (
+                            <option key={hour} value={hour.toString().padStart(2, '0')}>
+                                {hour > 12 ? `${hour - 12} PM` : hour === 12 ? '12 PM' : `${hour} AM`}
+                            </option>
+                        ))}
+                    </select>
+                    <span style={{ display: 'flex', alignItems: 'center', color: '#6b7280' }}>:</span>
+                    <select
+                        value={timing.startMinute}
+                        onChange={(e) => onChange({ ...timing, startMinute: e.target.value })}
+                        style={styles.select}
+                    >
+                        {['00', '15', '30', '45'].map(min => (
+                            <option key={min} value={min}>{min}</option>
+                        ))}
+                    </select>
+                </div>
+
+                <span style={{ color: '#6b7280', margin: '0 0.25rem' }}>to</span>
+
+                <div style={{ display: 'flex', gap: '0.5rem', flex: 1, minWidth: '140px' }}>
+                    <select
+                        value={timing.endHour}
+                        onChange={(e) => onChange({ ...timing, endHour: e.target.value })}
+                        style={styles.select}
+                    >
+                        {HOURS.map(hour => (
+                            <option key={hour} value={hour.toString().padStart(2, '0')}>
+                                {hour > 12 ? `${hour - 12} PM` : hour === 12 ? '12 PM' : `${hour} AM`}
+                            </option>
+                        ))}
+                    </select>
+                    <span style={{ display: 'flex', alignItems: 'center', color: '#6b7280' }}>:</span>
+                    <select
+                        value={timing.endMinute}
+                        onChange={(e) => onChange({ ...timing, endMinute: e.target.value })}
+                        style={styles.select}
+                    >
+                        {['00', '15', '30', '45'].map(min => (
+                            <option key={min} value={min}>{min}</option>
+                        ))}
+                    </select>
+                </div>
             </div>
-            
+
             <div style={{ marginTop: '0.75rem' }}>
                 <select
                     value={timing.frequency}
@@ -305,7 +310,7 @@ function TimingSelector({
                     ))}
                 </select>
             </div>
-            
+
             {hasError && (
                 <div style={{ color: '#dc2626', fontSize: '0.75rem', marginTop: '0.5rem' }}>
                     {errors.map((err, i) => (
@@ -319,7 +324,7 @@ function TimingSelector({
 
 export default function StudentFormPage() {
     const { scheduleId } = useParams<{ scheduleId: string }>();
-    
+
     const [schedule, setSchedule] = useState<Schedule | null>(null);
     const [loading, setLoading] = useState(true);
     const [submitting, setSubmitting] = useState(false);
@@ -327,24 +332,24 @@ export default function StudentFormPage() {
     const [submitted, setSubmitted] = useState(false);
     const [copied, setCopied] = useState(false);
     const [formClosedDueToDeadline, setFormClosedDueToDeadline] = useState(false);
-    
+
     const [firstName, setFirstName] = useState('');
     const [lastName, setLastName] = useState('');
     const [email, setEmail] = useState('');
     const [timing1, setTiming1] = useState<TimingSlot>({ ...EMPTY_TIMING, day: 'Monday' });
     const [timing2, setTiming2] = useState<TimingSlot>({ ...EMPTY_TIMING, day: 'Tuesday' });
     const [timing3, setTiming3] = useState<TimingSlot>({ ...EMPTY_TIMING, day: 'Wednesday' });
-    
+
     const [formErrors, setFormErrors] = useState<string[]>([]);
 
     useEffect(() => {
         async function loadSchedule() {
             if (!scheduleId) return;
-            
+
             try {
                 const scheduleData = await getSchedule(scheduleId);
                 setSchedule(scheduleData);
-                
+
                 // Check deadline
                 if (scheduleData.form_deadline) {
                     const deadline = new Date(scheduleData.form_deadline);
@@ -362,12 +367,12 @@ export default function StudentFormPage() {
                 setLoading(false);
             }
         }
-        
+
         loadSchedule();
     }, [scheduleId]);
 
-    const formUrl = typeof window !== 'undefined' 
-        ? `${window.location.origin}/form/${scheduleId}` 
+    const formUrl = typeof window !== 'undefined'
+        ? `${window.location.origin}/form/${scheduleId}`
         : '';
 
     const copyToClipboard = async () => {
@@ -382,106 +387,106 @@ export default function StudentFormPage() {
 
     const timesOverlap = (t1: TimingSlot, t2: TimingSlot): boolean => {
         if (t1.day !== t2.day) return false;
-        
+
         const start1 = parseInt(t1.startHour) * 60 + parseInt(t1.startMinute);
         const end1 = parseInt(t1.endHour) * 60 + parseInt(t1.endMinute);
         const start2 = parseInt(t2.startHour) * 60 + parseInt(t2.startMinute);
         const end2 = parseInt(t2.endHour) * 60 + parseInt(t2.endMinute);
-        
+
         return start1 < end2 && start2 < end1;
     };
 
     const validateForm = (): { errors: string[]; warnings: string[] } => {
         const errors: string[] = [];
         const warnings: string[] = [];
-        
+
         if (!firstName.trim()) errors.push('First name is required');
         if (!lastName.trim()) errors.push('Last name is required');
         if (!email.trim()) errors.push('Email is required');
         else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
             errors.push('Please enter a valid email address');
         }
-        
+
         const maxChoices = schedule?.max_choices || 3;
         const timings = [timing1, timing2, timing3].slice(0, maxChoices);
-        
+
         for (let i = 0; i < timings.length; i++) {
             const t = timings[i];
             const start = parseInt(t.startHour) * 60 + parseInt(t.startMinute);
             const end = parseInt(t.endHour) * 60 + parseInt(t.endMinute);
-            
+
             if (start >= end) {
                 errors.push(`Choice ${i + 1}: End time must be after start time`);
             }
-            
+
             for (let j = i + 1; j < timings.length; j++) {
                 if (timesOverlap(t, timings[j])) {
                     errors.push(`Choice ${i + 1} overlaps with Choice ${j + 1}`);
                 }
             }
         }
-        
+
         return { errors, warnings };
     };
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setError(null);
-        
+
         const { errors } = validateForm();
-        
+
         if (errors.length > 0) {
             setFormErrors(errors);
             setSubmitting(false);
             return;
         }
-        
+
         if (!scheduleId || !schedule) return;
-        
+
         setSubmitting(true);
-        
+
         try {
             // Check for duplicates
             const existingResponses = await getFormResponses(scheduleId);
-            
+
             // Block exact email match
-            const emailDuplicate = existingResponses.find(r => 
+            const emailDuplicate = existingResponses.find(r =>
                 r.email.toLowerCase() === email.toLowerCase()
             );
-            
+
             if (emailDuplicate) {
                 setFormErrors(['A response with this email has already been submitted.']);
                 setSubmitting(false);
                 return;
             }
-            
+
             // Warn about name match (but allow override)
-            const nameMatch = existingResponses.find(r => 
+            const nameMatch = existingResponses.find(r =>
                 r.student_name.toLowerCase() === `${firstName} ${lastName}`.toLowerCase()
             );
-            
+
             if (nameMatch) {
                 // Show confirmation dialog
                 const confirmSubmit = window.confirm(
                     `Someone with the name "${firstName} ${lastName}" has already submitted a response. ` +
                     `Is this a different person? Click OK to submit, or Cancel to go back.`
                 );
-                
+
                 if (!confirmSubmit) {
                     setSubmitting(false);
                     return;
                 }
             }
-            
+
             const maxChoices = schedule.max_choices || 3;
             const timings = [timing1, timing2, timing3];
-            
+
             const formData: any = {
                 schedule_id: scheduleId,
                 student_name: `${firstName} ${lastName}`,
                 email: email.trim(),
             };
-            
+
             // Add only the configured number of choices
             for (let i = 0; i < maxChoices; i++) {
                 const t = timings[i];
@@ -490,9 +495,9 @@ export default function StudentFormPage() {
                 formData[`preferred_${i + 1}_end`] = `${t.endHour}:${t.endMinute}`;
                 formData[`preferred_${i + 1}_frequency`] = t.frequency;
             }
-            
+
             await createFormResponse(formData);
-            
+
             setSubmitted(true);
         } catch (err) {
             console.error('Failed to submit form:', err);
@@ -546,7 +551,7 @@ export default function StudentFormPage() {
                                 If you need to make any changes, please contact the person who sent you this form link.
                             </div>
                         </div>
-                        
+
                         <div style={styles.copySection}>
                             <div style={styles.copyLabel}>Share this form with others who need to submit their availability:</div>
                             <div style={styles.copyRow}>
@@ -578,7 +583,7 @@ export default function StudentFormPage() {
                         {schedule && `${formatDate(schedule.start_date)} - ${formatDate(schedule.end_date)}`}
                     </div>
                 </div>
-                
+
                 <form onSubmit={handleSubmit} style={styles.content}>
                     {formClosedDueToDeadline && (
                         <div style={{ ...styles.error, backgroundColor: '#fef3c7', border: '1px solid #f59e0b', color: '#92400e' }}>
@@ -588,7 +593,7 @@ export default function StudentFormPage() {
                             </div>
                         </div>
                     )}
-                    
+
                     {formErrors.length > 0 && (
                         <div style={styles.error}>
                             <AlertCircle size={20} style={{ flexShrink: 0, marginTop: 2 }} />
@@ -599,19 +604,19 @@ export default function StudentFormPage() {
                             </div>
                         </div>
                     )}
-                    
+
                     {error && (
                         <div style={styles.error}>
                             <AlertCircle size={20} style={{ flexShrink: 0, marginTop: 2 }} />
                             <div>{error}</div>
                         </div>
                     )}
-                    
+
                     {schedule?.form_instructions && (
-                        <div style={{ 
-                            backgroundColor: '#f0f9ff', 
-                            border: '1px solid #bae6fd', 
-                            borderRadius: '0.5rem', 
+                        <div style={{
+                            backgroundColor: '#f0f9ff',
+                            border: '1px solid #bae6fd',
+                            borderRadius: '0.5rem',
                             padding: '1rem',
                             marginBottom: '1.5rem',
                             fontSize: '0.875rem',
@@ -621,9 +626,9 @@ export default function StudentFormPage() {
                             <div>{schedule.form_instructions}</div>
                         </div>
                     )}
-                    
+
                     <div style={styles.sectionTitle}>Your Information</div>
-                    
+
                     <div style={styles.formGroup}>
                         <label style={styles.label}>First Name *</label>
                         <input
@@ -634,7 +639,7 @@ export default function StudentFormPage() {
                             placeholder="Enter your first name"
                         />
                     </div>
-                    
+
                     <div style={styles.formGroup}>
                         <label style={styles.label}>Last Name *</label>
                         <input
@@ -645,7 +650,7 @@ export default function StudentFormPage() {
                             placeholder="Enter your last name"
                         />
                     </div>
-                    
+
                     <div style={styles.formGroup}>
                         <label style={styles.label}>Email Address *</label>
                         <input
@@ -656,13 +661,13 @@ export default function StudentFormPage() {
                             placeholder="Enter your email address"
                         />
                     </div>
-                    
+
                     <div style={{ marginTop: '1.5rem', marginBottom: '1rem' }}>
                         <div style={styles.sectionTitle}>Preferred Time Slots *</div>
                         <div style={{ fontSize: '0.8rem', color: '#6b7280', marginBottom: '1rem' }}>
                             Please provide {schedule?.max_choices || 3} preferred time slot{(schedule?.max_choices || 3) !== 1 ? 's' : ''}. All {(schedule?.max_choices || 3)} are required.
                         </div>
-                        
+
                         {(!formClosedDueToDeadline) && (
                             <>
                                 <TimingSelector
@@ -690,7 +695,7 @@ export default function StudentFormPage() {
                             </>
                         )}
                     </div>
-                    
+
                     <button
                         type="submit"
                         disabled={submitting || formClosedDueToDeadline}

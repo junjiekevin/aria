@@ -113,7 +113,7 @@ const styles = {
         flexDirection: 'column' as const,
         gap: '0.5rem',
         overflowY: 'auto' as const,
-        maxHeight: '160px',
+        maxHeight: '400px', // Increased for better use of space
     },
     unassignedCard: {
         padding: '0.6rem 0.75rem',
@@ -398,7 +398,14 @@ export default function SidePanel({
                 </button>
             </div>
 
-            <div style={{ ...styles.panel, flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+            <div style={{
+                ...styles.panel,
+                flex: 1,
+                overflow: 'hidden',
+                display: 'flex',
+                flexDirection: 'column',
+                minHeight: '300px' // Ensure visibility when stacked
+            }}>
                 {activeTab === 'events' ? (
                     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
                         {!isViewOnly ? (

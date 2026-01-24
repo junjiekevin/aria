@@ -82,9 +82,9 @@ const styles: Record<string, React.CSSProperties> = {
     right: 0,
     bottom: 0,
     width: '100%',
-    height: '100%',
+    height: '100dvh', // Use dynamic viewport height for mobile browsers
     maxWidth: '100%',
-    maxHeight: '100%',
+    maxHeight: '100dvh',
     borderRadius: 0,
   },
   header: {

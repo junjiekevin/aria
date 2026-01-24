@@ -32,6 +32,7 @@ const styles = {
     maxHeight: '90vh',
     overflow: 'auto',
     position: 'relative' as const,
+    margin: 'auto',
   },
   header: {
     padding: '1.5rem',
@@ -69,10 +70,13 @@ const styles = {
 export default function Modal({ isOpen, onClose, title, children, maxWidth = '32rem' }: ModalProps) {
   if (!isOpen) return null;
 
+  const isMobile = typeof window !== 'undefined' && window.innerWidth < 640;
+  const responsiveMaxWidth = isMobile ? '95%' : maxWidth;
+
   return (
     <div style={styles.overlay} onClick={onClose}>
-      <div 
-        style={{ ...styles.modal, maxWidth }} 
+      <div
+        style={{ ...styles.modal, maxWidth: responsiveMaxWidth }}
         onClick={(e) => e.stopPropagation()}
       >
         <div style={styles.header}>

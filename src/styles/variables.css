@@ -1,0 +1,35 @@
+/* src/styles/variables.css */
+:root {
+  --brand-primary: #f97316;
+  --brand-accent: #ea580c;
+  --brand-success: #10b981;
+  --brand-error: #ef4444;
+  --brand-warning: #f59e0b;
+
+  --bg-page: linear-gradient(180deg, #fff7ed 0%, #ffffff 50%, #fff7ed 100%);
+  --bg-white: #ffffff;
+  --bg-gray-50: #f9fafb;
+  --bg-orange-50: #fff7ed;
+
+  --text-900: #111827;
+  --text-700: #374151;
+  --text-600: #4b5563;
+  --text-500: #6b7280;
+  --text-400: #9ca3af;
+
+  --border-light: rgba(0, 0, 0, 0.04);
+  --border-divider: rgba(249, 115, 22, 0.1);
+  --border-gray-200: #e5e7eb;
+
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.08);
+  --shadow-md: 0 2px 8px rgba(0, 0, 0, 0.06);
+  --shadow-lg: 0 10px 40px rgba(0, 0, 0, 0.15);
+  --shadow-orange: 0 2px 8px rgba(249, 115, 22, 0.3);
+
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-full: 9999px;
+
+  --transition-fast: 0.2s ease;
+}
