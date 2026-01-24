@@ -135,6 +135,8 @@ export default function ConfigureFormModal({
     const [maxChoices, setMaxChoices] = useState(3);
     const [instructions, setInstructions] = useState('');
     const [deadline, setDeadline] = useState('');
+    const [workingHoursStart, setWorkingHoursStart] = useState(8);
+    const [workingHoursEnd, setWorkingHoursEnd] = useState(21);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
@@ -143,6 +145,8 @@ export default function ConfigureFormModal({
             setMaxChoices(schedule.max_choices || 3);
             setInstructions(schedule.form_instructions || '');
             setDeadline(schedule.form_deadline || '');
+            setWorkingHoursStart(schedule.working_hours_start ?? 8);
+            setWorkingHoursEnd(schedule.working_hours_end ?? 21);
         }
     }, [isOpen, schedule]);
 
@@ -152,10 +156,15 @@ export default function ConfigureFormModal({
         setLoading(true);
 
         try {
+            if (workingHoursStart >= workingHoursEnd) {
+                throw new Error('Day start must be before day end');
+            }
             await updateFormConfig(schedule.id, {
                 max_choices: maxChoices,
                 form_instructions: instructions || null,
                 form_deadline: deadline || null,
+                working_hours_start: workingHoursStart,
+                working_hours_end: workingHoursEnd,
             });
             onConfigured();
             onClose();
@@ -254,6 +263,44 @@ export default function ConfigureFormModal({
                     <div style={styles.hint}>Form will close for submissions after this date</div>
                 </div>
 
+                <div style={{ ...styles.formGroup, backgroundColor: '#f9fafb', padding: '1rem', borderRadius: '0.75rem', border: '1px solid #e5e7eb' }}>
+                    <label style={{ ...styles.label, color: '#f97316', fontWeight: '700', fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                        Operating Hours
+                    </label>
+                    <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', marginTop: '0.5rem' }}>
+                        <div style={{ flex: 1 }}>
+                            <label style={{ fontSize: '0.75rem', color: '#6b7280', display: 'block', marginBottom: '0.25rem' }}>Start Time</label>
+                            <select
+                                value={workingHoursStart}
+                                onChange={(e) => setWorkingHoursStart(parseInt(e.target.value))}
+                                style={{ ...styles.input, width: '100%', padding: '0.5rem' }}
+                            >
+                                {Array.from({ length: 24 }, (_, i) => (
+                                    <option key={i} value={i}>
+                                        {i === 0 ? '12 AM' : i < 12 ? `${i} AM` : i === 12 ? '12 PM' : `${i - 12} PM`}
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
+                        <div style={{ fontSize: '1rem', color: '#9ca3af', paddingTop: '1rem' }}>to</div>
+                        <div style={{ flex: 1 }}>
+                            <label style={{ fontSize: '0.75rem', color: '#6b7280', display: 'block', marginBottom: '0.25rem' }}>End Time</label>
+                            <select
+                                value={workingHoursEnd}
+                                onChange={(e) => setWorkingHoursEnd(parseInt(e.target.value))}
+                                style={{ ...styles.input, width: '100%', padding: '0.5rem' }}
+                            >
+                                {Array.from({ length: 24 }, (_, i) => (
+                                    <option key={i} value={i}>
+                                        {i === 0 ? '12 AM' : i < 12 ? `${i} AM` : i === 12 ? '12 PM' : `${i - 12} PM`}
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
+                    </div>
+                    <p style={{ ...styles.hint, fontSize: '0.7rem' }}>Adjusting operating hours will update the schedule grid and restrict future form submissions.</p>
+                </div>
+
                 <div style={styles.preview}>
                     <div style={styles.previewTitle}>Form Preview</div>
                     <div style={styles.previewItem}>
@@ -273,6 +320,10 @@ export default function ConfigureFormModal({
                     <div style={styles.previewItem}>
                         <span>•</span>
                         Deadline: {formatDeadline(deadline || null)}
+                    </div>
+                    <div style={styles.previewItem}>
+                        <span>•</span>
+                        Hours: {workingHoursStart === 0 ? '12 AM' : workingHoursStart < 12 ? `${workingHoursStart} AM` : workingHoursStart === 12 ? '12 PM' : `${workingHoursStart - 12} PM`} - {workingHoursEnd === 0 ? '12 AM' : workingHoursEnd < 12 ? `${workingHoursEnd} AM` : workingHoursEnd === 12 ? '12 PM' : `${workingHoursEnd - 12} PM`}
                     </div>
                 </div>
 

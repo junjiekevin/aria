@@ -1,11 +1,10 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useParams } from 'react-router-dom';
 import { Copy, Check, AlertCircle } from 'lucide-react';
 import { getSchedule, type Schedule } from '../lib/api/schedules';
 import { createFormResponse, getFormResponses } from '../lib/api/form-responses';
 
 const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-const HOURS = Array.from({ length: 14 }, (_, i) => i + 8);
 const FREQUENCIES = [
     { value: 'once', label: 'Once' },
     { value: 'weekly', label: 'Weekly' },
@@ -220,12 +219,14 @@ function TimingSelector({
     timing,
     onChange,
     index,
-    errors
+    errors,
+    hours
 }: {
     timing: TimingSlot;
     onChange: (timing: TimingSlot) => void;
     index: number;
     errors: string[];
+    hours: number[];
 }) {
     const hasError = errors.length > 0;
 
@@ -254,9 +255,9 @@ function TimingSelector({
                         onChange={(e) => onChange({ ...timing, startHour: e.target.value })}
                         style={styles.select}
                     >
-                        {HOURS.map(hour => (
+                        {hours.map(hour => (
                             <option key={hour} value={hour.toString().padStart(2, '0')}>
-                                {hour > 12 ? `${hour - 12} PM` : hour === 12 ? '12 PM' : `${hour} AM`}
+                                {hour === 0 ? '12 AM' : hour > 12 ? `${hour - 12} PM` : hour === 12 ? '12 PM' : `${hour} AM`}
                             </option>
                         ))}
                     </select>
@@ -280,9 +281,9 @@ function TimingSelector({
                         onChange={(e) => onChange({ ...timing, endHour: e.target.value })}
                         style={styles.select}
                     >
-                        {HOURS.map(hour => (
+                        {hours.map(hour => (
                             <option key={hour} value={hour.toString().padStart(2, '0')}>
-                                {hour > 12 ? `${hour - 12} PM` : hour === 12 ? '12 PM' : `${hour} AM`}
+                                {hour === 0 ? '12 AM' : hour > 12 ? `${hour - 12} PM` : hour === 12 ? '12 PM' : `${hour} AM`}
                             </option>
                         ))}
                     </select>
@@ -336,11 +337,28 @@ export default function StudentFormPage() {
     const [firstName, setFirstName] = useState('');
     const [lastName, setLastName] = useState('');
     const [email, setEmail] = useState('');
-    const [timing1, setTiming1] = useState<TimingSlot>({ ...EMPTY_TIMING, day: 'Monday' });
-    const [timing2, setTiming2] = useState<TimingSlot>({ ...EMPTY_TIMING, day: 'Tuesday' });
-    const [timing3, setTiming3] = useState<TimingSlot>({ ...EMPTY_TIMING, day: 'Wednesday' });
+    const [timing1, setTiming1] = useState<TimingSlot>(EMPTY_TIMING);
+    const [timing2, setTiming2] = useState<TimingSlot>(EMPTY_TIMING);
+    const [timing3, setTiming3] = useState<TimingSlot>(EMPTY_TIMING);
 
     const [formErrors, setFormErrors] = useState<string[]>([]);
+
+    const hours = useMemo(() => {
+        const start = schedule?.working_hours_start ?? 8;
+        const end = schedule?.working_hours_end ?? 21;
+        return Array.from({ length: end - start + 1 }, (_, i) => i + start);
+    }, [schedule]);
+
+    useEffect(() => {
+        if (schedule) {
+            const startStr = (schedule.working_hours_start ?? 9).toString().padStart(2, '0');
+            const endStr = Math.min((schedule.working_hours_start ?? 9) + 1, schedule.working_hours_end ?? 21).toString().padStart(2, '0');
+            const defaultTiming = { ...EMPTY_TIMING, startHour: startStr, endHour: endStr };
+            setTiming1({ ...defaultTiming, day: 'Monday' });
+            setTiming2({ ...defaultTiming, day: 'Tuesday' });
+            setTiming3({ ...defaultTiming, day: 'Wednesday' });
+        }
+    }, [schedule]);
 
     useEffect(() => {
         async function loadSchedule() {
@@ -675,6 +693,7 @@ export default function StudentFormPage() {
                                     onChange={setTiming1}
                                     index={0}
                                     errors={formErrors.filter(e => e.includes('Choice 1') || e.includes('1'))}
+                                    hours={hours}
                                 />
                                 {(schedule?.max_choices || 3) >= 2 && (
                                     <TimingSelector
@@ -682,6 +701,7 @@ export default function StudentFormPage() {
                                         onChange={setTiming2}
                                         index={1}
                                         errors={formErrors.filter(e => e.includes('Choice 2') || e.includes('2'))}
+                                        hours={hours}
                                     />
                                 )}
                                 {(schedule?.max_choices || 3) >= 3 && (
@@ -690,6 +710,7 @@ export default function StudentFormPage() {
                                         onChange={setTiming3}
                                         index={2}
                                         errors={formErrors.filter(e => e.includes('Choice 3') || e.includes('3'))}
+                                        hours={hours}
                                     />
                                 )}
                             </>

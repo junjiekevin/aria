@@ -14,7 +14,6 @@ import { DndContext, DragOverlay, useDraggable, useDroppable, PointerSensor, use
 
 
 const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-const HOURS = Array.from({ length: 14 }, (_, i) => i + 8);
 
 function TrashZone() {
   const { setNodeRef, isOver } = useDroppable({
@@ -82,6 +81,12 @@ export default function SchedulePage() {
   const isTrashed = schedule?.status === 'trashed';
   const isViewOnly = isArchived || isTrashed;
 
+  const HOURS = useMemo(() => {
+    const start = schedule?.working_hours_start ?? 8;
+    const end = schedule?.working_hours_end ?? 21;
+    return Array.from({ length: end - start + 1 }, (_, i) => i + start);
+  }, [schedule]);
+
   useEffect(() => {
     if (scheduleId) {
       loadScheduleData();
@@ -96,6 +101,8 @@ export default function SchedulePage() {
   };
 
   const { weekStart, weekEnd, weekNumber, totalWeeks } = useMemo(() => {
+    if (!schedule) return { weekStart: null, weekEnd: null, weekNumber: 0, totalWeeks: 0 };
+
     if (!schedule) return { weekStart: null, weekEnd: null, weekNumber: 0, totalWeeks: 0 };
 
     const start = parseLocalDate(schedule.start_date);
@@ -353,7 +360,14 @@ export default function SchedulePage() {
     const { active, over } = event;
     setIsDragging(false);
 
-    if (!over || !schedule) {
+    // The user's instruction placed `useMemo` here, but it must be at the component's top level.
+    // Assuming `HOURS` is meant to be a component-level memoized value,
+    // this block is moved to the component's top level.
+    // If `HOURS` was intended to be local to `handleDragEnd`, it would not be `useMemo`.
+    // Since the instruction explicitly mentioned `useMemo` and "inside SchedulePage",
+    // it implies a component-level definition.
+
+    if (loading || !schedule || !over) {
       setActiveDragId(null);
       return;
     }

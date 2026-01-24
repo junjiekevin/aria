@@ -26,35 +26,24 @@ export interface Schedule {
     max_choices: number;
     form_instructions: string | null;
     form_deadline: string | null;
-}
-
-export interface Schedule {
-    id: string;
-    user_id: string;
-    label: string;
-    start_date: string; // YYYY-MM-DD Format
-    end_date: string; // YYYY-MM-DD Format
-    status: 'draft' | 'collecting' | 'archived' | 'trashed';
-    deleted_at: string | null;
-    previous_status: 'draft' | 'collecting' | 'archived' | null; // Store status before trashing
-    send_confirmation_email: boolean; // Whether to send confirmation emails
-    created_at: string;
-    // Form configuration
-    max_choices: number;
-    form_instructions: string | null;
-    form_deadline: string | null;
+    working_hours_start: number;
+    working_hours_end: number;
 }
 
 export interface FormConfigInput {
     max_choices?: number;
     form_instructions?: string | null;
     form_deadline?: string | null;
+    working_hours_start?: number;
+    working_hours_end?: number;
 }
 
 export interface CreateScheduleInput {
     label: string;
     start_date: string; // YYYY-MM-DD Format
     end_date: string; // YYYY-MM-DD Format
+    working_hours_start?: number;
+    working_hours_end?: number;
 }
 
 export interface UpdateScheduleInput {
@@ -64,6 +53,8 @@ export interface UpdateScheduleInput {
     status?: 'draft' | 'collecting' | 'archived' | 'trashed';
     send_confirmation_email?: boolean;
     previous_status?: 'draft' | 'collecting' | 'archived' | null;
+    working_hours_start?: number;
+    working_hours_end?: number;
 }
 
 // (Removed duplicate findFirstDayOccurrence to keep a single implementation elsewhere)
@@ -151,7 +142,9 @@ export async function createSchedule(scheduleData: CreateScheduleInput) {
                 label: scheduleData.label.trim(),
                 start_date: scheduleData.start_date,
                 end_date: scheduleData.end_date,
-                status: 'draft'
+                status: 'draft',
+                working_hours_start: scheduleData.working_hours_start ?? 8,
+                working_hours_end: scheduleData.working_hours_end ?? 21
             }
         ])
         .select()
@@ -266,6 +259,12 @@ export async function updateSchedule(scheduleId: string, updates: UpdateSchedule
     }
     if (updates.send_confirmation_email !== undefined) {
         updatePayload.send_confirmation_email = updates.send_confirmation_email;
+    }
+    if (updates.working_hours_start !== undefined) {
+        updatePayload.working_hours_start = updates.working_hours_start;
+    }
+    if (updates.working_hours_end !== undefined) {
+        updatePayload.working_hours_end = updates.working_hours_end;
     }
 
     const { data, error } = await supabase
@@ -582,6 +581,8 @@ export async function updateFormConfig(scheduleId: string, config: FormConfigInp
     if (config.max_choices !== undefined) updatePayload.max_choices = config.max_choices;
     if (config.form_instructions !== undefined) updatePayload.form_instructions = config.form_instructions;
     if (config.form_deadline !== undefined) updatePayload.form_deadline = config.form_deadline;
+    if (config.working_hours_start !== undefined) updatePayload.working_hours_start = config.working_hours_start;
+    if (config.working_hours_end !== undefined) updatePayload.working_hours_end = config.working_hours_end;
 
     // Update schedule configuration and set status to 'collecting'
     const { data, error } = await supabase
