@@ -12,6 +12,8 @@ interface AddEventModalProps {
   scheduleStartDate: string;
   existingEntry?: ScheduleEntry | null;
   onNeedDeleteConfirmation?: () => void;
+  workingHoursStart?: number;
+  workingHoursEnd?: number;
 }
 
 const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
@@ -107,6 +109,8 @@ export default function AddEventModal({
   scheduleStartDate,
   existingEntry,
   onNeedDeleteConfirmation,
+  workingHoursStart,
+  workingHoursEnd,
 }: AddEventModalProps) {
   const isEditMode = !!existingEntry;
 
@@ -349,9 +353,9 @@ export default function AddEventModal({
                 style={{ ...styles.select, flex: 1 }}
                 disabled={loading}
               >
-                {Array.from({ length: 14 }, (_, i) => i + 8).map((hour) => (
+                {Array.from({ length: (workingHoursEnd ?? 21) - (workingHoursStart ?? 8) }, (_, i) => i + (workingHoursStart ?? 8)).map((hour) => (
                   <option key={hour} value={hour.toString().padStart(2, '0')}>
-                    {hour === 12 ? '12 PM' : hour > 12 ? `${hour - 12} PM` : `${hour} AM`}
+                    {hour === 0 ? '12 AM' : hour === 12 ? '12 PM' : hour > 12 ? `${hour - 12} PM` : `${hour} AM`}
                   </option>
                 ))}
               </select>

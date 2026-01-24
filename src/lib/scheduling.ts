@@ -145,7 +145,13 @@ function markTimingAsOccupied(
 }
 
 // Build availability map - each entry is a single time slot
-export function buildAvailabilityMap(entries: ScheduleEntry[], scheduleStart: Date, totalWeeks: number): Map<string, Set<string>> {
+export function buildAvailabilityMap(
+    entries: ScheduleEntry[],
+    scheduleStart: Date,
+    totalWeeks: number,
+    workingHoursStart: number = 8,
+    workingHoursEnd: number = 21
+): Map<string, Set<string>> {
     const availability = new Map<string, Set<string>>();
 
     for (let week = 0; week < totalWeeks; week++) {
@@ -153,7 +159,7 @@ export function buildAvailabilityMap(entries: ScheduleEntry[], scheduleStart: Da
             const dayKey = `${week}-${day}`;
             availability.set(dayKey, new Set<string>());
 
-            for (let hour = 8; hour < 21; hour++) {
+            for (let hour = workingHoursStart; hour < workingHoursEnd; hour++) {
                 for (let minute = 0; minute < 60; minute += 15) {
                     availability.get(dayKey)!.add(`${hour}:${minute}`);
                 }
@@ -191,9 +197,11 @@ export function scheduleParticipants(
     participants: FormResponse[],
     existingEntries: ScheduleEntry[],
     scheduleStart: Date,
-    totalWeeks: number
+    totalWeeks: number,
+    workingHoursStart: number = 8,
+    workingHoursEnd: number = 21
 ): SchedulingResult {
-    const availability = buildAvailabilityMap(existingEntries, scheduleStart, totalWeeks);
+    const availability = buildAvailabilityMap(existingEntries, scheduleStart, totalWeeks, workingHoursStart, workingHoursEnd);
 
     const participantsWithTimings = participants.map(participant => ({
         participant,

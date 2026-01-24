@@ -84,7 +84,8 @@ export default function SchedulePage() {
   const HOURS = useMemo(() => {
     const start = schedule?.working_hours_start ?? 8;
     const end = schedule?.working_hours_end ?? 21;
-    return Array.from({ length: end - start + 1 }, (_, i) => i + start);
+    // Show from start hour to the hour BEFORE the end hour (so end hour 21 means last slot is 20-21)
+    return Array.from({ length: end - start }, (_, i) => i + start);
   }, [schedule]);
 
   useEffect(() => {
@@ -96,6 +97,9 @@ export default function SchedulePage() {
 
   // Helper to parse YYYY-MM-DD in local timezone (not UTC)
   const parseLocalDate = (dateStr: string): Date => {
+    if (!dateStr) return new Date();
+    // Support both YYYY-MM-DD and full ISO strings
+    if (dateStr.includes('T')) return new Date(dateStr);
     const [year, month, day] = dateStr.split('-').map(Number);
     return new Date(year, month - 1, day);
   };
@@ -707,21 +711,17 @@ export default function SchedulePage() {
   };
 
   const getEventBlockStyle = (entry: ScheduleEntry) => {
-    const workingHoursStart = schedule?.working_hours_start ?? 8; // Define workingHoursStart here
     const startTime = new Date(entry.start_time);
     const endTime = new Date(entry.end_time);
 
-    const startHour = startTime.getHours();
-    const startMin = startTime.getMinutes();
-    const endHour = endTime.getHours();
-    const endMin = endTime.getMinutes();
+    const startMinutes = startTime.getMinutes();
+    const durationMinutes = (endTime.getTime() - startTime.getTime()) / (1000 * 60);
 
-    const durationHrs = (endHour + endMin / 60) - (startHour + startMin / 60);
-    const top = (startHour - workingHoursStart + startMin / 60) * 80;
-    const height = durationHrs * 80;
+    const topOffset = (startMinutes / 60) * 40;
+    const height = (durationMinutes / 60) * 40;
 
     return {
-      top: `${top}px`,
+      top: `${topOffset}px`,
       height: `${height}px`,
     };
   };
@@ -1040,31 +1040,43 @@ export default function SchedulePage() {
               })}
             </div>
 
-            {HOURS.map((hour) => (
-              <div key={hour} className={s.timetableGrid}>
-                <div className={s.timeLabel}>
-                  {hour === 12 ? '12 PM' : hour > 12 ? `${hour - 12} PM` : `${hour} AM`}
-                </div>
-                {DAYS.map((day) => {
-                  const slotEntries = getEntriesForSlot(day, hour);
+            <div style={{ position: 'relative' }}>
+              {HOURS.map((hour) => (
+                <div key={hour} className={s.timetableGrid}>
+                  <div className={s.timeLabel}>
+                    {hour === 0 ? '12 AM' : hour === 12 ? '12 PM' : hour > 12 ? `${hour - 12} PM` : `${hour} AM`}
+                  </div>
+                  {DAYS.map((day) => {
+                    const slotEntries = getEntriesForSlot(day, hour);
 
-                  return (
-                    <DroppableSlot key={`${day}-${hour}`} day={day} hour={hour}>
-                      {slotEntries.map((entry) => (
-                        <DraggableEventBlock key={entry.id} entry={entry}>
-                          <div style={{ fontWeight: '600' }}>{entry.student_name}</div>
-                          <div style={{ fontSize: '0.625rem', opacity: 0.9 }}>
-                            {formatLocalTime(entry.start_time)}
-                            {' - '}
-                            {formatLocalTime(entry.end_time)}
-                          </div>
-                        </DraggableEventBlock>
-                      ))}
-                    </DroppableSlot>
-                  );
-                })}
+                    return (
+                      <DroppableSlot key={`${day}-${hour}`} day={day} hour={hour}>
+                        {slotEntries.map((entry) => (
+                          <DraggableEventBlock key={entry.id} entry={entry}>
+                            <div style={{ fontWeight: '600' }}>{entry.student_name}</div>
+                            <div style={{ fontSize: '0.625rem', opacity: 0.9 }}>
+                              {formatLocalTime(entry.start_time)}
+                              {' - '}
+                              {formatLocalTime(entry.end_time)}
+                            </div>
+                          </DraggableEventBlock>
+                        ))}
+                      </DroppableSlot>
+                    );
+                  })}
+                </div>
+              ))}
+
+              {/* Final time label at the very bottom of the grid */}
+              <div className={s.timetableGrid} style={{ borderBottom: 'none' }}>
+                <div className={s.timeLabel}>
+                  {(() => {
+                    const lastHour = (schedule?.working_hours_end ?? 21);
+                    return lastHour === 0 ? '12 AM' : lastHour === 12 ? '12 PM' : lastHour > 12 ? `${lastHour - 12} PM` : `${lastHour} AM`;
+                  })()}
+                </div>
               </div>
-            ))}
+            </div>
           </div>
         </main>
 
@@ -1096,6 +1108,8 @@ export default function SchedulePage() {
           onNeedDeleteConfirmation={() => {
             setEntryToDelete(selectedEntry);
           }}
+          workingHoursStart={schedule.working_hours_start ?? 8}
+          workingHoursEnd={schedule.working_hours_end ?? 21}
         />
 
         <Modal
@@ -1226,9 +1240,11 @@ export default function SchedulePage() {
           onClose={() => setShowSchedulingPreview(false)}
           participants={getUnassignedParticipants()}
           existingEntries={entries}
-          scheduleStart={new Date(schedule.start_date)}
+          scheduleStart={parseLocalDate(schedule.start_date)}
           scheduleId={scheduleId!}
           onScheduled={loadScheduleData}
+          workingHoursStart={schedule.working_hours_start ?? 8}
+          workingHoursEnd={schedule.working_hours_end ?? 21}
         />
 
         <ConfigureFormModal

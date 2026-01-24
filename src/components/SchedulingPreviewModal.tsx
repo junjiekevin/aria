@@ -22,6 +22,8 @@ interface SchedulingPreviewModalProps {
     scheduleStart: Date;
     scheduleId: string;
     onScheduled: () => void;
+    workingHoursStart: number;
+    workingHoursEnd: number;
 }
 
 const styles = {
@@ -162,6 +164,8 @@ export default function SchedulingPreviewModal({
     scheduleStart,
     scheduleId,
     onScheduled,
+    workingHoursStart,
+    workingHoursEnd,
 }: SchedulingPreviewModalProps) {
     const [result, setResult] = useState<SchedulingResult | null>(null);
     const [loading, setLoading] = useState(false);
@@ -177,7 +181,14 @@ export default function SchedulingPreviewModal({
             scheduleEnd.setMonth(scheduleEnd.getMonth() + 3); // Default fallback to 3 months
             const totalWeeks = Math.ceil((scheduleEnd.getTime() - scheduleStart.getTime()) / (7 * 24 * 60 * 60 * 1000));
 
-            const schedulingResult = scheduleParticipants(participants, existingEntries, scheduleStart, totalWeeks);
+            const schedulingResult = scheduleParticipants(
+                participants,
+                existingEntries,
+                scheduleStart,
+                totalWeeks,
+                workingHoursStart,
+                workingHoursEnd
+            );
             setResult(schedulingResult);
             setLoading(false);
         }

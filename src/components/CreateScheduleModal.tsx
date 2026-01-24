@@ -33,6 +33,16 @@ const styles = {
     outline: 'none',
     transition: 'border-color 0.2s',
   },
+  select: {
+    padding: '0.75rem',
+    border: '1px solid #d1d5db',
+    borderRadius: '0.5rem',
+    fontSize: '1rem',
+    outline: 'none',
+    transition: 'border-color 0.2s',
+    backgroundColor: 'white',
+    cursor: 'pointer',
+  },
   helpText: {
     fontSize: '0.75rem',
     color: '#6b7280',
@@ -182,7 +192,7 @@ export default function CreateScheduleModal({ isOpen, onClose, onSuccess }: Crea
                 id="start_hour"
                 value={formData.working_hours_start}
                 onChange={(e) => setFormData({ ...formData, working_hours_start: parseInt(e.target.value) })}
-                style={{ ...styles.input, width: '100%', padding: '0.5rem' }}
+                style={{ ...styles.select, width: '100%', padding: '0.5rem' }}
               >
                 {Array.from({ length: 24 }, (_, i) => (
                   <option key={i} value={i}>
@@ -198,7 +208,7 @@ export default function CreateScheduleModal({ isOpen, onClose, onSuccess }: Crea
                 id="end_hour"
                 value={formData.working_hours_end}
                 onChange={(e) => setFormData({ ...formData, working_hours_end: parseInt(e.target.value) })}
-                style={{ ...styles.input, width: '100%', padding: '0.5rem' }}
+                style={{ ...styles.select, width: '100%', padding: '0.5rem' }}
               >
                 {Array.from({ length: 24 }, (_, i) => (
                   <option key={i} value={i}>

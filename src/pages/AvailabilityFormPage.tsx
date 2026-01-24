@@ -220,13 +220,15 @@ function TimingSelector({
     onChange,
     index,
     errors,
-    hours
+    startHours,
+    endHours
 }: {
     timing: TimingSlot;
     onChange: (timing: TimingSlot) => void;
     index: number;
     errors: string[];
-    hours: number[];
+    startHours: number[];
+    endHours: number[];
 }) {
     const hasError = errors.length > 0;
 
@@ -255,9 +257,9 @@ function TimingSelector({
                         onChange={(e) => onChange({ ...timing, startHour: e.target.value })}
                         style={styles.select}
                     >
-                        {hours.map(hour => (
+                        {startHours.map(hour => (
                             <option key={hour} value={hour.toString().padStart(2, '0')}>
-                                {hour === 0 ? '12 AM' : hour > 12 ? `${hour - 12} PM` : hour === 12 ? '12 PM' : `${hour} AM`}
+                                {hour === 0 ? '12 AM' : hour === 12 ? '12 PM' : hour > 12 ? `${hour - 12} PM` : `${hour} AM`}
                             </option>
                         ))}
                     </select>
@@ -281,9 +283,9 @@ function TimingSelector({
                         onChange={(e) => onChange({ ...timing, endHour: e.target.value })}
                         style={styles.select}
                     >
-                        {hours.map(hour => (
+                        {endHours.map(hour => (
                             <option key={hour} value={hour.toString().padStart(2, '0')}>
-                                {hour === 0 ? '12 AM' : hour > 12 ? `${hour - 12} PM` : hour === 12 ? '12 PM' : `${hour} AM`}
+                                {hour === 0 ? '12 AM' : hour === 12 ? '12 PM' : hour > 12 ? `${hour - 12} PM` : `${hour} AM`}
                             </option>
                         ))}
                     </select>
@@ -343,7 +345,13 @@ export default function AvailabilityFormPage() {
 
     const [formErrors, setFormErrors] = useState<string[]>([]);
 
-    const hours = useMemo(() => {
+    const startHours = useMemo(() => {
+        const start = schedule?.working_hours_start ?? 8;
+        const end = schedule?.working_hours_end ?? 21;
+        return Array.from({ length: end - start }, (_, i) => i + start);
+    }, [schedule]);
+
+    const endHours = useMemo(() => {
         const start = schedule?.working_hours_start ?? 8;
         const end = schedule?.working_hours_end ?? 21;
         return Array.from({ length: end - start + 1 }, (_, i) => i + start);
@@ -693,7 +701,8 @@ export default function AvailabilityFormPage() {
                                     onChange={setTiming1}
                                     index={0}
                                     errors={formErrors.filter(e => e.includes('Choice 1') || e.includes('1'))}
-                                    hours={hours}
+                                    startHours={startHours}
+                                    endHours={endHours}
                                 />
                                 {(schedule?.max_choices || 3) >= 2 && (
                                     <TimingSelector
@@ -701,7 +710,8 @@ export default function AvailabilityFormPage() {
                                         onChange={setTiming2}
                                         index={1}
                                         errors={formErrors.filter(e => e.includes('Choice 2') || e.includes('2'))}
-                                        hours={hours}
+                                        startHours={startHours}
+                                        endHours={endHours}
                                     />
                                 )}
                                 {(schedule?.max_choices || 3) >= 3 && (
@@ -710,7 +720,8 @@ export default function AvailabilityFormPage() {
                                         onChange={setTiming3}
                                         index={2}
                                         errors={formErrors.filter(e => e.includes('Choice 3') || e.includes('3'))}
-                                        hours={hours}
+                                        startHours={startHours}
+                                        endHours={endHours}
                                     />
                                 )}
                             </>

@@ -89,6 +89,8 @@ export default function EditScheduleModal({ isOpen, onClose, schedule, onSuccess
     start_date: '',
     end_date: '',
     status: 'draft',
+    working_hours_start: 8,
+    working_hours_end: 21,
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -100,6 +102,8 @@ export default function EditScheduleModal({ isOpen, onClose, schedule, onSuccess
         start_date: schedule.start_date,
         end_date: schedule.end_date,
         status: schedule.status,
+        working_hours_start: schedule.working_hours_start ?? 8,
+        working_hours_end: schedule.working_hours_end ?? 21,
       });
     }
   }, [schedule]);
@@ -112,6 +116,9 @@ export default function EditScheduleModal({ isOpen, onClose, schedule, onSuccess
     setLoading(true);
 
     try {
+      if ((formData.working_hours_start ?? 8) >= (formData.working_hours_end ?? 21)) {
+        throw new Error('Day start must be before day end');
+      }
       await updateSchedule(schedule.id, formData);
       onSuccess();
       onClose();
@@ -185,6 +192,44 @@ export default function EditScheduleModal({ isOpen, onClose, schedule, onSuccess
             onFocus={(e) => { e.currentTarget.style.borderColor = '#f97316'; }}
             onBlur={(e) => { e.currentTarget.style.borderColor = '#d1d5db'; }}
           />
+        </div>
+
+        <div style={{ ...styles.formGroup, backgroundColor: '#f9fafb', padding: '1rem', borderRadius: '0.75rem', border: '1px solid #e5e7eb' }}>
+          <label style={{ ...styles.label, color: '#f97316', fontWeight: '700', fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+            Operating Hours
+          </label>
+          <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', marginTop: '0.5rem' }}>
+            <div style={{ flex: 1 }}>
+              <label style={{ fontSize: '0.75rem', color: '#6b7280', display: 'block', marginBottom: '0.25rem' }}>Start Time</label>
+              <select
+                value={formData.working_hours_start}
+                onChange={(e) => setFormData({ ...formData, working_hours_start: parseInt(e.target.value) })}
+                style={{ ...styles.select, width: '100%', padding: '0.5rem' }}
+              >
+                {Array.from({ length: 24 }, (_, i) => (
+                  <option key={i} value={i}>
+                    {i === 0 ? '12 AM' : i < 12 ? `${i} AM` : i === 12 ? '12 PM' : `${i - 12} PM`}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div style={{ fontSize: '1rem', color: '#9ca3af', paddingTop: '1rem' }}>to</div>
+            <div style={{ flex: 1 }}>
+              <label style={{ fontSize: '0.75rem', color: '#6b7280', display: 'block', marginBottom: '0.25rem' }}>End Time</label>
+              <select
+                value={formData.working_hours_end}
+                onChange={(e) => setFormData({ ...formData, working_hours_end: parseInt(e.target.value) })}
+                style={{ ...styles.select, width: '100%', padding: '0.5rem' }}
+              >
+                {Array.from({ length: 24 }, (_, i) => (
+                  <option key={i} value={i}>
+                    {i === 0 ? '12 AM' : i < 12 ? `${i} AM` : i === 12 ? '12 PM' : `${i - 12} PM`}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+          <p style={{ ...styles.helpText, fontSize: '0.7rem' }}>Adjusting operating hours will update the schedule grid and restrict future form submissions.</p>
         </div>
 
         <div style={styles.buttonGroup}>
