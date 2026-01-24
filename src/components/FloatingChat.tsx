@@ -495,9 +495,15 @@ export default function FloatingChat({ onScheduleChange }: FloatingChatProps) {
         }
 
         // Add result to conversation history for LLM to continue
+        // IMPORTANT: Use 'user' role to signal this is system feedback, not assistant output
+        // This prompts the LLM to continue processing rather than assuming it's done
+        const continuationPrompt = result.success
+          ? `${llmContent}\n\n[System: Action completed. Check if there are more pending actions from the original request. If yes, proceed with the next FUNCTION_CALL. If all actions are complete, respond with a final confirmation.]`
+          : llmContent;
+
         conversationHistory = [
           ...conversationHistory,
-          { role: 'assistant', content: llmContent },
+          { role: 'user', content: continuationPrompt },
         ];
 
         // If the function failed, break the loop

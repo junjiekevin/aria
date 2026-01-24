@@ -64,7 +64,7 @@ export async function sendChatMessage(
     model: GEMINI_MODEL,
     messages: openRouterMessages,
     temperature: 0.7,
-    max_tokens: 1000,
+    max_tokens: 400, // Reduced for shorter, punchier responses
   };
 
   try {

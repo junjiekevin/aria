@@ -110,6 +110,15 @@ export default function SchedulePage() {
     }
   }, [scheduleId]);
 
+  // Listen for Aria chat changes to refresh data
+  useEffect(() => {
+    const handleAriaChange = () => {
+      loadScheduleData();
+    };
+    window.addEventListener('aria-schedule-change', handleAriaChange);
+    return () => window.removeEventListener('aria-schedule-change', handleAriaChange);
+  }, [scheduleId]);
+
 
   // Helper to parse YYYY-MM-DD in local timezone (not UTC)
   const parseLocalDate = (dateStr: string): Date => {
