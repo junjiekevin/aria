@@ -1,248 +1,359 @@
 // src/pages/AboutPage.tsx
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Shield, FileText, Heart } from 'lucide-react';
+import { ArrowLeft, Music, Sparkles, Shield, FileText, ChevronDown, ChevronUp, Brain } from 'lucide-react';
+import logoWithText from '../assets/images/logo-with-text.png';
 
 const styles: Record<string, React.CSSProperties> = {
   container: {
     minHeight: '100vh',
-    background: 'linear-gradient(135deg, #fff7ed 0%, #ffffff 50%, #fff7ed 100%)',
-    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto", sans-serif',
+    backgroundColor: '#fffcf9',
+    color: '#2d2d2d',
+    fontFamily: '"Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+    lineHeight: 1.6,
+    overflowX: 'hidden',
   },
   header: {
-    borderBottom: '1px solid #e5e7eb',
-    background: 'rgba(255, 255, 255, 0.8)',
-    backdropFilter: 'blur(4px)',
-    position: 'sticky' as const,
-    top: 0,
-    zIndex: 10,
-    boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
-  },
-  headerContent: {
-    maxWidth: '800px',
-    margin: '0 auto',
-    padding: '1rem 1.5rem',
+    padding: '1rem 2rem',
     display: 'flex',
+    justifyContent: 'space-between',
     alignItems: 'center',
-    gap: '1rem',
+    position: 'fixed',
+    top: 0,
+    width: '100%',
+    zIndex: 100,
+    background: 'rgba(255, 252, 249, 0.8)',
+    backdropFilter: 'blur(12px)',
+    borderBottom: '1px solid rgba(0,0,0,0.05)',
   },
   backButton: {
     display: 'flex',
     alignItems: 'center',
     gap: '0.5rem',
-    padding: '0.5rem 1rem',
-    background: 'none',
-    border: '1px solid #d1d5db',
-    borderRadius: '0.5rem',
+    padding: '0.6rem 1.2rem',
+    background: 'white',
+    border: '1px solid #e2e2e2',
+    borderRadius: '2rem',
     cursor: 'pointer',
-    fontSize: '0.875rem',
-    color: '#374151',
-    transition: 'all 0.2s',
+    fontSize: '0.9rem',
+    fontWeight: 500,
+    color: '#444',
+    transition: 'all 0.3s ease',
+    boxShadow: '0 2px 4px rgba(0,0,0,0.02)',
   },
-  title: {
-    fontSize: '1.5rem',
-    fontWeight: '600',
-    color: '#111827',
-    margin: 0,
+  hero: {
+    height: '70vh',
+    display: 'flex',
+    flexDirection: 'column',
+    justifyContent: 'center',
+    alignItems: 'center',
+    textAlign: 'center',
+    padding: '0 2rem',
+    background: 'radial-gradient(circle at 50% 50%, #fff 0%, #fffcf9 100%)',
+    position: 'relative',
   },
-  main: {
+  heroTitle: {
+    fontSize: 'clamp(3.5rem, 10vw, 6rem)',
+    fontWeight: 800,
+    background: 'linear-gradient(to right, #1a1a1a, #f97316)',
+    WebkitBackgroundClip: 'text',
+    WebkitTextFillColor: 'transparent',
+    marginBottom: '1.5rem',
+    letterSpacing: '-0.02em',
+  },
+  heroSubtitle: {
+    fontSize: '1.4rem',
+    color: '#666',
+    maxWidth: '700px',
+    marginBottom: '3rem',
+    lineHeight: 1.4,
+  },
+  section: {
     maxWidth: '800px',
     margin: '0 auto',
-    padding: '2rem 1.5rem',
+    padding: '4rem 2rem',
   },
-  card: {
-    backgroundColor: 'white',
-    borderRadius: '0.75rem',
-    boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
-    border: '1px solid #e5e7eb',
-    padding: '2rem',
+  sectionHeading: {
+    fontSize: '2.5rem',
+    fontWeight: 700,
+    color: '#1a1a1a',
+    marginBottom: '2rem',
+    letterSpacing: '-0.01em',
+  },
+  textBlock: {
+    fontSize: '1.125rem',
+    color: '#444',
     marginBottom: '1.5rem',
   },
-  logoSection: {
-    textAlign: 'center',
+  quote: {
+    fontSize: '1.5rem',
+    fontStyle: 'italic',
+    color: '#f97316',
+    padding: '2rem',
+    borderLeft: '4px solid #f97316',
+    background: 'rgba(249, 115, 22, 0.05)',
+    margin: '3rem 0',
+    borderRadius: '0 1rem 1rem 0',
+  },
+  card: {
+    background: 'white',
+    padding: '2.5rem',
+    borderRadius: '1.5rem',
+    border: '1px solid #f0f0f0',
+    boxShadow: '0 10px 30px rgba(0,0,0,0.03)',
     marginBottom: '2rem',
   },
-  logo: {
-    width: '80px',
-    height: '80px',
-    marginBottom: '1rem',
-  },
-  appName: {
-    fontSize: '2rem',
-    fontWeight: '700',
-    color: '#111827',
-    marginBottom: '0.5rem',
-  },
-  tagline: {
-    fontSize: '1.125rem',
-    color: '#6b7280',
-    marginBottom: '1rem',
-  },
-  version: {
-    display: 'inline-block',
-    padding: '0.25rem 0.75rem',
-    backgroundColor: '#ffedd5',
-    color: '#c2410c',
-    borderRadius: '9999px',
-    fontSize: '0.875rem',
-    fontWeight: '500',
-  },
-  sectionTitle: {
-    fontSize: '1.125rem',
-    fontWeight: '600',
-    color: '#111827',
-    marginBottom: '1rem',
-    display: 'flex',
-    alignItems: 'center',
-    gap: '0.5rem',
-  },
-  description: {
-    color: '#4b5563',
-    lineHeight: 1.7,
-    marginBottom: '1rem',
-  },
-  link: {
-    color: '#f97316',
-    textDecoration: 'none',
-  },
-  icon: {
-    width: '40px',
-    height: '40px',
-    borderRadius: '50%',
-    backgroundColor: '#ffedd5',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    color: '#f97316',
-    marginBottom: '1rem',
-  },
   footer: {
+    padding: '4rem 2rem',
+    background: '#1a1a1a',
+    color: '#888',
     textAlign: 'center',
-    padding: '2rem 0',
-    color: '#9ca3af',
   },
-  madeWith: {
+  legalSection: {
+    marginTop: '2rem',
+    textAlign: 'left',
+    maxWidth: '1000px',
+    margin: '2rem auto 0 auto',
+  },
+  legalToggle: {
     display: 'flex',
+    justifyContent: 'space-between',
     alignItems: 'center',
-    justifyContent: 'center',
-    gap: '0.5rem',
-    marginBottom: '0.5rem',
+    padding: '1.5rem 0',
+    borderBottom: '1px solid #333',
+    cursor: 'pointer',
+    color: '#ccc',
   },
+  logoInHeader: {
+    height: '32px',
+    width: 'auto',
+  }
+};
+
+const LegalItem = ({ title, icon: Icon, isLast, children }: { title: string, icon: React.ElementType, isLast?: boolean, children: React.ReactNode }) => {
+  const [isOpen, setIsOpen] = useState(false);
+  return (
+    <div style={{ borderBottom: isLast ? 'none' : '1px solid rgba(255,255,255,0.05)' }}>
+      <div
+        style={{ ...styles.legalToggle, color: isOpen ? '#f97316' : '#ccc' }}
+        onClick={() => setIsOpen(!isOpen)}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+          <Icon size={20} />
+          <span style={{ fontWeight: 600 }}>{title}</span>
+        </div>
+        {isOpen ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
+      </div>
+      {isOpen && (
+        <div style={{ padding: '2rem 0', color: '#888', fontSize: '0.95rem' }}>
+          {children}
+        </div>
+      )}
+    </div>
+  );
 };
 
 export default function AboutPage() {
   const navigate = useNavigate();
 
+  useEffect(() => {
+    window.scrollTo(0, 0);
+
+    // Simple intersection observer for reveal animations
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          (entry.target as HTMLElement).style.opacity = '1';
+          (entry.target as HTMLElement).style.transform = 'translateY(0)';
+        }
+      });
+    }, { threshold: 0.1 });
+
+    document.querySelectorAll('.reveal').forEach(el => observer.observe(el));
+    return () => observer.disconnect();
+  }, []);
+
   return (
     <div style={styles.container}>
+      <style>
+        {`
+          @keyframes fadeUp {
+            from { opacity: 0; transform: translateY(30px); }
+            to { opacity: 1; transform: translateY(0); }
+          }
+          .reveal {
+            opacity: 0;
+            transform: translateY(30px);
+            transition: all 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+          }
+        `}
+      </style>
+
       <header style={styles.header}>
-        <div style={styles.headerContent}>
-          <button
-            onClick={() => navigate('/dashboard')}
-            style={styles.backButton}
-            onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#f9fafb'; }}
-            onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; }}
-          >
-            <ArrowLeft size={20} />
-            Back to Dashboard
-          </button>
-          <h1 style={styles.title}>About</h1>
-        </div>
+        <button
+          onClick={() => navigate('/dashboard')}
+          style={styles.backButton}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.backgroundColor = '#f97316';
+            e.currentTarget.style.color = 'white';
+            e.currentTarget.style.borderColor = '#f97316';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.backgroundColor = 'white';
+            e.currentTarget.style.color = '#444';
+            e.currentTarget.style.borderColor = '#e2e2e2';
+          }}
+        >
+          <ArrowLeft size={18} />
+          Go Back
+        </button>
+        <img src={logoWithText} alt="Aria" style={styles.logoInHeader} />
       </header>
 
-      <main style={styles.main}>
-        <div style={styles.card}>
-          <div style={styles.logoSection}>
-            <img
-              src="/src/assets/images/aria-logo.png"
-              alt="Aria"
-              style={styles.logo}
-            />
-            <h2 style={styles.appName}>Aria</h2>
-            <p style={styles.tagline}>Your intelligent scheduling assistant for teachers</p>
-            <span style={styles.version}>Version 1.0.0</span>
+      <section style={styles.hero}>
+        <h1 style={styles.heroTitle}>Origins of Aria</h1>
+        <p style={styles.heroSubtitle}>
+          A journey from the stage to the architecture of intelligent scheduling.
+        </p>
+      </section>
+
+      <div style={styles.section} className="reveal">
+        <h2 style={styles.sectionHeading}>Why Aria Exists</h2>
+        <div style={styles.textBlock}>
+          Aria started with something simple I noticed when I was in music school.
+        </div>
+        <div style={styles.textBlock}>
+          My teacher spent an enormous amount of time dealing with scheduling. Lesson conflicts, changes, initial placements, last minute switches. It often took more time and energy than the teaching itself. Over time, I realized this was not unique to her. The same frustration came up across faculty, administrators, and friends working in completely different fields.
+        </div>
+        <div style={styles.textBlock}>
+          Capable, passionate people were spending hours managing logistics instead of doing the work they actually cared about.
+        </div>
+        <div style={styles.textBlock}>
+          The tools they had were not wrong. They were just heavy. Over time, many became complicated, rigid, or exhausting to use. The intention was always good, but the experience slowly drifted away from the people using them.
+        </div>
+        <div style={styles.textBlock}>
+          I kept thinking there had to be a better way.
+        </div>
+      </div>
+
+      <div style={{ ...styles.section, background: '#fff' }} className="reveal">
+        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '2rem' }}>
+          <Brain size={40} color="#f97316" />
+          <h2 style={{ ...styles.sectionHeading, marginBottom: 0 }}>Built With Simplicity in Mind</h2>
+        </div>
+        <div style={styles.textBlock}>
+          Music was my first world. I completed both my undergraduate and master’s degrees in music before transitioning into computer science, and that background shaped how I think about structure, flow, and clarity.
+        </div>
+        <div style={styles.textBlock}>
+          In lessons, my teacher often spoke about simplicity in music making. About removing what was unnecessary so the intent could come through clearly and effortlessly. During one of those conversations, she shared a quote that stayed with me throughout my life and later became the guiding principle behind Aria:
+        </div>
+        <blockquote style={styles.quote}>
+          “Everything should be made as simple as possible, but not simpler.”
+          <br />
+          <span style={{ fontSize: '1rem', fontWeight: 600, color: '#666', fontStyle: 'normal' }}>— Albert Einstein</span>
+        </blockquote>
+        <div style={styles.textBlock}>
+          That idea guided every decision. Aria was never meant to do everything. It was meant to do the right things well, without getting in the way.
+        </div>
+        <div style={styles.textBlock}>
+          Many products start simple and grow complicated over time. Aria was built to resist that. The goal was always ease, intuition, and respect for the user’s time.
+        </div>
+      </div>
+
+      <div style={styles.section} className="reveal">
+        <h2 style={styles.sectionHeading}>A Side Project With a Purpose</h2>
+        <div style={styles.textBlock}>
+          Aria began as a side project, built specifically to help my teacher. The goal was straightforward. Reduce the time she spent scheduling so she could focus on teaching, which was the reason she chose that profession in the first place.
+        </div>
+        <div style={styles.textBlock}>
+          It was never built for me. From the start, it was meant for others.
+        </div>
+        <div style={styles.textBlock}>
+          As development continued, it became clear that the same scheduling friction existed far beyond education. Different roles, different industries, same problem. Too much energy spent organizing instead of doing meaningful work.
+        </div>
+        <div style={styles.textBlock}>
+          That is when Aria started to grow beyond its original scope.
+        </div>
+      </div>
+
+      <div style={{ ...styles.section, padding: '4rem 2rem' }}>
+        <div style={styles.card} className="reveal">
+          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '1.5rem' }}>
+            <Sparkles size={24} color="#f97316" />
+            <h3 style={{ fontSize: '1.5rem', fontWeight: 700, margin: 0 }}>An Assistant, Not Just Software</h3>
           </div>
-
-          <p style={styles.description}>
-            Aria is a modern scheduling application designed specifically for teachers to streamline
-            their scheduling workflow. With AI-powered assistance powered by Gemini 2.0 Flash,
-            creating and managing class schedules has never been easier.
+          <p style={styles.textBlock}>
+            Aria is not meant to replace people. It is meant to work alongside them.
           </p>
-
-          <p style={styles.description}>
-            Whether you're planning weekly timetables, coordinating substitute teachers, or
-            managing complex scheduling constraints, Aria helps you get it done faster and
-            with less stress.
+          <p style={styles.textBlock}>
+            The intention was always to create something that feels supportive rather than demanding. Something precise but warm. Reliable without being rigid. A tool that helps people feel in control instead of overwhelmed.
+          </p>
+          <p style={styles.textBlock}>
+            When Aria works well, it fades into the background. Scheduling feels lighter. Organization feels clearer. The administrative weight is reduced enough that people can focus on what actually matters in their day.
           </p>
         </div>
 
-        <div style={styles.card}>
-          <div style={styles.icon}>
-            <Shield size={24} />
+        <div style={styles.card} className="reveal">
+          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '1.5rem' }}>
+            <Music size={24} color="#f97316" />
+            <h3 style={{ fontSize: '1.5rem', fontWeight: 700, margin: 0 }}>Why the Name Aria</h3>
           </div>
-          <h3 style={styles.sectionTitle}>Privacy Policy</h3>
-          <p style={styles.description}>
-            Your privacy is important to us. Aria collects minimal personal information necessary
-            to provide our services. We do not sell or share your data with third parties for
-            marketing purposes. All data is encrypted and stored securely using Supabase
-            infrastructure.
+          <p style={styles.textBlock}>
+            An aria is a moment in an opera where everything becomes clear. The structure is there, but it never overshadows the expression.
           </p>
-          <p style={styles.description}>
-            <strong>Data We Collect:</strong>
+          <p style={styles.textBlock}>
+            That idea felt right.
           </p>
-          <ul style={{ color: '#4b5563', lineHeight: 1.8, marginBottom: '1rem', paddingLeft: '1.5rem' }}>
-            <li>Account information (name, email) via Google OAuth</li>
-            <li>Schedule data you create and manage</li>
-            <li>Usage analytics to improve our services</li>
-          </ul>
-          <p style={styles.description}>
-            You can request deletion of your account and all associated data at any time by
-            contacting <a href="mailto:support@aria.app" style={styles.link}>support@aria.app</a>.
+          <p style={styles.textBlock}>
+            Aria is meant to bring clarity and calm to something that is usually frustrating. To make scheduling feel simpler, even enjoyable, without forcing people to change how they naturally work.
           </p>
         </div>
+      </div>
 
-        <div style={styles.card}>
-          <div style={styles.icon}>
-            <FileText size={24} />
-          </div>
-          <h3 style={styles.sectionTitle}>Terms of Service</h3>
-          <p style={styles.description}>
-            By using Aria, you agree to these terms and conditions. Please read them carefully.
-          </p>
-          <p style={styles.description}>
-            <strong>Acceptable Use:</strong> Aria is intended for legitimate educational scheduling
-            purposes. Users must not use the service for illegal activities, spam, or to harm
-            others.
-          </p>
-          <p style={styles.description}>
-            <strong>Account Security:</strong> You are responsible for maintaining the
-            confidentiality of your account credentials and for all activities that occur under
-            your account.
-          </p>
-          <p style={styles.description}>
-            <strong>Service Availability:</strong> While we strive to maintain 99.9% uptime,
-            we do not guarantee uninterrupted service. Scheduled maintenance will be announced
-            in advance when possible.
-          </p>
-          <p style={styles.description}>
-            <strong>Limitation of Liability:</strong> Aria is provided "as is" without warranties.
-            We are not liable for any indirect, incidental, or consequential damages arising
-            from the use of our services.
-          </p>
-          <p style={styles.description}>
-            <strong>Changes to Terms:</strong> We reserve the right to modify these terms at any
-            time. Continued use after changes constitutes acceptance of the new terms.
-          </p>
+      <div style={{ ...styles.section, textAlign: 'center' }} className="reveal">
+        <h2 style={styles.sectionHeading}>Responsibility</h2>
+        <p style={{ ...styles.textBlock, maxWidth: '600px', margin: '0 auto 2rem auto' }}>
+          Aria is something I am proud of, and something I feel responsible for.
+        </p>
+        <p style={{ ...styles.textBlock, maxWidth: '600px', margin: '0 auto' }}>
+          Its success is not about adding more features or complexity. It is about staying true to its original purpose. Making scheduling easier without making everything else harder.
+        </p>
+        <p style={{ ...styles.textBlock, maxWidth: '600px', margin: '2rem auto', fontWeight: 600 }}>
+          If Aria does its job well, people spend less time organizing and more time doing the work they care about.
+        </p>
+      </div>
+
+      <footer style={styles.footer}>
+        <div style={styles.legalSection}>
+          <LegalItem title="Privacy Policy" icon={Shield}>
+            <p style={{ marginBottom: '1.5rem' }}>Your privacy is a core priority at Aria. We believe in total transparency regarding how your information is handled.</p>
+
+            <p style={{ marginBottom: '0.5rem', color: '#ccc', fontWeight: 600 }}>Data Collection & Usage</p>
+            <p style={{ marginBottom: '1rem' }}>We only collect the minimum amount of personal information necessary to provide our scheduling services. This includes your name and email provided via Google OAuth. We do not sell, rent, or trade your personal data with third parties for marketing purposes.</p>
+
+            <p style={{ marginBottom: '0.5rem', color: '#ccc', fontWeight: 600 }}>Security & Infrastructure</p>
+            <p style={{ marginBottom: '1rem' }}>Aria leverages enterprise-grade security via Supabase and PostgreSQL. All class data and schedules are protected by Row Level Security (RLS) policies, ensuring that only you can access or modify your information. All data is encrypted both in transit and at rest.</p>
+
+            <p style={{ marginBottom: '0.5rem', color: '#ccc', fontWeight: 600 }}>User Control</p>
+            <p>You maintain full ownership of your data. You can access, update, or request the permanent deletion of your account and all associated schedules at any time through your account settings or by contacting our support team.</p>
+          </LegalItem>
+
+          <LegalItem title="Terms of Service" icon={FileText} isLast>
+            <p style={{ marginBottom: '1.5rem' }}>By using Aria, you agree to the following terms and conditions designed to ensure a safe and reliable environment for all educators.</p>
+
+            <p style={{ marginBottom: '0.5rem', color: '#ccc', fontWeight: 600 }}>Account Stewardship</p>
+            <p style={{ marginBottom: '1rem' }}>Aria is intended for legitimate educational and professional scheduling. You are responsible for maintaining the confidentiality of your account credentials and for all activities that occur under your profile.</p>
+
+            <p style={{ marginBottom: '0.5rem', color: '#ccc', fontWeight: 600 }}>Service Quality & Liability</p>
+            <p style={{ marginBottom: '1rem' }}>While we strive for 99.9% uptime and a bug-free experience, Aria is provided "as is." We are not liable for any incidental or consequential damages resulting from service interruptions or data handling beyond our reasonable control.</p>
+
+            <p style={{ marginBottom: '0.5rem', color: '#ccc', fontWeight: 600 }}>Future Evolution</p>
+            <p>We reserve the right to evolve Aria's features and terms. Significant changes to service terms will be communicated ahead of time to ensure you remain in control of your scheduling workflow.</p>
+          </LegalItem>
         </div>
 
-        <footer style={styles.footer}>
-          <div style={styles.madeWith}>
-            <span>Made with</span>
-            <Heart size={16} color="#f97316" fill="#f97316" />
-            <span>for educators everywhere</span>
-          </div>
-          <p style={{ margin: 0 }}>© 2025 Aria. All rights reserved.</p>
-        </footer>
-      </main>
+        <p style={{ marginTop: '3rem', fontSize: '0.9rem' }}>© 2026 Aria. Designed for focus.</p>
+      </footer>
     </div>
   );
 }
