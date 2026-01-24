@@ -1,14 +1,14 @@
 import { supabase } from "../supabase";
-import { 
-    getScheduleEntries, 
-    createScheduleEntry, 
-    updateScheduleEntry, 
-    deleteScheduleEntry 
+import {
+    getScheduleEntries,
+    createScheduleEntry,
+    updateScheduleEntry,
+    deleteScheduleEntry
 } from './schedule-entries';
-import { 
-    getFormResponses, 
+import {
+    getFormResponses,
     updateFormResponseAssigned,
-    getPreferredTimings 
+    getPreferredTimings
 } from './form-responses';
 
 export interface Schedule {
@@ -66,6 +66,41 @@ export interface UpdateScheduleInput {
     previous_status?: 'draft' | 'collecting' | 'archived' | null;
 }
 
+// (Removed duplicate findFirstDayOccurrence to keep a single implementation elsewhere)
+
+// Resolve a schedule UUID by its label (case-insensitive). Returns null if not found or ambiguous.
+export async function resolveScheduleIdByLabel(label: string): Promise<string | null> {
+    const schedules = await getSchedules();
+    const matches = schedules.filter(s => s.label.toLowerCase() === label.toLowerCase());
+    if (matches.length === 1) return matches[0].id;
+    return null;
+}
+
+// Helper: find first occurrence of a day within a schedule's start date
+// IMPORTANT: Parse date in LOCAL time to avoid timezone offset issues
+function findFirstDayOccurrence(scheduleStartDate: string, dayName: string): string {
+    const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    const targetIndex = days.findIndex(d => d.toLowerCase() === dayName.toLowerCase());
+    if (targetIndex < 0) throw new Error(`Invalid day name: ${dayName}`);
+
+    // Parse YYYY-MM-DD in LOCAL time (not UTC) to avoid day offset
+    const [year, month, day] = scheduleStartDate.split('-').map(Number);
+    const start = new Date(year, month - 1, day); // month is 0-indexed
+    if (isNaN(start.getTime())) throw new Error(`Invalid start date: ${scheduleStartDate}`);
+
+    const currentIndex = start.getDay();
+    let diff = targetIndex - currentIndex;
+    if (diff < 0) diff += 7;
+    const first = new Date(start);
+    first.setDate(start.getDate() + diff);
+
+    // Return YYYY-MM-DD in local time
+    const yyyy = first.getFullYear();
+    const mm = String(first.getMonth() + 1).padStart(2, '0');
+    const dd = String(first.getDate()).padStart(2, '0');
+    return `${yyyy}-${mm}-${dd}`;
+}
+
 export interface ScheduleValidationError extends Error {
     code: 'SCHEDULE_LIMIT_EXCEEDED' | 'INVALID_DATE_RANGE' | 'INVALID_STATUS_TRANSITION' | 'SCHEDULE_NOT_FOUND' | 'UNAUTHORIZED';
 }
@@ -75,7 +110,7 @@ export async function createSchedule(scheduleData: CreateScheduleInput) {
     const { data: { user } } = await supabase.auth.getUser();
 
     if (!user) {
-        const error = new Error ('User not authenticated') as ScheduleValidationError;
+        const error = new Error('User not authenticated') as ScheduleValidationError;
         error.code = 'UNAUTHORIZED'
         throw error;
     }
@@ -92,10 +127,10 @@ export async function createSchedule(scheduleData: CreateScheduleInput) {
 
     // Check schedule limit (max 3)
     const { data: existingSchedules, error: countError } = await supabase
-    .from('schedules')
-    .select('id')
-    .eq('user_id', user.id)
-    .neq('status', 'trashed');
+        .from('schedules')
+        .select('id')
+        .eq('user_id', user.id)
+        .neq('status', 'trashed');
 
     if (countError) {
         throw new Error(`Failed to check schedule limit: ${countError.message}`);
@@ -109,18 +144,18 @@ export async function createSchedule(scheduleData: CreateScheduleInput) {
 
     // Create schedule
     const { data, error } = await supabase
-    .from('schedules')
-    .insert([
-        {
-            user_id: user.id,
-            label: scheduleData.label.trim(),
-            start_date: scheduleData.start_date,
-            end_date: scheduleData.end_date,
-            status: 'draft'
-        }
-    ])
-    .select()
-    .single();
+        .from('schedules')
+        .insert([
+            {
+                user_id: user.id,
+                label: scheduleData.label.trim(),
+                start_date: scheduleData.start_date,
+                end_date: scheduleData.end_date,
+                status: 'draft'
+            }
+        ])
+        .select()
+        .single();
 
     if (error) {
         throw new Error(`Failed to create schedule: ${error.message}`);
@@ -144,8 +179,8 @@ export async function getSchedules() {
         .select('*')
         .eq('user_id', user.id)
         .neq('status', 'trashed')
-        .order('created_at', { ascending: false }); 
-    
+        .order('created_at', { ascending: false });
+
     if (error) {
         throw new Error(`Failed to fetch schedules: ${error.message}`);
     }
@@ -169,7 +204,7 @@ export async function getSchedule(scheduleId: string) {
         .eq('id', scheduleId)
         .eq('user_id', user.id)
         .single();
-    
+
     if (error) {
         if (error.code === 'PGRST116') {
             const notFoundError = new Error('Schedule not found') as ScheduleValidationError;
@@ -240,7 +275,7 @@ export async function updateSchedule(scheduleId: string, updates: UpdateSchedule
         .eq('user_id', user.id)
         .select()
         .single();
-    
+
     if (error) {
         if (error.code === 'PGRST116') {
             const notFoundError = new Error('Schedule not found') as ScheduleValidationError;
@@ -295,7 +330,7 @@ export async function deleteSchedule(scheduleId: string) {
             previous_status: existingSchedule.status
         })
         .eq('id', scheduleId);
-    
+
     if (error) {
         throw new Error(`Failed to delete schedule: ${error.message}`);
     }
@@ -322,7 +357,7 @@ export async function restoreSchedule(scheduleId: string) {
         .select('id')
         .eq('user_id', user.id)
         .neq('status', 'trashed');
-    
+
     if (countError) {
         throw new Error(`Failed to check schedule limit: ${countError.message}`);
     }
@@ -350,7 +385,7 @@ export async function restoreSchedule(scheduleId: string) {
             .eq('user_id', user.id)
             .select()
             .single();
-        
+
         if (error) {
             throw new Error(`Failed to restore schedule: ${error.message}`);
         }
@@ -369,7 +404,7 @@ export async function restoreSchedule(scheduleId: string) {
         .eq('user_id', user.id)
         .select()
         .single();
-    
+
     if (error) {
         if (error.code === 'PGRST116') {
             const notFoundError = new Error('Schedule not found') as ScheduleValidationError;
@@ -480,7 +515,7 @@ export async function permanentDeleteAllTrashed() {
 function validateStatusTransition(currentStatus: string, newStatus: string): boolean {
     // Same status transition is always valid (allows editing same schedule)
     if (currentStatus === newStatus) return true;
-    
+
     const validTransitions: Record<string, string[]> = {
         draft: ['collecting', 'trashed'],
         collecting: ['archived', 'trashed'],
@@ -606,17 +641,60 @@ export async function addEventToSchedule(args: {
     end_time?: string;   // HH:MM format (optional, defaults to hour+1:00)
     recurrence_rule?: string; // e.g., 'FREQ=WEEKLY;BYDAY=MO' for weekly
 }) {
+    // Resolve schedule_id: allow passing a label; fetch actual UUID if needed
+    let resolvedScheduleId = args.schedule_id;
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (!uuidRegex.test(resolvedScheduleId)) {
+        // Load all schedules to resolve exact match or report ambiguity
+        const all = await getSchedules();
+        const exactMatches = all.filter(s => s.label.toLowerCase() === String(args.schedule_id).toLowerCase());
+        if (exactMatches.length === 1) {
+            resolvedScheduleId = exactMatches[0].id;
+        } else if (exactMatches.length > 1) {
+            throw new Error(`Multiple schedules match '${args.schedule_id}'. Available: ${all.map(s => s.label).join(', ')}`);
+        } else {
+            throw new Error(`Schedule not found: ${args.schedule_id}. Available: ${all.map(s => s.label).join(', ')}`);
+        }
+        // resolvedScheduleId now is a UUID
+    }
+    // Get the schedule to find its start date
+    const schedule = await getSchedule(resolvedScheduleId);
+
+    // Calculate the first occurrence of the requested day within the schedule's date range
+    const firstDate = findFirstDayOccurrence(schedule.start_date, args.day);
+
     const start = args.start_time || `${args.hour.toString().padStart(2, '0')}:00`;
     const end = args.end_time || `${(args.hour + 1).toString().padStart(2, '0')}:00`;
-    
+
+    // Create Date objects in local time, then convert to ISO string
+    // This ensures the time displays correctly in the user's timezone
+    const startDate = new Date(`${firstDate}T${start}:00`);
+    const endDate = new Date(`${firstDate}T${end}:00`);
+
+    // Use toISOString() which converts local time to UTC - this is correct
+    // because when the SchedulePage reads it back, new Date() will convert UTC back to local
+    const start_time = startDate.toISOString();
+    const end_time = endDate.toISOString();
+
+    // Default to weekly recurrence if day is specified but no recurrence_rule provided
+    // Map day name to RRULE BYDAY abbreviation
+    const dayAbbrevMap: Record<string, string> = {
+        'Sunday': 'SU', 'Monday': 'MO', 'Tuesday': 'TU', 'Wednesday': 'WE',
+        'Thursday': 'TH', 'Friday': 'FR', 'Saturday': 'SA'
+    };
+    const dayAbbrev = dayAbbrevMap[args.day];
+    const defaultRecurrence = dayAbbrev ? `FREQ=WEEKLY;BYDAY=${dayAbbrev}` : '';
+
     return createScheduleEntry({
-        schedule_id: args.schedule_id,
+        schedule_id: resolvedScheduleId,
         student_name: args.student_name,
-        start_time: `${args.day}T${start}:00`,
-        end_time: `${args.day}T${end}:00`,
-        recurrence_rule: args.recurrence_rule || ''
+        start_time,
+        end_time,
+        recurrence_rule: args.recurrence_rule ?? defaultRecurrence
     });
 }
+
+// (removed duplicate function)
 
 // Update or move an event in a schedule
 export async function updateEventInSchedule(args: {
@@ -629,22 +707,88 @@ export async function updateEventInSchedule(args: {
     recurrence_rule?: string;
 }) {
     const updates: { student_name?: string; start_time?: string; end_time?: string; recurrence_rule?: string } = {};
-    
+
     if (args.student_name !== undefined) updates.student_name = args.student_name;
     if (args.recurrence_rule !== undefined) updates.recurrence_rule = args.recurrence_rule;
-    
+
     if (args.day !== undefined && args.hour !== undefined) {
+        // Get the original event to find the schedule and calculate new date
+        const originalEntry = await getScheduleEntryById(args.event_id);
+        const schedule = await getSchedule(originalEntry.schedule_id);
+
+        // Calculate the first occurrence of the new day within the schedule's date range
+        const firstDate = findFirstDayOccurrence(schedule.start_date, args.day);
+
         const start = args.start_time || `${args.hour.toString().padStart(2, '0')}:00`;
         const end = args.end_time || `${(args.hour + 1).toString().padStart(2, '0')}:00`;
-        updates.start_time = `${args.day}T${start}:00`;
-        updates.end_time = `${args.day}T${end}:00`;
+
+        updates.start_time = `${firstDate}T${start}:00`;
+        updates.end_time = `${firstDate}T${end}:00`;
     } else if (args.start_time !== undefined) {
         updates.start_time = args.start_time;
     } else if (args.end_time !== undefined) {
         updates.end_time = args.end_time;
     }
-    
+
     return updateScheduleEntry(args.event_id, updates);
+}
+
+// Atomic-like swap of two events
+// Uses a 3-step process to avoid collision constraints: A -> Temp, B -> A, Temp -> B
+export async function swapEvents(event1_id: string, event2_id: string) {
+    // 1. Get both events
+    const entry1 = await getScheduleEntryById(event1_id);
+    const entry2 = await getScheduleEntryById(event2_id);
+
+    // Store original times
+    const time1 = { start: entry1.start_time, end: entry1.end_time };
+    const time2 = { start: entry2.start_time, end: entry2.end_time };
+
+    // 2. Move Event 1 to a temporary safe holding spot (e.g., 100 years in the future to keep day of week)
+    // We add 5200 weeks (~100 years) to maintain the same day-of-week logic if needed, 
+    // though for single events just shifting the year is enough.
+    // Let's just use a very far future date.
+    const tempStart = new Date(time1.start);
+    tempStart.setFullYear(tempStart.getFullYear() + 100);
+    const tempEnd = new Date(time1.end);
+    tempEnd.setFullYear(tempEnd.getFullYear() + 100);
+
+    await updateScheduleEntry(event1_id, {
+        start_time: tempStart.toISOString(),
+        end_time: tempEnd.toISOString()
+    });
+
+    // 3. Move Event 2 to Event 1's ORIGINAL time
+    await updateScheduleEntry(event2_id, {
+        start_time: time1.start,
+        end_time: time1.end
+    });
+
+    // 4. Move Event 1 (from temp) to Event 2's ORIGINAL time
+    const updatedEntry1 = await updateScheduleEntry(event1_id, {
+        start_time: time2.start,
+        end_time: time2.end
+    });
+
+    // Re-fetch Entry 2 to return updated state
+    const updatedEntry2 = await getScheduleEntryById(event2_id);
+
+    return [updatedEntry1, updatedEntry2];
+}
+
+// Helper to get a single schedule entry by ID
+async function getScheduleEntryById(entryId: string) {
+    const { data, error } = await supabase
+        .from('schedule_entries')
+        .select('*')
+        .eq('id', entryId)
+        .single();
+
+    if (error || !data) {
+        throw new Error('Event not found');
+    }
+
+    return data;
 }
 
 // Delete an event from a schedule
@@ -653,31 +797,33 @@ export async function deleteEventFromSchedule(args: { event_id: string }) {
 }
 
 // Get event summary grouped by day (for AI context)
+// Returns event IDs so AI can update/delete events
 export async function getEventSummaryInSchedule(scheduleId: string) {
     const entries = await getScheduleEntries(scheduleId);
-    
-    // Group by day
-    const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
-    const summary: Record<string, Array<{ student: string; time: string }>> = {};
-    
+
+    // Group by day (Sunday = 0, Monday = 1, etc. in JS)
+    const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    const summary: Record<string, Array<{ id: string; name: string; time: string }>> = {};
+
     days.forEach(day => summary[day] = []);
-    
+
     entries.forEach(entry => {
-        // Parse day from ISO format (e.g., "2026-01-20T15:00:00" -> get day of week)
+        // Parse date in LOCAL time (new Date() converts UTC to local automatically)
         const date = new Date(entry.start_time);
-        const dayIndex = (date.getDay() + 6) % 7; // Convert Sunday=0 to Monday=0
-        const dayName = days[dayIndex];
-        
-        // Extract time from ISO format
-        const timeMatch = entry.start_time.match(/T(\d{2}):(\d{2})/);
-        const time = timeMatch ? `${timeMatch[1]}:${timeMatch[2]}` : entry.start_time.split('T')[1]?.substring(0, 5) || '';
-        
+        const dayName = days[date.getDay()];
+
+        // Format time in local timezone (HH:MM format)
+        const hours = date.getHours().toString().padStart(2, '0');
+        const minutes = date.getMinutes().toString().padStart(2, '0');
+        const time = `${hours}:${minutes}`;
+
         summary[dayName].push({
-            student: entry.student_name,
+            id: entry.id,  // Include ID so AI can delete/update
+            name: entry.student_name,
             time: time
         });
     });
-    
+
     return summary;
 }
 
@@ -697,22 +843,22 @@ export async function getParticipantPreferences(participantId: string) {
     if (!user) {
         throw new Error('User not authenticated');
     }
-    
+
     const { data, error } = await supabase
         .from('form_responses')
         .select('*')
         .eq('id', participantId)
         .eq('user_id', user.id)
         .single();
-    
+
     if (error) {
         throw new Error(`Failed to fetch participant: ${error.message}`);
     }
-    
+
     if (!data) {
         throw new Error('Participant not found');
     }
-    
+
     // Return formatted preferences
     return {
         id: data.id,

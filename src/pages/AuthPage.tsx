@@ -146,7 +146,7 @@ export default function AuthPage() {
             <div style={styles.card}>
                 <img src={logo} alt="Aria" style={styles.logo} />
                 <p style={styles.tagline}>
-                    Smart scheduling for teams, clinics,<br />studios, and organizations
+                    Smart scheduling for individuals, teams, clinics,<br />studios, and organizations
                 </p>
 
                 <SupabaseAuth

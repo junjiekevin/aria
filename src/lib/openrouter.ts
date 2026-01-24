@@ -17,6 +17,7 @@ export interface FunctionCall {
 
 export interface ChatResponse {
   message: string;
+  rawContent?: string; // Original unstripped message for history
   functionCall?: FunctionCall;
 }
 
@@ -67,6 +68,9 @@ export async function sendChatMessage(
   };
 
   try {
+    console.log('[Aria Debug] Sending request to OpenRouter...');
+    console.log('[Aria Debug] Messages:', JSON.stringify(openRouterMessages.slice(-3), null, 2));
+
     const response = await fetch(OPENROUTER_API_URL, {
       method: 'POST',
       headers: {
@@ -78,58 +82,101 @@ export async function sendChatMessage(
       body: JSON.stringify(requestBody),
     });
 
+    console.log('[Aria Debug] Response status:', response.status, response.statusText);
+
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
+      console.error('[Aria Debug] API Error:', errorData);
       throw new Error(
         `OpenRouter API error: ${response.status} ${response.statusText}. ${JSON.stringify(errorData)}`
       );
     }
 
     const data: OpenRouterResponse = await response.json();
+    console.log('[Aria Debug] Full API response:', JSON.stringify(data, null, 2));
 
     if (!data.choices || data.choices.length === 0) {
+      console.error('[Aria Debug] No choices in response');
       throw new Error('No response from Gemini');
     }
 
     const assistantMessage = data.choices[0].message.content;
+    console.log('[Aria Debug] Raw assistant message:', assistantMessage);
 
-    // Check if the response contains a function call
-    // Supports two formats:
-    // 1. FUNCTION_CALL: {...json...} (preferred)
-    // 2. <tool_call>{...json...}</tool_call> (alternative)
-    const functionCallPatterns = [
-      { regex: /FUNCTION_CALL:\s*(\{[\s\S]*?\})\s*$/, key: 'FUNCTION_CALL' },
-      { regex: /<tool_call>\s*(\{[\s\S]*?\})\s*<\/tool_call>/, key: 'tool_call' },
-    ];
+    // Strip <think>...</think> reasoning tags from R1-style models (DeepSeek R1, etc.)
+    // These models output chain-of-thought reasoning that should not be shown to users
+    // or interfere with function call parsing
+    const cleanedMessage = assistantMessage.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
+    console.log('[Aria Debug] Cleaned message (think tags removed):', cleanedMessage);
 
-    let functionCallMatch = null;
-    let matchedPattern = null;
-
-    for (const pattern of functionCallPatterns) {
-      functionCallMatch = assistantMessage.match(pattern.regex);
-      if (functionCallMatch) {
-        matchedPattern = pattern.key;
-        break;
+    // Helper: Strip ALL function call syntax from message for display
+    const stripFunctionCalls = (msg: string): string => {
+      // Robustly truncate at the first sign of a function call to ensure clean UI
+      const functionCallIndex = msg.indexOf('FUNCTION_CALL:');
+      if (functionCallIndex !== -1) {
+        return msg.substring(0, functionCallIndex).trim();
       }
-    }
-    
-    if (functionCallMatch) {
+
+      const toolCallIndex = msg.indexOf('<tool_call>');
+      if (toolCallIndex !== -1) {
+        return msg.substring(0, toolCallIndex).trim();
+      }
+
+      return msg.trim();
+    };
+
+    const textResponse = stripFunctionCalls(cleanedMessage);
+
+    // 1. Look for FUNCTION_CALL: pattern (in cleaned message, not raw)
+    const functionCallMarker = 'FUNCTION_CALL:';
+    const firstCallIndex = cleanedMessage.indexOf(functionCallMarker);
+
+    // 2. Look for <tool_call> pattern (in cleaned message)
+    const toolCallMatch = cleanedMessage.match(/<tool_call>\s*(\{[\s\S]*?\})\s*<\/tool_call>/);
+
+    if (firstCallIndex !== -1) {
       try {
-        const jsonString = functionCallMatch[1].trim();
-        console.log(`Attempting to parse (${matchedPattern}):`, jsonString);
-        
+        const start = firstCallIndex + functionCallMarker.length;
+        const potentialJson = cleanedMessage.substring(start).trim();
+
+        let jsonString = '';
+        let braceCount = 0;
+        let foundStart = false;
+        let endIndex = -1;
+
+        // Manually extract the first valid JSON object to handle multiple calls or noise
+        for (let i = 0; i < potentialJson.length; i++) {
+          const char = potentialJson[i];
+          if (char === '{') {
+            braceCount++;
+            foundStart = true;
+          } else if (char === '}') {
+            braceCount--;
+          }
+
+          if (foundStart) {
+            if (braceCount === 0) {
+              endIndex = i + 1;
+              break;
+            }
+          }
+        }
+
+        if (endIndex !== -1) {
+          jsonString = potentialJson.substring(0, endIndex);
+        } else {
+          // Fallback: try to parse the whole trailing string or up to the next newline
+          jsonString = potentialJson;
+        }
+
+        console.log('[Aria Debug] Parsed JSON string:', jsonString);
         const functionCall = JSON.parse(jsonString);
-        
-        // Remove FUNCTION_CALL and everything after it (AI adds confirmation text after)
-        const textResponse = assistantMessage
-          .replace(/FUNCTION_CALL:\s*\{[\s\S]*?\}\s*.*$/, '')
-          .replace(/<tool_call>\s*\{[\s\S]*?\}\s*<\/tool_call>/, '')
-          .trim();
-        
+
         console.log('Successfully parsed function call:', functionCall);
-        
+
         return {
-          message: textResponse || 'Executing action...',
+          message: textResponse || 'Processing...',
+          rawContent: cleanedMessage, // Keep cleaned message for history (think tags removed, FUNCTION_CALL preserved)
           functionCall: {
             name: functionCall.name,
             arguments: functionCall.arguments || {},
@@ -138,166 +185,53 @@ export async function sendChatMessage(
       } catch (parseError) {
         console.error('Failed to parse function call:', parseError);
         return {
-          message: assistantMessage,
+          message: textResponse || 'I encountered an issue processing that request.',
+          rawContent: cleanedMessage, // Keep cleaned message for history
           functionCall: undefined,
         };
       }
+    } else if (toolCallMatch) {
+      // ... existing tool_call logic if needed, or unify it. 
+      // For now, let's just handle it similarly or return the existing match logic 
+      // but since we want to be robust, let's trust the FUNCTION_CALL logic primarily 
+      // as that's what the prompt uses. 
+
+      try {
+        const functionCall = JSON.parse(toolCallMatch[1]);
+        return {
+          message: textResponse || 'Processing...',
+          rawContent: cleanedMessage, // Keep cleaned message for history
+          functionCall: {
+            name: functionCall.name,
+            arguments: functionCall.arguments || {},
+          }
+        }
+      } catch (e) {
+        // ignore
+      }
     }
 
+    console.log('[Aria Debug] No function call detected, returning plain message');
     return {
-      message: assistantMessage,
+      message: textResponse,
+      rawContent: cleanedMessage, // Keep cleaned message for history
       functionCall: undefined,
     };
   } catch (error) {
-    console.error('Error calling OpenRouter:', error);
+    console.error('[Aria Debug] Error calling OpenRouter:', error);
     throw error;
   }
 }
 
 /**
- * System prompt for Aria - Chain of Thought reasoning with function calling
- * Aria is a friendly, autonomous scheduling assistant
+ * @deprecated Use getSystemPrompt from './aria' instead
+ * This monolithic prompt has been replaced by the Function Registry system
+ * for better context management and scalability.
+ *
+ * The new system dynamically builds prompts based on detected user intent,
+ * injecting only relevant function context to prevent context rot.
+ *
+ * See: src/lib/aria/functionRegistry.ts - Function definitions
+ * See: src/lib/aria/promptBuilder.ts - Dynamic prompt builder
  */
-export const ARIA_SYSTEM_PROMPT = `You are Aria, a friendly scheduling assistant who's genuinely helpful and easy to talk to.
-
-## Your Core Approach
-
-Think through requests INTERNALY - don't show your reasoning to users.
-
-Your output should ONLY include:
-1. A brief friendly message responding to the user
-2. A FUNCTION_CALL on its own line at the very end (if action needed)
-
-Example GOOD output:
-"Got it! Adding Singing every Monday at 3pm."
-FUNCTION_CALL: {"name":"addEventToSchedule","arguments":{"schedule_id":"3714130a-82f5-4d52-85ca-ca8105322725","student_name":"Singing","day":"Monday","hour":15}}
-
-Example BAD output (never do this):
-"Let me think... First I need to list schedules... Then find the right one... Then add the event..."
-FUNCTION_CALL: {...}
-
-## Output Format - CRITICAL
-
-FUNCTION_CALL must be:
-1. On its OWN LINE
-2. At the END of your response (nothing after it)
-3. Valid JSON only
-
-Example CORRECT:
-"Adding Singing to your schedule!"
-FUNCTION_CALL: {"name":"addEventToSchedule","arguments":{"schedule_id":"3714130a-82f5-4d52-85ca-ca8105322725","student_name":"Singing","day":"Monday","hour":15}}
-
-Example INCORRECT (don't do this):
-"Adding Singing... FUNCTION_CALL: {...} ✓ Done!"
-"*Looking for schedule* FUNCTION_CALL: {...} ✓ Found it! FUNCTION_CALL: {...}"
-
-After FUNCTION_CALL, add NOTHING else - not even emojis or checkmarks.
-
-## Function Calling Format
-
-When you need to take action, respond with a brief friendly message, then include a function call on a new line starting with "FUNCTION_CALL:" followed by valid JSON.
-
-Example:
-"I'll create that schedule for you!"
-FUNCTION_CALL: {"name":"createSchedule","arguments":{"label":"Fall 2026 Piano","start_date":"2026-09-01","end_date":"2026-12-15"}}
-
-## Extracting IDs from Responses - CRITICAL
-
-When you call listSchedules, the response looks like:
-[{"id":"3714130a-82f5-4d52-85ca-ca8105322725","label":"Practice Schedule 2026","status":"collecting","start_date":"2026-01-01","end_date":"2026-12-31"}]
-
-Extract the ID:
-- From "3714130a-82f5-4d52-85ca-ca8105322725" (36 characters with dashes)
-- NOT "[SCHEDULE_UUID_FROM_LIST]" or "1" or any placeholder
-- Use it directly: {"schedule_id":"3714130a-82f5-4d52-85ca-ca8105322725",...}
-
-## Schedule Identification - CRITICAL
-
-When user mentions a SPECIFIC schedule by name (e.g., "Practice Schedule 2026"):
-
-1. ALWAYS call listSchedules FIRST to get all schedules
-2. Find the schedule that MATCHES or PARTIALLY MATCHES the user's request
-3. Extract the EXACT UUID from the response (format: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx)
-4. Use that UUID in subsequent function calls
-5. If NO schedule matches, go to "When Schedule Not Found"
-
-NEVER guess or invent schedule IDs - always extract from listSchedules response.
-
-## When Schedule Not Found
-
-If listSchedules returns no matching schedule:
-1. Say "I can't find '[schedule name]'. You have these schedules:"
-2. List available schedules with labels only (no IDs to user)
-3. Ask "Which one did you mean?"
-
-Example:
-"I can't find 'Practice Schedule'. You have these schedules: 1) Practice Schedule 2026, 2) Fall 2026. Which one did you mean?"
-
-If listSchedules fails or returns empty:
-1. Say "I couldn't find any schedules. Would you like to create one?"
-
-## Schedule Functions
-
-- createSchedule: Create a new schedule (label, start_date YYYY-MM-DD, end_date YYYY-MM-DD)
-- listSchedules: List all active schedules
-- listTrashedSchedules: List schedules in trash
-- updateSchedule: Update schedule (ID required, plus optional: label, dates, status)
-- trashSchedule: Move a schedule to trash (soft delete, recoverable)
-- recoverSchedule: Restore a schedule from trash
-- emptyTrash: Permanently delete ALL trashed schedules (ASK FOR CONFIRMATION FIRST!)
-
-## Event Functions
-
-- addEventToSchedule: Add an event (schedule_id, student_name, day, hour 0-23)
-- updateEventInSchedule: Update or move an event (event_id required, plus optional: student_name, day, hour)
-- deleteEventFromSchedule: Remove an event (event_id required)
-- getEventSummaryInSchedule: Get day-by-day summary of events (schedule_id required)
-
-## Participant Functions
-
-- listUnassignedParticipants: Show participants without events (schedule_id required)
-- getParticipantPreferences: Get a participant's preferences (participant_id required)
-- markParticipantAssigned: Mark participant as assigned/unassigned (participant_id, assigned boolean)
-
-## Date & Time Rules
-
-- Use YYYY-MM-DD format for dates (e.g., "March 2026" → "2026-03-01")
-- Hours are 24-hour format (15 for 3pm, 9 for 9am, 14 for 2pm)
-- Days are: Monday, Tuesday, Wednesday, Thursday, Friday, Saturday, Sunday
-- Holidays like Christmas, Easter, New Year's, Thanksgiving are understood naturally
-
-## Status Transitions
-
-Status flow: draft → collecting → archived (can also go to trash at any stage)
-- draft can go to: collecting, trash
-- collecting can go to: archived, trash
-- archived can go to: collecting, trash
-- trash can go to: draft, collecting, archived (recovery)
-
-If user asks for an invalid transition, guide them: "I can help with that, but [schedule] is [status]. To [action], it needs to be [required status] first."
-
-## Event Identification - CRITICAL
-
-When user mentions a SPECIFIC event (e.g., "John's Monday lesson"):
-
-1. Call getEventSummaryInSchedule to see all events
-2. Find the event that matches the user's description
-3. If MULTIPLE events match, ask "Which one? (1) John's Monday 3pm, (2) John's Tuesday 4pm..."
-4. If NO events match, tell the user "I can't find any event matching '[description]'"
-
-## Multi-Action Requests
-
-For "swap all Monday with Wednesday" or "create 3 schedules":
-1. Explain what will happen
-2. List each action
-3. Ask confirmation ("Should I proceed with all of these?")
-4. Execute each action one at a time
-5. Report results
-
-## Important
-
-- Keep responses SHORT and warm - like texting a helpful friend
-- Never show internal IDs to users (they're for you only)
-- If something goes wrong, explain simply and suggest next steps
-- Always ask confirmation for destructive actions (emptyTrash, multiple deletes)
-- You're helping the user - be genuinely helpful and conversational`;
+export { getSystemPrompt as ARIA_SYSTEM_PROMPT } from './aria';

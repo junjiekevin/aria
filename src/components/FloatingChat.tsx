@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { Send, Loader2, User, MessageCircle, X, Minimize2 } from 'lucide-react';
-import { sendChatMessage, ARIA_SYSTEM_PROMPT, type Message } from '../lib/openrouter';
+import { sendChatMessage, type Message } from '../lib/openrouter';
+import { getSystemPrompt, type PromptContext } from '../lib/aria';
 import { executeFunction } from '../lib/functions';
 import ariaProfile from '../assets/images/aria-profile.png';
 
@@ -55,7 +56,7 @@ const styles: Record<string, React.CSSProperties> = {
     alignItems: 'center',
     justifyContent: 'center',
   },
-  
+
   // Chat Window (expanded state)
   chatWindow: {
     position: 'fixed' as const,
@@ -314,6 +315,75 @@ export default function FloatingChat({ onScheduleChange }: FloatingChatProps) {
     }
   }, [isOpen]);
 
+  // Helper: Format function result for display vs for LLM
+  const formatFunctionResult = (name: string, result: { success: boolean; data?: unknown; error?: string }) => {
+    // Functions that need raw data sent back to LLM for follow-up
+    const functionsNeedingRawData = [
+      'listSchedules',
+      'listTrashedSchedules',
+      'getEventSummaryInSchedule',
+      'listUnassignedParticipants',
+      'getParticipantPreferences',
+    ];
+
+    let displayContent = '';
+    let llmContent = '';
+    let scheduleModified = false;
+
+    if (result.success) {
+      if (functionsNeedingRawData.includes(name) && result.data) {
+        // Show raw JSON to both user and LLM (LLM needs IDs)
+        const jsonResult = JSON.stringify(result.data, null, 2);
+        displayContent = `[Function Result] ${name}:\n${jsonResult}`;
+        llmContent = `[Function Result] ${name} succeeded:\n${jsonResult}`;
+      } else if (name === 'createSchedule' && (result.data as { label?: string })?.label) {
+        displayContent = `✓ Created "${(result.data as { label: string }).label}"`;
+        llmContent = `[Function Result] ${name} succeeded: Created schedule "${(result.data as { label: string }).label}"`;
+        scheduleModified = true;
+      } else if (name === 'addEventToSchedule' && result.data) {
+        const eventName = (result.data as { student_name?: string }).student_name || 'Event';
+        displayContent = `✓ Added "${eventName}" to the schedule`;
+        llmContent = `[Function Result] ${name} succeeded: Added "${eventName}" to the schedule`;
+        scheduleModified = true;
+      } else if (name === 'updateEventInSchedule') {
+        displayContent = '✓ Event updated';
+        llmContent = `[Function Result] ${name} succeeded: Event updated`;
+        scheduleModified = true;
+      } else if (name === 'deleteEventFromSchedule') {
+        displayContent = '✓ Event deleted';
+        llmContent = `[Function Result] ${name} succeeded: Event deleted`;
+        scheduleModified = true;
+      } else if (name === 'deleteSchedule' || name === 'trashSchedule') {
+        displayContent = '✓ Schedule moved to trash';
+        llmContent = `[Function Result] ${name} succeeded: Schedule moved to trash`;
+        scheduleModified = true;
+      } else if (name === 'updateSchedule') {
+        displayContent = '✓ Schedule updated';
+        llmContent = `[Function Result] ${name} succeeded: Schedule updated`;
+        scheduleModified = true;
+      } else if (name === 'recoverSchedule') {
+        displayContent = '✓ Schedule restored';
+        llmContent = `[Function Result] ${name} succeeded: Schedule restored`;
+        scheduleModified = true;
+      } else if (name === 'emptyTrash') {
+        displayContent = '✓ Trash emptied';
+        llmContent = `[Function Result] ${name} succeeded: Trash emptied`;
+        scheduleModified = true;
+      } else if (name === 'markParticipantAssigned') {
+        displayContent = '✓ Participant status updated';
+        llmContent = `[Function Result] ${name} succeeded: Participant status updated`;
+      } else {
+        displayContent = '✓ Action completed';
+        llmContent = `[Function Result] ${name} succeeded`;
+      }
+    } else {
+      displayContent = `✗ Error: ${result.error}`;
+      llmContent = `[Function Result] ${name} FAILED: ${result.error}`;
+    }
+
+    return { displayContent, llmContent, scheduleModified };
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!input.trim() || loading) return;
@@ -325,132 +395,129 @@ export default function FloatingChat({ onScheduleChange }: FloatingChatProps) {
       timestamp: new Date(),
     };
 
-    // Add user message with 100 message limit
+    // Add user message
     setMessages((prev) => {
       const updated = [...prev, userMessage];
-      if (updated.length > MAX_MESSAGES) {
-        return updated.slice(-MAX_MESSAGES);
-      }
-      return updated;
+      return updated.length > MAX_MESSAGES ? updated.slice(-MAX_MESSAGES) : updated;
     });
     setInput('');
     setLoading(true);
 
     try {
-      const conversationHistory: Message[] = [
+      // Extract schedule ID from URL
+      const scheduleMatch = window.location.pathname.match(/\/schedule\/([a-f0-9-]{36})/i);
+      const currentScheduleId = scheduleMatch ? scheduleMatch[1] : null;
+
+      const promptContext: PromptContext = {
+        scheduleId: currentScheduleId || undefined,
+      };
+
+      if (currentScheduleId) {
+        console.log('[FloatingChat Debug] Current schedule context:', currentScheduleId);
+      }
+
+      // Build initial conversation history
+      let conversationHistory: Message[] = [
         ...messages.map((msg) => ({ role: msg.role, content: msg.content })),
         { role: 'user', content: userMessage.content },
       ];
 
-      const response = await sendChatMessage(conversationHistory, ARIA_SYSTEM_PROMPT);
+      const systemPrompt = getSystemPrompt(userMessage.content, promptContext);
 
-      const assistantMessage: ChatMessage = {
-        id: (Date.now() + 1).toString(),
-        role: 'assistant',
-        content: response.message,
-        timestamp: new Date(),
-      };
+      // Agentic loop - keep processing until no more function calls
+      const MAX_ITERATIONS = 10; // Safety limit
+      let iterations = 0;
+      let anyScheduleModified = false;
 
-      setMessages((prev) => {
-        const updated = [...prev, assistantMessage];
-        if (updated.length > MAX_MESSAGES) {
-          return updated.slice(-MAX_MESSAGES);
+      while (iterations < MAX_ITERATIONS) {
+        iterations++;
+        console.log(`[FloatingChat Debug] Agentic loop iteration ${iterations}`);
+
+        const response = await sendChatMessage(conversationHistory, systemPrompt);
+        console.log('[FloatingChat Debug] Got response:', response);
+
+        // History Logic: Use RAW content to preserve Function Call for LLM memory
+        // This prevents the infinite loop "amnesia"
+        conversationHistory = [
+          ...conversationHistory,
+          { role: 'assistant', content: response.rawContent || response.message },
+        ];
+
+        // UX Logic: Clean up usage
+        // 1. Show FIRST message ("I'm on it")
+        // 2. Hide intermediate messages (iterations > 1 with function calls)
+        // 3. Show FINAL message (no function call)
+        const shouldShowMessage = iterations === 1 || !response.functionCall;
+
+        if (shouldShowMessage && response.message && response.message.trim()) {
+          const assistantMessage: ChatMessage = {
+            id: (Date.now() + iterations * 10).toString(),
+            role: 'assistant',
+            content: response.message,
+            timestamp: new Date(),
+          };
+          setMessages((prev) => {
+            const updated = [...prev, assistantMessage];
+            return updated.length > MAX_MESSAGES ? updated.slice(-MAX_MESSAGES) : updated;
+          });
         }
-        return updated;
-      });
 
-      if (response.functionCall) {
+        // If no function call, we're done
+        if (!response.functionCall) {
+          console.log('[FloatingChat Debug] No function call, agentic loop complete');
+          break;
+        }
+
+        // Execute the function
         const { name, arguments: args } = response.functionCall;
-        
-        const executingMessage: ChatMessage = {
-          id: (Date.now() + 2).toString(),
-          role: 'assistant',
-          content: `Executing ${name}...`,
-          timestamp: new Date(),
-        };
-        setMessages((prev) => {
-          const updated = [...prev, executingMessage];
-          if (updated.length > MAX_MESSAGES) {
-            return updated.slice(-MAX_MESSAGES);
-          }
-          return updated;
-        });
+        console.log(`[FloatingChat Debug] Executing function: ${name}`, args);
 
         const result = await executeFunction(name, args);
-        setMessages((prev) => prev.filter((msg) => msg.id !== executingMessage.id));
+        const { displayContent, llmContent, scheduleModified } = formatFunctionResult(name, result);
 
-        let resultContent = '';
-        let scheduleModified = false;
-        if (result.success) {
-          if (name === 'createSchedule' && result.data?.label) {
-            resultContent = `✓ Created "${result.data.label}"`;
-            scheduleModified = true;
-          } else if (name === 'createMultipleSchedules' && result.data?.schedules) {
-            const scheduleNames = result.data.schedules.map((s: any) => `"${s.label}"`).join(', ');
-            resultContent = `✓ Created ${result.data.count} schedules: ${scheduleNames}`;
-            scheduleModified = true;
-          } else if (name === 'listSchedules' && Array.isArray(result.data)) {
-            if (result.data.length === 0) {
-              resultContent = 'You have no schedules yet.';
-            } else {
-              const statusMap: Record<string, string> = {
-                draft: 'Draft',
-                collecting: 'Active',
-                archived: 'Archived',
-                trashed: 'Trashed'
-              };
-              resultContent = `You currently have ${result.data.length} schedule${result.data.length > 1 ? 's' : ''}:\n${result.data.map((s: any, idx: number) => 
-                `${idx + 1}. "${s.label}" (${statusMap[s.status] || s.status})`
-              ).join('\n')}`;
-            }
-          } else if (name === 'deleteSchedule') {
-            resultContent = '✓ Schedule moved to trash';
-            scheduleModified = true;
-          } else if (name === 'deleteAllSchedules') {
-            resultContent = `✓ Deleted all schedules`;
-            scheduleModified = true;
-          } else if (name === 'updateSchedule') {
-            resultContent = '✓ Schedule updated';
-            scheduleModified = true;
-          } else if (name === 'activateSchedule') {
-            resultContent = '✓ Schedule activated';
-            scheduleModified = true;
-          } else if (name === 'archiveSchedule') {
-            resultContent = '✓ Schedule archived';
-            scheduleModified = true;
-          } else if (name === 'trashSchedule') {
-            resultContent = '✓ Schedule moved to trash';
-            scheduleModified = true;
-          } else if (name === 'recoverSchedule') {
-            resultContent = '✓ Schedule restored successfully';
-            scheduleModified = true;
-          } else {
-            resultContent = '✓ Action completed successfully';
-          }
-        } else {
-          resultContent = `✗ Error: ${result.error}`;
+        if (scheduleModified) {
+          anyScheduleModified = true;
         }
 
-        const resultMessage: ChatMessage = {
-          id: (Date.now() + 3).toString(),
-          role: 'assistant',
-          content: resultContent,
-          timestamp: new Date(),
-        };
-        setMessages((prev) => {
-          const updated = [...prev, resultMessage];
-          if (updated.length > MAX_MESSAGES) {
-            return updated.slice(-MAX_MESSAGES);
-          }
-          return updated;
-        });
+        // Show result to user ONLY IF ERROR
+        // Success messages are hidden to reduce noise
+        if (!result.success) {
+          const resultMessage: ChatMessage = {
+            id: (Date.now() + iterations * 10 + 1).toString(),
+            role: 'assistant',
+            content: displayContent, // Shows "Error: ..."
+            timestamp: new Date(),
+          };
+          setMessages((prev) => {
+            const updated = [...prev, resultMessage];
+            return updated.length > MAX_MESSAGES ? updated.slice(-MAX_MESSAGES) : updated;
+          });
+        }
 
-        if (scheduleModified && onScheduleChange) {
-          setTimeout(() => onScheduleChange(), 100);
+        // Add result to conversation history for LLM to continue
+        conversationHistory = [
+          ...conversationHistory,
+          { role: 'assistant', content: llmContent },
+        ];
+
+        // If the function failed, break the loop
+        if (!result.success) {
+          console.log('[FloatingChat Debug] Function failed, stopping loop');
+          break;
         }
       }
+
+      if (iterations >= MAX_ITERATIONS) {
+        console.warn('[FloatingChat Debug] Max iterations reached');
+      }
+
+      // Trigger schedule refresh if any modifications were made
+      if (anyScheduleModified && onScheduleChange) {
+        setTimeout(() => onScheduleChange(), 100);
+      }
+
     } catch (error) {
-      console.error('Error sending message:', error);
+      console.error('Error in agentic loop:', error);
       const errorMessage: ChatMessage = {
         id: (Date.now() + 1).toString(),
         role: 'assistant',
@@ -459,10 +526,7 @@ export default function FloatingChat({ onScheduleChange }: FloatingChatProps) {
       };
       setMessages((prev) => {
         const updated = [...prev, errorMessage];
-        if (updated.length > MAX_MESSAGES) {
-          return updated.slice(-MAX_MESSAGES);
-        }
-        return updated;
+        return updated.length > MAX_MESSAGES ? updated.slice(-MAX_MESSAGES) : updated;
       });
     } finally {
       setLoading(false);
