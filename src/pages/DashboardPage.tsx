@@ -114,20 +114,7 @@ function ScheduleCard({
 			className={s.card}
 			style={{
 				opacity: isTrashed ? 0.65 : 1,
-				backgroundColor: isTrashed ? '#fafafa' : 'white',
-				transform: isTrashed ? 'none' : undefined,
-			}}
-			onMouseEnter={(e) => {
-				if (!isTrashed) {
-					e.currentTarget.style.transform = 'translateY(-2px)';
-					e.currentTarget.style.boxShadow = '0 8px 24px rgba(0, 0, 0, 0.1)';
-				}
-			}}
-			onMouseLeave={(e) => {
-				if (!isTrashed) {
-					e.currentTarget.style.transform = '';
-					e.currentTarget.style.boxShadow = '';
-				}
+				backgroundColor: isTrashed ? 'var(--bg-gray-50)' : 'white',
 			}}
 		>
 			<div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
@@ -141,38 +128,17 @@ function ScheduleCard({
 								onChange={(e) => setEditingName(e.target.value)}
 								onBlur={handleNameBlur}
 								onKeyDown={handleNameKeyDown}
-								style={{
-									fontSize: '1.125rem',
-									fontWeight: '600',
-									color: '#111827',
-									margin: '0 0 0.5rem 0',
-									padding: '0.5rem 0.75rem',
-									border: '2px solid #f97316',
-									borderRadius: '8px',
-									width: '100%',
-									maxWidth: '320px',
-									outline: 'none',
-								}}
+								className={s.nameInput}
+								style={{ maxWidth: '320px', width: '100%' }}
 							/>
 						) : (
 							<h3
 								onClick={handleNameClick}
-								style={{
-									fontSize: '1.125rem',
-									fontWeight: '600',
-									color: isTrashed ? '#6b7280' : '#111827',
-									margin: '0 0 0.5rem 0',
-									cursor: isTrashed ? 'default' : 'pointer',
-									transition: 'color 0.2s',
-									display: 'flex',
-									alignItems: 'center',
-									gap: '0.5rem',
-								}}
-								onMouseEnter={(e) => { if (!isTrashed) e.currentTarget.style.color = '#f97316'; }}
-								onMouseLeave={(e) => { if (!isTrashed) e.currentTarget.style.color = '#111827'; }}
+								className={s.cardTitle}
+								style={{ color: isTrashed ? 'var(--text-400)' : 'var(--text-900)' }}
 							>
 								{schedule.label}
-								{isTrashed && <span style={{ fontSize: '0.75rem', fontWeight: 'normal', color: '#9ca3af' }}>(Trashed)</span>}
+								{isTrashed && <span className={s.trashedLabel}>(Trashed)</span>}
 							</h3>
 						)}
 						<div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: isTrashed ? '#9ca3af' : '#6b7280', fontSize: '0.875rem' }}>
@@ -189,7 +155,7 @@ function ScheduleCard({
 							<button
 								onClick={() => onRecover?.(schedule)}
 								className={s.button}
-								style={{ flex: 1, backgroundColor: '#10b981', borderRadius: '12px' }}
+								style={{ flex: 1, backgroundColor: 'var(--brand-success)' }}
 							>
 								<RotateCcw size={16} />
 								Recover
@@ -197,7 +163,7 @@ function ScheduleCard({
 							<button
 								onClick={() => onHardDelete?.(schedule)}
 								className={s.button}
-								style={{ flex: 1, backgroundColor: 'white', color: '#dc2626', border: '1px solid #fecaca', borderRadius: '12px' }}
+								style={{ flex: 1, backgroundColor: 'white', color: 'var(--brand-error)', border: '1px solid #fecaca', boxShadow: 'none' }}
 							>
 								<XCircle size={16} />
 								Delete
@@ -208,7 +174,7 @@ function ScheduleCard({
 							<button
 								onClick={() => onView?.(schedule)}
 								className={s.button}
-								style={{ flex: 1, borderRadius: '12px' }}
+								style={{ flex: 1 }}
 							>
 								<Sparkles size={16} />
 								View
@@ -216,7 +182,7 @@ function ScheduleCard({
 							<button
 								onClick={() => onRecover?.(schedule)}
 								className={s.button}
-								style={{ flex: 1, backgroundColor: '#10b981', borderRadius: '12px' }}
+								style={{ flex: 1, backgroundColor: 'var(--brand-success)' }}
 							>
 								<RotateCcw size={16} />
 								Restore
@@ -224,7 +190,7 @@ function ScheduleCard({
 							<button
 								onClick={() => onTrash?.(schedule)}
 								className={s.button}
-								style={{ flex: 1, backgroundColor: 'white', color: '#dc2626', border: '1px solid #fecaca', borderRadius: '12px' }}
+								style={{ flex: 1, backgroundColor: 'white', color: 'var(--brand-error)', border: '1px solid #fecaca', boxShadow: 'none' }}
 							>
 								<Trash2 size={16} />
 								Trash
@@ -235,7 +201,7 @@ function ScheduleCard({
 							<button
 								onClick={() => onView(schedule)}
 								className={s.button}
-								style={{ flex: 1, borderRadius: '12px' }}
+								style={{ flex: 1.5 }}
 							>
 								<Sparkles size={16} />
 								View
@@ -243,7 +209,7 @@ function ScheduleCard({
 							<button
 								onClick={onEdit}
 								className={s.button}
-								style={{ flex: 1, backgroundColor: 'white', color: '#374151', border: '1px solid #e5e7eb', boxShadow: 'none', borderRadius: '12px' }}
+								style={{ flex: 1, backgroundColor: 'white', color: 'var(--text-700)', border: '1px solid var(--border-gray-200)', boxShadow: 'none' }}
 							>
 								Edit
 							</button>
@@ -251,7 +217,7 @@ function ScheduleCard({
 								<button
 									onClick={() => onArchive?.(schedule)}
 									className={s.button}
-									style={{ backgroundColor: 'transparent', color: '#6b7280', border: '1px solid #e5e7eb', boxShadow: 'none', padding: '0.75rem', borderRadius: '12px' }}
+									style={{ backgroundColor: 'transparent', color: 'var(--text-500)', border: '1px solid var(--border-gray-200)', boxShadow: 'none', padding: '0.6rem' }}
 									title="Archive"
 								>
 									<Archive size={16} />
@@ -260,7 +226,7 @@ function ScheduleCard({
 							<button
 								onClick={() => onTrash?.(schedule)}
 								className={s.button}
-								style={{ backgroundColor: 'transparent', color: '#9ca3af', border: '1px solid #e5e7eb', boxShadow: 'none', padding: '0.75rem', borderRadius: '12px' }}
+								style={{ backgroundColor: 'transparent', color: 'var(--text-400)', border: '1px solid var(--border-gray-200)', boxShadow: 'none', padding: '0.6rem' }}
 							>
 								<Trash2 size={16} />
 							</button>
@@ -685,15 +651,6 @@ export default function DashboardPage() {
 			)}
 
 			{/* Toast */}
-			{/* Mobile FAB */}
-			<button
-				className={s.fab}
-				onClick={handleCreateSchedule}
-				aria-label="Create Schedule"
-				style={{ display: window.innerWidth < 640 ? 'flex' : 'none' }}
-			>
-				<Plus size={28} />
-			</button>
 
 			{toast && (
 				<div className={`${s.toast} ${toast.type === 'success' ? s.toastSuccess : s.toastError}`}>

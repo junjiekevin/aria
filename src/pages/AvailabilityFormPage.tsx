@@ -411,6 +411,35 @@ export default function AvailabilityFormPage() {
         }
     };
 
+    const applySmartDuration = (oldTiming: TimingSlot, newTiming: TimingSlot): TimingSlot => {
+        const oldStart = parseInt(oldTiming.startHour) * 60 + parseInt(oldTiming.startMinute);
+        const oldEnd = parseInt(oldTiming.endHour) * 60 + parseInt(oldTiming.endMinute);
+        const newStart = parseInt(newTiming.startHour) * 60 + parseInt(newTiming.startMinute);
+
+        const duration = oldEnd - oldStart;
+
+        // If start time changed, shift end time by the same duration
+        if (newTiming.startHour !== oldTiming.startHour || newTiming.startMinute !== oldTiming.startMinute) {
+            const totalEndMinutes = newStart + duration;
+            const h = Math.min(Math.floor(totalEndMinutes / 60), (schedule?.working_hours_end ?? 21));
+            const m = totalEndMinutes % 60;
+
+            return {
+                ...newTiming,
+                endHour: h.toString().padStart(2, '0'),
+                endMinute: m.toString().padStart(2, '0')
+            };
+        }
+
+        return newTiming;
+    };
+
+    const handleTimingChange = (index: number, newTiming: TimingSlot) => {
+        if (index === 0) setTiming1(applySmartDuration(timing1, newTiming));
+        if (index === 1) setTiming2(applySmartDuration(timing2, newTiming));
+        if (index === 2) setTiming3(applySmartDuration(timing3, newTiming));
+    };
+
     const timesOverlap = (t1: TimingSlot, t2: TimingSlot): boolean => {
         if (t1.day !== t2.day) return false;
 
@@ -698,7 +727,7 @@ export default function AvailabilityFormPage() {
                             <>
                                 <TimingSelector
                                     timing={timing1}
-                                    onChange={setTiming1}
+                                    onChange={(newVal) => handleTimingChange(0, newVal)}
                                     index={0}
                                     errors={formErrors.filter(e => e.includes('Choice 1') || e.includes('1'))}
                                     startHours={startHours}
@@ -707,7 +736,7 @@ export default function AvailabilityFormPage() {
                                 {(schedule?.max_choices || 3) >= 2 && (
                                     <TimingSelector
                                         timing={timing2}
-                                        onChange={setTiming2}
+                                        onChange={(newVal) => handleTimingChange(1, newVal)}
                                         index={1}
                                         errors={formErrors.filter(e => e.includes('Choice 2') || e.includes('2'))}
                                         startHours={startHours}
@@ -717,7 +746,7 @@ export default function AvailabilityFormPage() {
                                 {(schedule?.max_choices || 3) >= 3 && (
                                     <TimingSelector
                                         timing={timing3}
-                                        onChange={setTiming3}
+                                        onChange={(newVal) => handleTimingChange(2, newVal)}
                                         index={2}
                                         errors={formErrors.filter(e => e.includes('Choice 3') || e.includes('3'))}
                                         startHours={startHours}

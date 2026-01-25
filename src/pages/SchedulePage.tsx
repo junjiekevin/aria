@@ -17,31 +17,7 @@ import { DndContext, DragOverlay, useDraggable, useDroppable, PointerSensor, Tou
 
 const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
-function TrashZone() {
-  const { setNodeRef, isOver } = useDroppable({
-    id: 'trash',
-  });
 
-  return (
-    <div
-      ref={setNodeRef}
-      style={{
-        border: `2px dashed ${isOver ? '#ef4444' : '#d1d5db'}`,
-        padding: '1.5rem',
-        textAlign: 'center',
-        backgroundColor: isOver ? '#fee2e2' : '#f9fafb',
-        borderRadius: 'var(--radius-full)',
-        color: isOver ? '#991b1b' : '#6b7280',
-        width: '100%',
-        maxWidth: '400px',
-        fontWeight: 600,
-        fontSize: '0.875rem'
-      }}
-    >
-      {isOver ? 'Drop here to delete' : 'Drag here to delete'}
-    </div>
-  );
-}
 
 export default function SchedulePage() {
   // Separate sensors for mouse and touch devices
@@ -720,23 +696,6 @@ export default function SchedulePage() {
         setActiveDragId(null);
         loadScheduleData();
       }
-    } else if (dropId === 'trash') {
-      // Cancel drag first (clean transition)
-      setActiveDragId(null);
-      setIsDragging(false);
-
-      // Then open delete confirmation
-      if (draggedEntry.recurrence_rule && draggedEntry.recurrence_rule !== '') {
-        setEntryToDelete(draggedEntry);
-      } else {
-        // Delete immediately for non-recurring entries
-        try {
-          await deleteScheduleEntry(draggedEntry.id);
-          setEntries(entries.filter(e => e.id !== draggedEntry.id));
-        } catch (err) {
-          console.error('Failed to delete event:', err);
-        }
-      }
     } else if (dropId.startsWith('entry-')) {
       const targetEntryId = dropId.replace('entry-', '');
       const targetEntry = entries.find(e => e.id === targetEntryId);
@@ -1328,15 +1287,7 @@ export default function SchedulePage() {
 
         {/* Mobile FAB or other persistent overlays can go here */}
 
-        {/* Contextual Trash Zone */}
-        {isDragging && (
-          <div
-            className={`${s.trashZone} ${activeDragId === 'trash' ? s.trashZoneActive : ''}`}
-          // Using a simple data attribute or specific ID for dnd-kit drop target
-          >
-            <TrashZone />
-          </div>
-        )}
+
 
         <AddEventModal
           isOpen={showAddModal}

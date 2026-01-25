@@ -193,47 +193,6 @@
     transform: translateY(-1px);
 }
 
-/* Contextual Trash Zone - Repositioned to top-center to avoid blocking grid */
-.trashZone {
-    position: fixed;
-    top: 4.5rem;
-    /* Just below the sticky toolbar */
-    left: 50%;
-    transform: translateX(-50%);
-    background: #fee2e2;
-    border: 2px dashed #ef4444;
-    color: #991b1b;
-    padding: 0.85rem 3rem;
-    border-radius: 0 0 var(--radius-lg) var(--radius-lg);
-    z-index: 10000;
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
-    font-weight: 700;
-    font-size: 0.875rem;
-    box-shadow: var(--shadow-lg);
-    transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
-    animation: slideDownIn 0.3s ease;
-}
-
-.trashZoneActive {
-    background: #fecaca;
-    transform: translateX(-50%) scale(1.05);
-    border-style: solid;
-}
-
-@keyframes slideDownIn {
-    from {
-        opacity: 0;
-        transform: translate(-50%, -20px);
-    }
-
-    to {
-        opacity: 1;
-        transform: translate(-50%, 0);
-    }
-}
-
 /* Utility Back Button */
 .backButton {
     width: 36px;
