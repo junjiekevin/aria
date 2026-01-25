@@ -802,12 +802,20 @@ export default function SchedulePage() {
     };
   };
 
+  const getResponseDuration = (response: FormResponse) => {
+    if (response.preferred_1_start && response.preferred_1_end) {
+      const [startH, startM] = response.preferred_1_start.split(':').map(Number);
+      const [endH, endM] = response.preferred_1_end.split(':').map(Number);
+      return (endH * 60 + endM) - (startH * 60 + startM);
+    }
+    return 60; // Default 1 hour
+  };
+
   function DraggableEventBlock({ entry, children }: { entry: ScheduleEntry; children: React.ReactNode }) {
     const {
       attributes,
       listeners,
       setNodeRef,
-      transform,
       isDragging: isBeingDragged, // Renamed to avoid conflict with component-level isDragging
     } = useDraggable({
       id: entry.id,
@@ -815,11 +823,11 @@ export default function SchedulePage() {
       disabled: isViewOnly,
     });
 
-    const style = transform ? {
-      transform: `translate3d(${transform.x}px, ${transform.y}px, 0)`,
-      zIndex: 1000,
-      opacity: isBeingDragged ? 0 : 1,
-    } : undefined;
+    const style = {
+      opacity: isBeingDragged ? 0.3 : 1,
+      pointerEvents: (isBeingDragged || isViewOnly) ? 'none' : 'auto' as any,
+      cursor: isViewOnly ? 'default' : 'grab',
+    };
 
     return (
       <div
@@ -828,7 +836,7 @@ export default function SchedulePage() {
         style={{
           ...getEventBlockStyle(entry),
           ...style, // Apply transform and opacity from useDraggable
-          visibility: isBeingDragged ? 'hidden' : 'visible',
+          opacity: isBeingDragged ? 0.3 : 1,
           pointerEvents: isBeingDragged ? 'none' : 'auto',
           cursor: isViewOnly ? 'default' : 'grab',
         }}
@@ -851,7 +859,6 @@ export default function SchedulePage() {
       attributes,
       listeners,
       setNodeRef,
-      transform,
       isDragging: isBeingDragged,
     } = useDraggable({
       id: `unassigned-${response.id}`,
@@ -859,20 +866,16 @@ export default function SchedulePage() {
       disabled: isViewOnly,
     });
 
-    const style = transform ? {
-      transform: `translate3d(${transform.x}px, ${transform.y}px, 0)`,
-      zIndex: 1000,
-    } : undefined;
+    const style = {
+      opacity: isBeingDragged ? 0.3 : 1,
+      cursor: isViewOnly ? 'default' : 'grab',
+    };
 
     return (
       <div
         ref={setNodeRef}
         className={s.unassignedCard}
-        style={{
-          ...style,
-          opacity: isBeingDragged ? 0.5 : 1,
-          cursor: isViewOnly ? 'default' : 'grab',
-        }}
+        style={style}
         {...(!isViewOnly ? { ...attributes, ...listeners } : {})}
       >
         {children}
@@ -1548,24 +1551,35 @@ export default function SchedulePage() {
           </div>
         </Modal>
 
-        <DragOverlay>
+        <DragOverlay dropAnimation={null}>
           {activeDragId && (() => {
             if (typeof activeDragId === 'string' && activeDragId.startsWith('unassigned-')) {
               const responseId = activeDragId.replace('unassigned-', '');
               const response = responses.find(r => r.id === responseId);
               if (!response) return null;
+
+              const duration = getResponseDuration(response);
+              const height = (duration / 60) * 40;
+
               return (
                 <div
-                  className={s.unassignedCard}
+                  className={s.eventBlock}
                   style={{
-                    opacity: 0.9,
+                    height: `${height}px`,
+                    width: '180px', // Standard width for dragging unassigned
+                    position: 'relative',
+                    top: 0,
+                    opacity: 0.95,
                     cursor: 'grabbing',
-                    zIndex: 9999,
-                    boxShadow: '0 8px 20px rgba(0, 0, 0, 0.15)',
-                    transform: 'scale(1.02)',
+                    zIndex: 10000,
+                    boxShadow: '0 20px 50px rgba(0, 0, 0, 0.3), 0 4px 15px rgba(0, 0, 0, 0.1)',
+                    transform: 'scale(1.05)',
                   }}
                 >
-                  <div className={s.unassignedCardName}>{response.student_name}</div>
+                  <div style={{ fontWeight: '600' }}>{response.student_name}</div>
+                  <div style={{ fontSize: '0.625rem', opacity: 0.9 }}>
+                    {duration} minutes
+                  </div>
                 </div>
               );
             }
@@ -1574,7 +1588,18 @@ export default function SchedulePage() {
             if (!entry) return null;
 
             return (
-              <div style={{ ...getEventBlockStyle(entry), opacity: 0.7, cursor: 'grabbing', zIndex: 9999 }}>
+              <div
+                className={s.eventBlock}
+                style={{
+                  ...getEventBlockStyle(entry),
+                  top: 0,
+                  opacity: 0.95,
+                  cursor: 'grabbing',
+                  zIndex: 10000,
+                  boxShadow: '0 20px 50px rgba(0, 0, 0, 0.3), 0 4px 15px rgba(0, 0, 0, 0.1)',
+                  transform: 'scale(1.05)',
+                }}
+              >
                 <div style={{ fontWeight: '600' }}>{entry.student_name}</div>
                 <div style={{ fontSize: '0.625rem', opacity: 0.9 }}>
                   {formatLocalTime(entry.start_time)} - {formatLocalTime(entry.end_time)}
