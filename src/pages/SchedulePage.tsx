@@ -1,7 +1,8 @@
 // src/pages/SchedulePage.tsx
 import { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, ChevronLeft, ChevronRight, Trash2, Settings, List, Sparkles, Copy, Check, Layout } from 'lucide-react';
+import { ArrowLeft, ChevronLeft, ChevronRight, Trash2, Settings, List, Sparkles, Copy, Check, Layout, Calendar, FileText } from 'lucide-react';
+import { exportToICS, exportToPDF } from '../lib/export';
 import s from './SchedulePage.module.css';
 import { getSchedule, updateSchedule, type Schedule } from '../lib/api/schedules';
 import { getScheduleEntries, createScheduleEntry, updateScheduleEntry, deleteScheduleEntry, type ScheduleEntry } from '../lib/api/schedule-entries';
@@ -10,6 +11,7 @@ import AddEventModal from '../components/AddEventModal';
 import Modal from '../components/Modal';
 import SchedulingPreviewModal from '../components/SchedulingPreviewModal';
 import ConfigureFormModal from '../components/ConfigureFormModal';
+import SwapConfirmModal from '../components/SwapConfirmModal';
 import { DndContext, DragOverlay, useDraggable, useDroppable, PointerSensor, TouchSensor, useSensor, useSensors, type DragEndEvent, type DragStartEvent } from '@dnd-kit/core';
 
 
@@ -85,6 +87,15 @@ export default function SchedulePage() {
   const [showConfigureFormModal, setShowConfigureFormModal] = useState(false);
   const [showTrashConfirm, setShowTrashConfirm] = useState(false);
   const [isCopied, setIsCopied] = useState(false);
+
+  // Swap confirmation modal state
+  const [showSwapModal, setShowSwapModal] = useState(false);
+  const [pendingSwap, setPendingSwap] = useState<{
+    eventA: ScheduleEntry;
+    eventB: ScheduleEntry;
+    isConflict: boolean;
+    swapAction: () => Promise<void>;
+  } | null>(null);
 
   // Editable title and date range state
   const [isEditingTitle, setIsEditingTitle] = useState(false);
@@ -581,74 +592,74 @@ export default function SchedulePage() {
       });
 
       if (overlappingEntry) {
-        const confirmSwap = window.confirm(
-          `"${draggedEntry.student_name}" conflicts with "${overlappingEntry.student_name}". Swap them?`
-        );
-
-        if (!confirmSwap) return;
-
+        // Prepare swap action for modal confirmation
         const dayAbbrev = ['SU', 'MO', 'TU', 'WE', 'TH', 'FR', 'SA'][dayIndex];
-
-        // Get the original day of the dragged entry for the swap
         const draggedOriginalDay = new Date(draggedEntry.start_time).getDay();
         const draggedOriginalDayAbbrev = ['SU', 'MO', 'TU', 'WE', 'TH', 'FR', 'SA'][draggedOriginalDay];
 
-        // Helper to get frequency type from recurrence rule
-        const getFrequency = (rule: string): 'once' | 'weekly' | '2weekly' | 'monthly' => {
-          if (!rule) return 'once';
-          if (rule.includes('INTERVAL=2')) return '2weekly';
-          if (rule.includes('FREQ=MONTHLY')) return 'monthly';
-          // Check for INTERVAL=4 (which represents "monthly" in our system)
-          if (rule.includes('INTERVAL=4')) return 'monthly';
-          return 'weekly';
+        const swapAction = async () => {
+          // Helper to get frequency type from recurrence rule
+          const getFrequency = (rule: string): 'once' | 'weekly' | '2weekly' | 'monthly' => {
+            if (!rule) return 'once';
+            if (rule.includes('INTERVAL=2')) return '2weekly';
+            if (rule.includes('FREQ=MONTHLY')) return 'monthly';
+            if (rule.includes('INTERVAL=4')) return 'monthly';
+            return 'weekly';
+          };
+
+          // Helper to update just the BYDAY in recurrence rule while preserving frequency
+          const updateRecurrenceDay = (rule: string, newDayAbbrev: string): string => {
+            const freq = getFrequency(rule);
+            if (freq === 'once') return '';
+            if (freq === '2weekly') return `FREQ=WEEKLY;INTERVAL=2;BYDAY=${newDayAbbrev}`;
+            if (freq === 'monthly') return `FREQ=WEEKLY;INTERVAL=4;BYDAY=${newDayAbbrev}`;
+            return `FREQ=WEEKLY;BYDAY=${newDayAbbrev}`;
+          };
+
+          try {
+            const overlappingDuration = new Date(overlappingEntry.end_time).getTime() - new Date(overlappingEntry.start_time).getTime();
+            const draggedNewStart = new Date(draggedEntry.start_time);
+            const overlappingNewEnd = new Date(draggedNewStart.getTime() + overlappingDuration);
+
+            const newDraggedRecurrence = updateRecurrenceDay(draggedEntry.recurrence_rule, dayAbbrev);
+            const newOverlappingRecurrence = updateRecurrenceDay(overlappingEntry.recurrence_rule, draggedOriginalDayAbbrev);
+
+            setEntries(prev => prev.map(e => {
+              if (e.id === draggedEntry.id) {
+                return { ...e, start_time: firstOccurrence.toISOString(), end_time: newEnd.toISOString(), recurrence_rule: newDraggedRecurrence };
+              }
+              if (e.id === overlappingEntry.id) {
+                return { ...e, start_time: draggedEntry.start_time, end_time: overlappingNewEnd.toISOString(), recurrence_rule: newOverlappingRecurrence };
+              }
+              return e;
+            }));
+
+            await updateScheduleEntry(draggedEntry.id, {
+              start_time: firstOccurrence.toISOString(),
+              end_time: newEnd.toISOString(),
+              recurrence_rule: newDraggedRecurrence,
+            });
+
+            await updateScheduleEntry(overlappingEntry.id, {
+              start_time: draggedEntry.start_time,
+              end_time: overlappingNewEnd.toISOString(),
+              recurrence_rule: newOverlappingRecurrence,
+            });
+          } catch (err) {
+            console.error('Failed to swap events:', err);
+            loadScheduleData();
+          }
         };
 
-        // Helper to update just the BYDAY in recurrence rule while preserving frequency
-        const updateRecurrenceDay = (rule: string, newDayAbbrev: string): string => {
-          const freq = getFrequency(rule);
-          if (freq === 'once') return '';
-          if (freq === '2weekly') return `FREQ=WEEKLY;INTERVAL=2;BYDAY=${newDayAbbrev}`;
-          if (freq === 'monthly') return `FREQ=WEEKLY;INTERVAL=4;BYDAY=${newDayAbbrev}`;
-          return `FREQ=WEEKLY;BYDAY=${newDayAbbrev}`;
-        };
-
-        try {
-          // Preserve the overlapping entry's original duration
-          const overlappingDuration = new Date(overlappingEntry.end_time).getTime() - new Date(overlappingEntry.start_time).getTime();
-          const draggedNewStart = new Date(draggedEntry.start_time);
-          const overlappingNewEnd = new Date(draggedNewStart.getTime() + overlappingDuration);
-
-          const newDraggedRecurrence = updateRecurrenceDay(draggedEntry.recurrence_rule, dayAbbrev);
-          const newOverlappingRecurrence = updateRecurrenceDay(overlappingEntry.recurrence_rule, draggedOriginalDayAbbrev);
-
-          setEntries(entries.map(e => {
-            if (e.id === draggedEntry.id) {
-              return { ...e, start_time: firstOccurrence.toISOString(), end_time: newEnd.toISOString(), recurrence_rule: newDraggedRecurrence };
-            }
-            if (e.id === overlappingEntry.id) {
-              return { ...e, start_time: draggedEntry.start_time, end_time: overlappingNewEnd.toISOString(), recurrence_rule: newOverlappingRecurrence };
-            }
-            return e;
-          }));
-
-          await updateScheduleEntry(draggedEntry.id, {
-            start_time: firstOccurrence.toISOString(),
-            end_time: newEnd.toISOString(),
-            recurrence_rule: newDraggedRecurrence,
-          });
-
-          await updateScheduleEntry(overlappingEntry.id, {
-            start_time: draggedEntry.start_time,
-            end_time: overlappingNewEnd.toISOString(),
-            recurrence_rule: newOverlappingRecurrence,
-          });
-
-          setActiveDragId(null);
-        } catch (err) {
-          console.error('Failed to swap events:', err);
-          setActiveDragId(null);
-          loadScheduleData();
-        }
+        // Show swap confirmation modal
+        setPendingSwap({
+          eventA: draggedEntry,
+          eventB: overlappingEntry,
+          isConflict: true,
+          swapAction,
+        });
+        setShowSwapModal(true);
+        setActiveDragId(null);
         return;
       }
 
@@ -732,90 +743,87 @@ export default function SchedulePage() {
 
       if (!targetEntry || targetEntry.id === draggedEntry.id) return;
 
-      const confirmSwap = window.confirm(
-        `Swap "${draggedEntry.student_name}" with "${targetEntry.student_name}"?`
-      );
+      // Prepare swap action for modal confirmation
+      const swapAction = async () => {
+        try {
+          const draggedStart = new Date(draggedEntry.start_time);
+          const draggedEnd = new Date(draggedEntry.end_time);
+          const draggedDurationMs = draggedEnd.getTime() - draggedStart.getTime();
 
-      if (!confirmSwap) return;
+          const targetStart = new Date(targetEntry.start_time);
+          const targetEnd = new Date(targetEntry.end_time);
+          const targetDurationMs = targetEnd.getTime() - targetStart.getTime();
 
-      try {
-        // Calculate original durations (from each entry's own start/end)
-        const draggedStart = new Date(draggedEntry.start_time);
-        const draggedEnd = new Date(draggedEntry.end_time);
-        const draggedDurationMs = draggedEnd.getTime() - draggedStart.getTime();
+          // Helper to get frequency type from recurrence rule
+          const getFrequency = (rule: string): 'once' | 'weekly' | '2weekly' | 'monthly' => {
+            if (!rule) return 'once';
+            if (rule.includes('INTERVAL=2')) return '2weekly';
+            if (rule.includes('FREQ=MONTHLY')) return 'monthly';
+            if (rule.includes('INTERVAL=4')) return 'monthly';
+            return 'weekly';
+          };
 
-        const targetStart = new Date(targetEntry.start_time);
-        const targetEnd = new Date(targetEntry.end_time);
-        const targetDurationMs = targetEnd.getTime() - targetStart.getTime();
+          // Helper to update just the BYDAY in recurrence rule while preserving frequency
+          const updateRecurrenceDay = (rule: string, newDate: Date): string => {
+            const dayAbbrevs = ['SU', 'MO', 'TU', 'WE', 'TH', 'FR', 'SA'];
+            const newDayAbbrev = dayAbbrevs[newDate.getDay()];
+            const freq = getFrequency(rule);
 
-        // Helper to get frequency type from recurrence rule
-        const getFrequency = (rule: string): 'once' | 'weekly' | '2weekly' | 'monthly' => {
-          if (!rule) return 'once';
-          if (rule.includes('INTERVAL=2')) return '2weekly';
-          if (rule.includes('FREQ=MONTHLY')) return 'monthly';
-          // Check for INTERVAL=4 (which represents "monthly" in our system)
-          if (rule.includes('INTERVAL=4')) return 'monthly';
-          return 'weekly';
-        };
+            if (freq === 'once') return '';
+            if (freq === '2weekly') return `FREQ=WEEKLY;INTERVAL=2;BYDAY=${newDayAbbrev}`;
+            if (freq === 'monthly') return `FREQ=WEEKLY;INTERVAL=4;BYDAY=${newDayAbbrev}`;
+            return `FREQ=WEEKLY;BYDAY=${newDayAbbrev}`;
+          };
 
-        // Helper to update just the BYDAY in recurrence rule while preserving frequency
-        const updateRecurrenceDay = (rule: string, newDate: Date): string => {
-          const dayAbbrevs = ['SU', 'MO', 'TU', 'WE', 'TH', 'FR', 'SA'];
-          const newDayAbbrev = dayAbbrevs[newDate.getDay()];
+          const newDraggedRecurrence = updateRecurrenceDay(draggedEntry.recurrence_rule, targetStart);
+          const newTargetRecurrence = updateRecurrenceDay(targetEntry.recurrence_rule, draggedStart);
 
-          // Extract frequency and rebuild rule
-          const freq = getFrequency(rule);
+          await updateScheduleEntry(draggedEntry.id, {
+            start_time: targetStart.toISOString(),
+            end_time: new Date(targetStart.getTime() + draggedDurationMs).toISOString(),
+            recurrence_rule: newDraggedRecurrence,
+          });
 
-          if (freq === 'once') return '';
-          if (freq === '2weekly') return `FREQ=WEEKLY;INTERVAL=2;BYDAY=${newDayAbbrev}`;
-          if (freq === 'monthly') return `FREQ=WEEKLY;INTERVAL=4;BYDAY=${newDayAbbrev}`;
-          return `FREQ=WEEKLY;BYDAY=${newDayAbbrev}`;
-        };
+          await updateScheduleEntry(targetEntry.id, {
+            start_time: draggedStart.toISOString(),
+            end_time: new Date(draggedStart.getTime() + targetDurationMs).toISOString(),
+            recurrence_rule: newTargetRecurrence,
+          });
 
-        // Calculate new recurrence rules - each entry keeps its own frequency
-        const newDraggedRecurrence = updateRecurrenceDay(draggedEntry.recurrence_rule, targetStart);
-        const newTargetRecurrence = updateRecurrenceDay(targetEntry.recurrence_rule, draggedStart);
+          setEntries(prev => prev.map(e => {
+            if (e.id === draggedEntry.id) {
+              return {
+                ...e,
+                start_time: targetStart.toISOString(),
+                end_time: new Date(targetStart.getTime() + draggedDurationMs).toISOString(),
+                recurrence_rule: newDraggedRecurrence,
+              };
+            }
+            if (e.id === targetEntry.id) {
+              return {
+                ...e,
+                start_time: draggedStart.toISOString(),
+                end_time: new Date(draggedStart.getTime() + targetDurationMs).toISOString(),
+                recurrence_rule: newTargetRecurrence,
+              };
+            }
+            return e;
+          }));
+        } catch (err) {
+          console.error('Failed to swap events:', err);
+          loadScheduleData();
+        }
+      };
 
-        // Update entries one at a time to avoid race conditions
-        await updateScheduleEntry(draggedEntry.id, {
-          start_time: targetStart.toISOString(),
-          end_time: new Date(targetStart.getTime() + draggedDurationMs).toISOString(),
-          recurrence_rule: newDraggedRecurrence,
-        });
-
-        await updateScheduleEntry(targetEntry.id, {
-          start_time: draggedStart.toISOString(),
-          end_time: new Date(draggedStart.getTime() + targetDurationMs).toISOString(),
-          recurrence_rule: newTargetRecurrence,
-        });
-
-        // Update local state with the new values
-        setEntries(entries.map(e => {
-          if (e.id === draggedEntry.id) {
-            return {
-              ...e,
-              start_time: targetStart.toISOString(),
-              end_time: new Date(targetStart.getTime() + draggedDurationMs).toISOString(),
-              recurrence_rule: newDraggedRecurrence,
-            };
-          }
-          if (e.id === targetEntry.id) {
-            return {
-              ...e,
-              start_time: draggedStart.toISOString(),
-              end_time: new Date(draggedStart.getTime() + targetDurationMs).toISOString(),
-              recurrence_rule: newTargetRecurrence,
-            };
-          }
-          return e;
-        }));
-
-        setActiveDragId(null);
-      } catch (err) {
-        console.error('Failed to swap events:', err);
-        setActiveDragId(null);
-        alert('Failed to swap events. Please try again.');
-      }
+      // Show swap confirmation modal
+      setPendingSwap({
+        eventA: draggedEntry,
+        eventB: targetEntry,
+        isConflict: false,
+        swapAction,
+      });
+      setShowSwapModal(true);
+      setActiveDragId(null);
     }
   };
 
@@ -879,7 +887,39 @@ export default function SchedulePage() {
     );
   }
 
+  function DraggableUnassignedCard({ response, children }: { response: FormResponse; children: React.ReactNode }) {
+    const {
+      attributes,
+      listeners,
+      setNodeRef,
+      transform,
+      isDragging: isBeingDragged,
+    } = useDraggable({
+      id: `unassigned-${response.id}`,
+      data: response,
+      disabled: isViewOnly,
+    });
 
+    const style = transform ? {
+      transform: `translate3d(${transform.x}px, ${transform.y}px, 0)`,
+      zIndex: 1000,
+    } : undefined;
+
+    return (
+      <div
+        ref={setNodeRef}
+        className={s.unassignedCard}
+        style={{
+          ...style,
+          opacity: isBeingDragged ? 0.5 : 1,
+          cursor: isViewOnly ? 'default' : 'grab',
+        }}
+        {...(!isViewOnly ? { ...attributes, ...listeners } : {})}
+      >
+        {children}
+      </div>
+    );
+  }
 
   function DroppableSlot({ children, day, hour }: { children: React.ReactNode; day: string; hour: number }) {
     const { setNodeRef: setSlotRef, isOver } = useDroppable({
@@ -1062,18 +1102,20 @@ export default function SchedulePage() {
                       <div className={s.popoverContent}>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                           {getUnassignedParticipants().map((response) => (
-                            <div
-                              key={response.id}
-                              className={s.unassignedCard}
-                              onClick={() => setResponseToView(response)}
-                            >
-                              <div className={s.unassignedCardName}>{response.student_name}</div>
+                            <DraggableUnassignedCard key={response.id} response={response}>
+                              <div
+                                className={s.unassignedCardName}
+                                onClick={() => !isDragging && setResponseToView(response)}
+                                style={{ cursor: 'pointer', flex: 1 }}
+                              >
+                                {response.student_name}
+                              </div>
                               <Trash2
                                 size={14}
                                 className={s.unassignedCardIcon}
                                 onClick={(e) => { e.stopPropagation(); setParticipantToDelete(response); }}
                               />
-                            </div>
+                            </DraggableUnassignedCard>
                           ))}
                           {getUnassignedParticipants().length === 0 && (
                             <div className={s.emptyState}>No unassigned participants</div>
@@ -1107,6 +1149,41 @@ export default function SchedulePage() {
                           <div>
                             <span style={{ color: 'var(--text-500)', display: 'block', marginBottom: '0.25rem' }}>Status</span>
                             <span style={{ fontWeight: 600 }}>{getStatusLabel(schedule.status)}</span>
+                          </div>
+
+                          {/* Export Section */}
+                          <div style={{ borderTop: '1px solid var(--border-divider)', paddingTop: '1rem' }}>
+                            <span style={{ color: 'var(--text-500)', display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem'}}>Export</span>
+                            <div style={{ display: 'flex', gap: '0.5rem' }}>
+                              <button
+                                onClick={() => {
+                                  if (weekStart) {
+                                    exportToICS(schedule, entries);
+                                  }
+                                  setIsInfoOpen(false);
+                                }}
+                                className={s.toolbarButton}
+                                style={{ flex: 1, justifyContent: 'center' }}
+                                title="Export to iCal format (Google Calendar, Apple Calendar, Outlook)"
+                              >
+                                <Calendar size={14} />
+                                <span>iCal</span>
+                              </button>
+                              <button
+                                onClick={() => {
+                                  if (weekStart) {
+                                    exportToPDF(schedule, entries, weekStart);
+                                  }
+                                  setIsInfoOpen(false);
+                                }}
+                                className={s.toolbarButton}
+                                style={{ flex: 1, justifyContent: 'center' }}
+                                title="Export current week as PDF"
+                              >
+                                <FileText size={14} />
+                                <span>PDF</span>
+                              </button>
+                            </div>
                           </div>
 
                           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.625rem', borderTop: '1px solid var(--border-divider)', paddingTop: '1rem' }}>
@@ -1264,6 +1341,23 @@ export default function SchedulePage() {
           }}
           workingHoursStart={schedule.working_hours_start ?? 8}
           workingHoursEnd={schedule.working_hours_end ?? 21}
+        />
+
+        <SwapConfirmModal
+          isOpen={showSwapModal}
+          onClose={() => {
+            setShowSwapModal(false);
+            setPendingSwap(null);
+          }}
+          onConfirm={() => {
+            if (pendingSwap?.swapAction) {
+              pendingSwap.swapAction();
+            }
+            setPendingSwap(null);
+          }}
+          eventA={pendingSwap?.eventA ?? null}
+          eventB={pendingSwap?.eventB ?? null}
+          isConflict={pendingSwap?.isConflict}
         />
 
         <Modal
@@ -1495,8 +1589,17 @@ export default function SchedulePage() {
               const response = responses.find(r => r.id === responseId);
               if (!response) return null;
               return (
-                <div style={{ padding: '0.6rem 0.75rem', backgroundColor: '#fbbf24', borderRadius: '0.5rem', border: '1px solid #f59e0b', fontSize: '0.875rem', opacity: 0.7, cursor: 'grabbing', zIndex: 9999 }}>
-                  <div style={{ fontWeight: '600', color: '#92400e' }}>{response.student_name}</div>
+                <div
+                  className={s.unassignedCard}
+                  style={{
+                    opacity: 0.9,
+                    cursor: 'grabbing',
+                    zIndex: 9999,
+                    boxShadow: '0 8px 20px rgba(0, 0, 0, 0.15)',
+                    transform: 'scale(1.02)',
+                  }}
+                >
+                  <div className={s.unassignedCardName}>{response.student_name}</div>
                 </div>
               );
             }
@@ -1518,5 +1621,3 @@ export default function SchedulePage() {
     </div >
   );
 }
-
-
