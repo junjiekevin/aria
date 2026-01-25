@@ -181,7 +181,7 @@ export async function getSchedules() {
     return data || [];
 }
 
-// Get single schedule by ID
+// Get single schedule by ID (Owner version - requires auth)
 export async function getSchedule(scheduleId: string) {
     const { data: { user } } = await supabase.auth.getUser();
 
@@ -205,6 +205,28 @@ export async function getSchedule(scheduleId: string) {
             throw notFoundError;
         }
         throw new Error(`Failed to fetch schedule: ${error.message}`);
+    }
+
+    return data;
+}
+
+// Get single schedule for public consumption (No auth required)
+// Only allows fetching if status is 'collecting' or 'archived' (enforced by RLS)
+export async function getPublicSchedule(scheduleId: string) {
+    // Note: We does NOT check for user session here
+    const { data, error } = await supabase
+        .from('schedules')
+        .select('id, label, start_date, end_date, status, max_choices, form_instructions, form_deadline, working_hours_start, working_hours_end')
+        .eq('id', scheduleId)
+        .single();
+
+    if (error) {
+        if (error.code === 'PGRST116') {
+            const notFoundError = new Error('Schedule not found') as ScheduleValidationError;
+            notFoundError.code = 'SCHEDULE_NOT_FOUND';
+            throw notFoundError;
+        }
+        throw new Error(`Failed to fetch form details: ${error.message}`);
     }
 
     return data;

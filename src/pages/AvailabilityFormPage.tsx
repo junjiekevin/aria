@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useParams } from 'react-router-dom';
 import { Copy, Check, AlertCircle } from 'lucide-react';
-import { getSchedule, type Schedule } from '../lib/api/schedules';
+import { getPublicSchedule, type Schedule } from '../lib/api/schedules';
 import { createFormResponse, getFormResponses } from '../lib/api/form-responses';
 
 const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
@@ -373,8 +373,8 @@ export default function AvailabilityFormPage() {
             if (!scheduleId) return;
 
             try {
-                const scheduleData = await getSchedule(scheduleId);
-                setSchedule(scheduleData);
+                const scheduleData = await getPublicSchedule(scheduleId);
+                setSchedule(scheduleData as Schedule);
 
                 // Check deadline
                 if (scheduleData.form_deadline) {

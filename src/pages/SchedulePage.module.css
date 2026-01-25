@@ -331,14 +331,16 @@
         margin-top: 0.25rem;
     }
 
-    .toolbarButton {
-        padding: 0.4rem 0.6rem;
-    }
-
     .successButton,
     .activateButton {
         padding: 0.4rem 0.8rem;
         font-size: 0.75rem;
+        min-height: 44px;
+    }
+
+    .toolbarButton {
+        padding: 0.4rem 0.6rem;
+        min-height: 44px;
     }
 
     .dayHeader {
