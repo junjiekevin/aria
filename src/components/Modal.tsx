@@ -79,18 +79,27 @@ export default function Modal({ isOpen, onClose, title, children, maxWidth = '32
         style={{ ...styles.modal, maxWidth: responsiveMaxWidth }}
         onClick={(e) => e.stopPropagation()}
       >
-        <div style={styles.header}>
-          <h2 style={styles.title}>{title}</h2>
+        <div style={{
+          ...styles.header,
+          padding: isMobile ? '1rem' : '1.5rem',
+        }}>
+          <h2 style={{
+            ...styles.title,
+            fontSize: isMobile ? '1.25rem' : '1.5rem',
+          }}>{title}</h2>
           <button
             onClick={onClose}
             style={styles.closeButton}
             onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#f3f4f6'; }}
             onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; }}
           >
-            <X size={24} color="#6b7280" />
+            <X size={isMobile ? 20 : 24} color="#6b7280" />
           </button>
         </div>
-        <div style={styles.content}>
+        <div style={{
+          ...styles.content,
+          padding: isMobile ? '1rem' : '1.5rem',
+        }}>
           {children}
         </div>
       </div>

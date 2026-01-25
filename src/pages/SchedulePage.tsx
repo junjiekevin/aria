@@ -989,7 +989,7 @@ export default function SchedulePage() {
           <div className={s.toolbarContent}>
             {/* Left: Back & Title */}
             <div className={s.leftSection}>
-              <button onClick={() => navigate('/dashboard')} className={s.backButton}>
+              <button onClick={() => navigate('/dashboard')} className={`${s.backButton} ${s.dashboardBackButton}`}>
                 <ArrowLeft size={18} />
               </button>
               <div className={s.titleArea}>
@@ -1055,8 +1055,17 @@ export default function SchedulePage() {
               >
                 <ChevronLeft size={20} />
               </button>
-              <div style={{ fontSize: '0.875rem', fontWeight: 600, minWidth: '160px', textAlign: 'center' }}>
-                Week {weekNumber} of {totalWeeks}
+              <div style={{ fontSize: '0.875rem', fontWeight: 600, minWidth: '220px', textAlign: 'center' }}>
+                {weekStart && weekEnd ? (
+                  <>
+                    {weekStart.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })} – {weekEnd.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+                    <span style={{ color: 'var(--text-400)', fontWeight: 400, marginLeft: '0.5rem' }}>
+                      (Week {weekNumber} of {totalWeeks})
+                    </span>
+                  </>
+                ) : (
+                  `Week ${weekNumber} of ${totalWeeks}`
+                )}
               </div>
               <button
                 onClick={goToNextWeek}
@@ -1153,7 +1162,7 @@ export default function SchedulePage() {
 
                           {/* Export Section */}
                           <div style={{ borderTop: '1px solid var(--border-divider)', paddingTop: '1rem' }}>
-                            <span style={{ color: 'var(--text-500)', display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem'}}>Export</span>
+                            <span style={{ color: 'var(--text-500)', display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem' }}>Export</span>
                             <div style={{ display: 'flex', gap: '0.5rem' }}>
                               <button
                                 onClick={() => {
@@ -1261,11 +1270,17 @@ export default function SchedulePage() {
               {DAYS.map((day, index) => {
                 const date = weekStart ? new Date(weekStart) : null;
                 if (date) date.setDate(date.getDate() + index);
-                const dateStr = date ? date.getDate() : '';
                 return (
                   <div key={day} className={s.dayHeader}>
                     <span>{day}</span>
-                    <span className={s.dayHeaderDate}>{dateStr}</span>
+                    <span className={s.dayHeaderDate}>
+                      {date ? (
+                        <>
+                          <span style={{ fontSize: '0.65rem', marginRight: '0.15rem' }}>{date.toLocaleDateString(undefined, { month: 'short' })}</span>
+                          {date.getDate()}
+                        </>
+                      ) : ''}
+                    </span>
                   </div>
                 );
               })}

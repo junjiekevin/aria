@@ -195,13 +195,18 @@ export default function ConfigureFormModal({
 
                 <div style={styles.formGroup}>
                     <label style={styles.label}>Number of Preferred Timings</label>
-                    <div style={styles.radioGroup}>
+                    <div style={{
+                        ...styles.radioGroup,
+                        flexDirection: typeof window !== 'undefined' && window.innerWidth < 480 ? 'column' : 'row',
+                        gap: typeof window !== 'undefined' && window.innerWidth < 480 ? '0.5rem' : '1rem',
+                    }}>
                         {[1, 2, 3].map((num) => (
                             <label
                                 key={num}
                                 style={{
                                     ...styles.radioLabel,
                                     ...(maxChoices === num ? styles.radioLabelSelected : {}),
+                                    justifyContent: 'flex-start',
                                 }}
                             >
                                 <input
@@ -277,18 +282,29 @@ export default function ConfigureFormModal({
                     </div>
                 </div>
 
-                <div style={styles.buttonGroup}>
+                <div style={{
+                    ...styles.buttonGroup,
+                    flexDirection: typeof window !== 'undefined' && window.innerWidth < 480 ? 'column-reverse' : 'row',
+                }}>
                     <button
                         type="button"
                         onClick={onClose}
-                        style={{ ...styles.button, ...styles.secondaryButton }}
+                        style={{
+                            ...styles.button,
+                            ...styles.secondaryButton,
+                            flex: typeof window !== 'undefined' && window.innerWidth < 480 ? 'none' : 1,
+                        }}
                         disabled={loading}
                     >
                         Cancel
                     </button>
                     <button
                         type="submit"
-                        style={{ ...styles.button, ...styles.primaryButton }}
+                        style={{
+                            ...styles.button,
+                            ...styles.primaryButton,
+                            flex: typeof window !== 'undefined' && window.innerWidth < 480 ? 'none' : 1,
+                        }}
                         disabled={loading}
                         onMouseEnter={(e) => { if (!loading) e.currentTarget.style.backgroundColor = '#ea580c'; }}
                         onMouseLeave={(e) => { if (!loading) e.currentTarget.style.backgroundColor = '#f97316'; }}
