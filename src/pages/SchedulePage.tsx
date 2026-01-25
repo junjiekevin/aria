@@ -1,7 +1,7 @@
 // src/pages/SchedulePage.tsx
 import { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, ChevronLeft, ChevronRight, Trash2, Settings, List, Sparkles, Copy, Check, Layout, Calendar, FileText, Share } from 'lucide-react';
+import { ArrowLeft, ChevronLeft, ChevronRight, Trash2, Settings, List, Sparkles, Copy, Check, Layout, Calendar, FileText } from 'lucide-react';
 import { exportToICS, exportToPDF } from '../lib/export';
 import s from './SchedulePage.module.css';
 import { getSchedule, updateSchedule, type Schedule } from '../lib/api/schedules';
@@ -315,28 +315,9 @@ export default function SchedulePage() {
     return status.charAt(0).toUpperCase() + status.slice(1);
   };
 
-  const handleCopyLink = async () => {
+  const handleCopyLink = () => {
     if (!schedule) return;
     const link = `${window.location.origin}/form/${schedule.id}`;
-
-    // Use Web Share API if available (mobile-friendly)
-    if (navigator.share) {
-      try {
-        await navigator.share({
-          title: `Availability Form: ${schedule.label}`,
-          text: `Please submit your availability for ${schedule.label}`,
-          url: link,
-        });
-        return;
-      } catch (err) {
-        // Fallback to clipboard if user cancels or it fails
-        if ((err as Error).name !== 'AbortError') {
-          console.error('Error sharing:', err);
-        }
-      }
-    }
-
-    // Fallback to clipboard
     navigator.clipboard.writeText(link);
     setIsCopied(true);
     setTimeout(() => setIsCopied(false), 2000);
@@ -1224,8 +1205,8 @@ export default function SchedulePage() {
                     style={{ borderColor: 'var(--brand-primary)', color: 'var(--brand-primary)' }}
                   >
                     <div className={s.pulse} />
-                    <span>{isCopied ? 'Copied!' : (typeof navigator !== 'undefined' && !!navigator.share) ? 'Share Link' : 'Copy Link'}</span>
-                    {isCopied ? <Check size={14} /> : (typeof navigator !== 'undefined' && !!navigator.share) ? <Share size={14} /> : <Copy size={14} />}
+                    <span>{isCopied ? 'Copied!' : 'Copy Form Link'}</span>
+                    {isCopied ? <Check size={14} /> : <Copy size={14} />}
                   </button>
                 )}
 
