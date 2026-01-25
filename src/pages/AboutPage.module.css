@@ -143,8 +143,13 @@
 }
 
 .logoInHeader {
-    height: 32px;
+    height: 42px;
     width: auto;
+    transition: transform 0.3s ease;
+}
+
+.logoInHeader:hover {
+    transform: scale(1.02);
 }
 
 .legalContent {
@@ -184,7 +189,7 @@
     }
 
     .logoInHeader {
-        height: 24px;
+        height: 30px;
     }
 
     .hero {

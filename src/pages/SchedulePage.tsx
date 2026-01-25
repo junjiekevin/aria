@@ -17,8 +17,6 @@ import { DndContext, DragOverlay, useDraggable, useDroppable, PointerSensor, Tou
 
 const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
-
-
 export default function SchedulePage() {
   // Separate sensors for mouse and touch devices
   // PointerSensor: activates after 8px movement (for mouse precision)
