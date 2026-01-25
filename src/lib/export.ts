@@ -87,16 +87,102 @@ function formatTime(date: Date): string {
 }
 
 /**
- * Get entries for a specific day and hour
+ * Parse recurrence rule to usable object
+ */
+function parseRecurrenceRule(rule: string) {
+  if (!rule) return null;
+
+  const freqMatch = rule.match(/FREQ=(\w+)/);
+  const intervalMatch = rule.match(/INTERVAL=(\d+)/);
+  const byDayMatch = rule.match(/BYDAY=(\w+)/);
+
+  let freq = freqMatch ? freqMatch[1] : 'WEEKLY';
+  let interval = intervalMatch ? parseInt(intervalMatch[1]) : 1;
+
+  if (freq === 'WEEKLY') {
+    if (interval === 4) {
+      freq = 'MONTHLY';
+    } else if (interval === 2) {
+      freq = '2WEEKLY';
+    }
+  }
+
+  const byDayStr = byDayMatch ? byDayMatch[1] : '';
+  const dayAbbrevs = ['SU', 'MO', 'TU', 'WE', 'TH', 'FR', 'SA'];
+  const dayIndex = dayAbbrevs.indexOf(byDayStr);
+
+  return { freq, interval, dayIndex: dayIndex >= 0 ? dayIndex : null };
+}
+
+/**
+ * Check if a schedule entry occurs in the visible week window
+ */
+function isEntryInCurrentWeek(
+  entry: ScheduleEntry,
+  schedule: Schedule,
+  weekStart: Date,
+  weekEnd: Date
+): boolean {
+  const entryStart = new Date(entry.start_time);
+  const rule = parseRecurrenceRule(entry.recurrence_rule);
+
+  // One-time events: check if date falls in window
+  if (!rule || rule.dayIndex == null) {
+    return entryStart >= weekStart && entryStart <= weekEnd;
+  }
+
+  // Recurring events logic
+  const parseLocalDate = (dateStr: string): Date => {
+    if (dateStr.includes('T')) return new Date(dateStr);
+    const [year, month, day] = dateStr.split('-').map(Number);
+    return new Date(year, month - 1, day);
+  };
+
+  const scheduleStart = parseLocalDate(schedule.start_date);
+  const scheduleFirstDay = new Date(scheduleStart);
+  scheduleFirstDay.setDate(scheduleStart.getDate() - scheduleStart.getDay());
+
+  const daysFromFirst = Math.floor((entryStart.getTime() - scheduleFirstDay.getTime()) / (1000 * 60 * 60 * 24));
+  const entryWeekOffset = Math.floor(daysFromFirst / 7);
+
+  const currentWeekFirstDay = new Date(weekStart);
+  const daysFromCurrentFirst = Math.floor((currentWeekFirstDay.getTime() - scheduleFirstDay.getTime()) / (1000 * 60 * 60 * 24));
+  const currentWeekOffset = Math.floor(daysFromCurrentFirst / 7);
+
+  if (rule.freq === 'WEEKLY' || rule.freq === '2WEEKLY') {
+    const weekDiff = Math.abs(entryWeekOffset - currentWeekOffset);
+    const interval = rule.freq === '2WEEKLY' ? 2 : 1;
+    return weekDiff % interval === 0;
+  }
+
+  if (rule.freq === 'MONTHLY') {
+    const weeksInterval = rule.interval > 0 ? rule.interval : 4;
+    const weekDiff = Math.abs(entryWeekOffset - currentWeekOffset);
+    return weekDiff % weeksInterval === 0;
+  }
+
+  return entryWeekOffset === currentWeekOffset;
+}
+
+/**
+ * Get entries for a specific day and hour, respecting recurrence and week window
  */
 function getEntriesForSlot(
   entries: ScheduleEntry[],
   dayIndex: number,
-  hour: number
+  hour: number,
+  schedule: Schedule,
+  weekStart: Date,
+  weekEnd: Date
 ): ScheduleEntry[] {
   return entries.filter(entry => {
-    const startDate = new Date(entry.start_time);
-    return startDate.getDay() === dayIndex && startDate.getHours() === hour;
+    if (!isEntryInCurrentWeek(entry, schedule, weekStart, weekEnd)) return false;
+
+    const rule = parseRecurrenceRule(entry.recurrence_rule);
+    const entryDayIndex = rule?.dayIndex ?? new Date(entry.start_time).getDay();
+    const entryHour = new Date(entry.start_time).getHours();
+
+    return entryDayIndex === dayIndex && entryHour === hour;
   });
 }
 
@@ -131,13 +217,17 @@ export function exportToPDF(
     return date;
   });
 
+  const weekEnd = new Date(weekStart);
+  weekEnd.setDate(weekStart.getDate() + 6);
+  weekEnd.setHours(23, 59, 59, 999);
+
   // Build the timetable grid
   let tableRows = '';
   for (const hour of hours) {
     let cells = `<td class="time-cell">${formatHour(hour)}</td>`;
 
     for (let dayIndex = 0; dayIndex < 7; dayIndex++) {
-      const dayEntries = getEntriesForSlot(entries, dayIndex, hour);
+      const dayEntries = getEntriesForSlot(entries, dayIndex, hour, schedule, weekStart, weekEnd);
 
       if (dayEntries.length > 0) {
         const entryContent = dayEntries.map(e => {
