@@ -448,28 +448,50 @@
     background: var(--bg-orange-50);
 }
 
+.timeLabelFooter {
+    width: 55px;
+    padding: 0.25rem;
+    font-size: 0.7rem;
+    color: var(--text-400);
+    text-align: right;
+    border-right: 1px solid transparent;
+    font-weight: 500;
+    margin-top: -10px;
+    /* Offset to align with the line above */
+    background: transparent;
+}
+
 .timeSlot {
     height: 40px;
-    border-right: 1px solid var(--border-gray-200);
-    border-bottom: 1px solid var(--bg-gray-50);
+    border-right: 1px solid #e2e8f0;
+    /* Stronger border for grid columns */
+    border-bottom: 1px solid #f1f5f9;
+    /* Subtle horizontal line */
     position: relative;
     background-color: white;
     transition: background-color 0.2s;
 }
 
+.timeSlot:hover {
+    background-color: #fff7ed !important;
+}
+
 .eventBlock {
     position: absolute;
-    top: 0;
-    left: 2px;
-    right: 2px;
+    top: 1px;
+    left: 3px;
+    right: 3px;
     background-color: var(--brand-primary);
     color: white;
-    border-radius: var(--radius-sm);
+    border-radius: 6px;
     padding: 0.25rem 0.5rem;
     font-size: 0.625rem;
     font-weight: 600;
     cursor: pointer;
-    box-shadow: var(--shadow-sm);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    /* Slightly more distinct elevation */
+    border: 1px solid rgba(0, 0, 0, 0.05);
+    /* Hairline border for definition */
     transition: all 0.2s;
     display: flex;
     flex-direction: column;

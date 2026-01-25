@@ -1314,8 +1314,8 @@ export default function SchedulePage() {
               ))}
 
               {/* Final time label at the very bottom of the grid */}
-              <div className={s.timetableGrid} style={{ borderBottom: 'none' }}>
-                <div className={s.timeLabel}>
+              <div style={{ position: 'absolute', bottom: 0, left: 0 }}>
+                <div className={s.timeLabelFooter}>
                   {(() => {
                     const lastHour = (schedule?.working_hours_end ?? 21);
                     return lastHour === 0 ? '12 AM' : lastHour === 12 ? '12 PM' : lastHour > 12 ? `${lastHour - 12} PM` : `${lastHour} AM`;

@@ -1,0 +1,228 @@
+/* src/pages/AboutPage.module.css */
+@import '../styles/variables.css';
+
+.container {
+    min-height: 100vh;
+    background-color: #fffcf9;
+    color: #2d2d2d;
+    font-family: 'Outfit', 'Inter', -apple-system, sans-serif;
+    line-height: 1.6;
+    overflow-x: hidden;
+}
+
+.header {
+    padding: 1rem 2rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    position: fixed;
+    top: 0;
+    width: 100%;
+    z-index: 100;
+    background: rgba(255, 252, 249, 0.8);
+    backdrop-filter: blur(12px);
+    border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+.backButton {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.6rem 1.2rem;
+    background: white;
+    border: 1px solid var(--border-gray-200);
+    border-radius: 2rem;
+    cursor: pointer;
+    font-size: 0.9rem;
+    font-weight: 500;
+    color: var(--text-700);
+    transition: all 0.3s ease;
+    box-shadow: var(--shadow-sm);
+}
+
+.backButton:hover {
+    background: var(--brand-primary);
+    color: white;
+    border-color: var(--brand-primary);
+}
+
+.hero {
+    height: 70vh;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    text-align: center;
+    padding: 0 2rem;
+    background: radial-gradient(circle at 50% 50%, #fff 0%, #fffcf9 100%);
+    position: relative;
+}
+
+.heroTitle {
+    font-size: clamp(3rem, 10vw, 6rem);
+    font-weight: 800;
+    background: linear-gradient(to right, #1a1a1a, var(--brand-primary));
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    margin-bottom: 1.5rem;
+    letter-spacing: -0.02em;
+}
+
+.heroSubtitle {
+    font-size: 1.4rem;
+    color: var(--text-500);
+    max-width: 700px;
+    margin-bottom: 3rem;
+    line-height: 1.4;
+}
+
+.section {
+    max-width: 800px;
+    margin: 0 auto;
+    padding: 4rem 2rem;
+}
+
+.sectionHeading {
+    font-size: 2.5rem;
+    font-weight: 700;
+    color: var(--text-900);
+    margin-bottom: 2rem;
+    letter-spacing: -0.01em;
+}
+
+.textBlock {
+    font-size: 1.125rem;
+    color: var(--text-700);
+    margin-bottom: 1.5rem;
+}
+
+.quote {
+    font-size: 1.5rem;
+    font-style: italic;
+    color: var(--brand-primary);
+    padding: 2rem;
+    border-left: 4px solid var(--brand-primary);
+    background: rgba(249, 115, 22, 0.05);
+    margin: 3rem 0;
+    border-radius: 0 1rem 1rem 0;
+}
+
+.card {
+    background: white;
+    padding: 2.5rem;
+    border-radius: 1.5rem;
+    border: 1px solid #f0f0f0;
+    box-shadow: var(--shadow-md);
+    margin-bottom: 2rem;
+}
+
+.footer {
+    padding: 4rem 2rem;
+    background: #1a1a1a;
+    color: #888;
+    text-align: center;
+}
+
+.legalSection {
+    margin-top: 2rem;
+    text-align: left;
+    max-width: 1000px;
+    margin: 2rem auto 0 auto;
+}
+
+.legalToggle {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1.5rem 0;
+    border-bottom: 1px solid #333;
+    cursor: pointer;
+    color: #ccc;
+    transition: color 0.2s;
+}
+
+.logoInHeader {
+    height: 32px;
+    width: auto;
+}
+
+.legalContent {
+    padding: 1.5rem 0;
+    color: #888;
+    font-size: 0.95rem;
+}
+
+/* Animations */
+@keyframes fadeUp {
+    from {
+        opacity: 0;
+        transform: translateY(30px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.reveal {
+    opacity: 0;
+    transform: translateY(30px);
+    transition: all 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Mobile Responsiveness */
+@media (max-width: 600px) {
+    .header {
+        padding: 0.75rem 1rem;
+    }
+
+    .backButton {
+        padding: 0.5rem 0.8rem;
+        font-size: 0.8rem;
+    }
+
+    .logoInHeader {
+        height: 24px;
+    }
+
+    .hero {
+        height: 60vh;
+        padding: 0 1.5rem;
+    }
+
+    .heroTitle {
+        font-size: 2.5rem;
+    }
+
+    .heroSubtitle {
+        font-size: 1.1rem;
+    }
+
+    .section {
+        padding: 3rem 1.5rem;
+    }
+
+    .sectionHeading {
+        font-size: 1.75rem;
+    }
+
+    .textBlock {
+        font-size: 1rem;
+    }
+
+    .quote {
+        font-size: 1.25rem;
+        padding: 1.5rem;
+        margin: 2rem 0;
+    }
+
+    .card {
+        padding: 1.5rem;
+    }
+
+    .footer {
+        padding: 3rem 1.5rem;
+    }
+}

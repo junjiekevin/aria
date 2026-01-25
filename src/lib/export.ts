@@ -154,125 +154,183 @@ export function exportToPDF(
     tableRows += `<tr>${cells}</tr>`;
   }
 
+  const formatDateRange = (start: Date) => {
+    const end = new Date(start);
+    end.setDate(start.getDate() + 6);
+    const startStr = start.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    const endStr = end.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    return `${startStr} – ${endStr}`;
+  };
+
   const html = `
 <!DOCTYPE html>
 <html>
 <head>
-  <title>${schedule.label} - Schedule</title>
+  <title>${schedule.label} - Aria Schedule</title>
   <style>
+    @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&display=swap');
+    
+    @page {
+      size: landscape;
+      margin: 0.5in;
+    }
+
     * {
       margin: 0;
       padding: 0;
       box-sizing: border-box;
     }
     body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      font-family: 'Outfit', -apple-system, sans-serif;
       padding: 20px;
       color: #111827;
+      background-color: #fff;
+      -webkit-print-color-adjust: exact !important;
+      print-color-adjust: exact !important;
+      color-adjust: exact !important;
     }
-    .header {
+    .page-header {
       margin-bottom: 20px;
-      padding-bottom: 15px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
       border-bottom: 2px solid #f97316;
+      padding-bottom: 15px;
     }
-    .title {
+    .brand-section h1 {
       font-size: 24px;
       font-weight: 700;
       color: #111827;
-      margin-bottom: 5px;
+      letter-spacing: -0.01em;
     }
-    .subtitle {
+    .date-section {
+      text-align: right;
+    }
+    .date-range {
       font-size: 14px;
-      color: #6b7280;
-    }
-    .week-info {
-      font-size: 12px;
-      color: #9ca3af;
-      margin-top: 5px;
+      font-weight: 600;
+      color: #ea580c;
     }
     table {
       width: 100%;
-      border-collapse: collapse;
-      font-size: 11px;
+      border-collapse: separate;
+      border-spacing: 0;
+      font-size: 10px;
+      border: 1px solid #d1d5db;
+      border-radius: 8px;
+      overflow: hidden;
+      table-layout: fixed;
     }
     th {
       background-color: #fff7ed;
-      padding: 8px 4px;
+      padding: 10px 5px;
       text-align: center;
-      border: 1px solid #e5e7eb;
-      font-weight: 600;
+      border-bottom: 2px solid #fdba74;
+      border-right: 1px solid #fed7aa;
+      font-weight: 700;
+    }
+    th:last-child {
+      border-right: none;
     }
     th .day-name {
       display: block;
-      font-size: 12px;
+      font-size: 11px;
+      color: #9a3412;
+      font-weight: 800;
     }
     th .day-date {
       display: block;
-      font-size: 10px;
-      color: #6b7280;
-      font-weight: 400;
+      font-size: 9px;
+      color: #c2410c;
+      font-weight: 600;
+      margin-top: 2px;
     }
     td {
-      border: 1px solid #e5e7eb;
+      border-bottom: 1px solid #e5e7eb;
+      border-right: 1px solid #e5e7eb;
       padding: 4px;
       vertical-align: top;
-      height: 40px;
+      height: 45px;
+      overflow: hidden;
+    }
+    td:last-child {
+      border-right: none;
+    }
+    tr:last-child td {
+      border-bottom: none;
     }
     .time-cell {
       width: 60px;
       text-align: right;
-      padding-right: 8px;
-      font-weight: 500;
-      color: #6b7280;
-      background-color: #f9fafb;
+      padding-right: 10px;
+      font-weight: 700;
+      color: #334155;
+      background-color: #f1f5f9;
+      font-size: 9px;
+      border-right: 2.5px solid #cbd5e1;
     }
     .slot {
-      width: calc((100% - 60px) / 7);
+      background-color: white;
     }
     .has-entry {
-      background-color: #fff7ed;
+      background-color: #fffaf5;
     }
     .entry {
-      background-color: #fb923c;
+      background-color: #f97316;
       color: white;
       padding: 4px 6px;
       border-radius: 4px;
-      font-size: 10px;
+      font-size: 9px;
       margin-bottom: 2px;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.15);
+      border-left: 2.5px solid #ea580c;
     }
     .entry strong {
       display: block;
-      font-size: 11px;
+      font-size: 9px;
+      font-weight: 800;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
     .entry-time {
-      font-size: 9px;
-      opacity: 0.9;
+      font-size: 8.5px;
+      font-weight: 600;
+      opacity: 1;
     }
-    .footer {
+    .page-footer {
       margin-top: 20px;
-      padding-top: 15px;
-      border-top: 1px solid #e5e7eb;
-      font-size: 10px;
-      color: #9ca3af;
-      text-align: center;
+      padding-top: 10px;
+      display: flex;
+      justify-content: flex-end;
+      font-size: 9px;
+      color: #6b7280;
+    }
+    .footer-brand {
+      font-weight: 700;
+      color: #4b5563;
     }
     @media print {
-      body { padding: 10px; }
+      body { padding: 0; }
       .no-print { display: none; }
+      table { break-inside: avoid; }
     }
   </style>
 </head>
 <body>
-  <div class="header">
-    <div class="title">${schedule.label}</div>
-    <div class="subtitle">${formatDate(new Date(schedule.start_date))} - ${formatDate(new Date(schedule.end_date))}</div>
-    <div class="week-info">Week of ${formatDate(weekStart)}</div>
+  <div class="page-header">
+    <div class="brand-section">
+      <h1>${schedule.label}</h1>
+    </div>
+    <div class="date-section">
+      <div class="date-range">${formatDateRange(weekStart)}</div>
+    </div>
   </div>
 
   <table>
     <thead>
       <tr>
-        <th></th>
+        <th style="width: 60px; background-color: #f8fafc; border-bottom: 2px solid #e2e8f0; border-right: 2px solid #e2e8f0;"></th>
         ${DAYS.map((day, i) => `
           <th>
             <span class="day-name">${day}</span>
@@ -286,10 +344,9 @@ export function exportToPDF(
     </tbody>
   </table>
 
-  <div class="footer">
-    Generated by Aria Scheduling Assistant
+  <div class="page-footer">
+    <div class="footer-brand">Aria Scheduling Assistant • aria.app</div>
   </div>
-
   <script>
     window.onload = function() {
       window.print();

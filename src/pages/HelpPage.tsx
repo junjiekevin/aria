@@ -13,177 +13,7 @@ import {
   MessageSquare,
   Lock
 } from 'lucide-react';
-
-const styles: Record<string, React.CSSProperties> = {
-  container: {
-    minHeight: '100vh',
-    background: '#fcfcfd',
-    color: '#111827',
-    fontFamily: 'Inter, system-ui, -apple-system, sans-serif',
-    paddingBottom: '5rem',
-  },
-  header: {
-    background: 'rgba(255, 255, 255, 0.8)',
-    backdropFilter: 'blur(20px)',
-    borderBottom: '1px solid rgba(0, 0, 0, 0.05)',
-    position: 'sticky',
-    top: 0,
-    zIndex: 100,
-    padding: '1rem 0',
-  },
-  headerContent: {
-    maxWidth: '1200px',
-    margin: '0 auto',
-    padding: '0 1.5rem',
-    display: 'flex',
-    alignItems: 'center',
-    gap: '1.5rem',
-  },
-  backButton: {
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    width: '40px',
-    height: '40px',
-    borderRadius: '12px',
-    border: '1px solid #e5e7eb',
-    background: 'white',
-    cursor: 'pointer',
-    color: '#374151',
-    transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
-  },
-  hero: {
-    background: 'linear-gradient(135deg, #fff7ed 0%, #ffffff 100%)',
-    padding: '4rem 1.5rem',
-    textAlign: 'center',
-    borderBottom: '1px solid #fee2e2',
-  },
-  heroTitle: {
-    fontSize: '2.5rem',
-    fontWeight: '800',
-    letterSpacing: '-0.025em',
-    marginBottom: '1rem',
-    background: 'linear-gradient(to right, #111827, #4b5563)',
-    WebkitBackgroundClip: 'text',
-    WebkitTextFillColor: 'transparent',
-  },
-  heroSubtitle: {
-    fontSize: '1.125rem',
-    color: '#4b5563',
-    maxWidth: '600px',
-    margin: '0 auto 2.5rem',
-  },
-  searchContainer: {
-    maxWidth: '600px',
-    margin: '0 auto',
-    position: 'relative',
-  },
-  searchInput: {
-    width: '100%',
-    padding: '1.25rem 1.5rem 1.25rem 3.5rem',
-    borderRadius: '16px',
-    border: '1px solid #e5e7eb',
-    fontSize: '1rem',
-    boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.05)',
-    outline: 'none',
-    transition: 'all 0.2s',
-  },
-  main: {
-    maxWidth: '1200px',
-    margin: '0 auto',
-    padding: '3rem 1.5rem',
-  },
-  grid: {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
-    gap: '1.5rem',
-    marginBottom: '4rem',
-  },
-  categoryCard: {
-    padding: '1.5rem',
-    borderRadius: '20px',
-    background: 'white',
-    border: '1px solid #e5e7eb',
-    cursor: 'pointer',
-    transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
-    display: 'flex',
-    flexDirection: 'column',
-    gap: '1rem',
-  },
-  iconBox: {
-    width: '48px',
-    height: '48px',
-    borderRadius: '14px',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: '0.5rem',
-  },
-  sectionTitle: {
-    fontSize: '1.5rem',
-    fontWeight: '700',
-    marginBottom: '2rem',
-    display: 'flex',
-    alignItems: 'center',
-    gap: '0.75rem',
-  },
-  faqList: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: '1rem',
-    maxWidth: '900px',
-  },
-  faqItem: {
-    background: 'white',
-    borderRadius: '16px',
-    border: '1px solid #e5e7eb',
-    overflow: 'hidden',
-    transition: 'all 0.2s',
-  },
-  faqHeader: {
-    padding: '1.25rem 1.5rem',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    cursor: 'pointer',
-    fontWeight: '600',
-    fontSize: '1rem',
-  },
-  faqContent: {
-    padding: '0 1.5rem 1.5rem',
-    color: '#4b5563',
-    lineHeight: '1.6',
-    fontSize: '0.9375rem',
-  },
-  contactGrid: {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))',
-    gap: '1.5rem',
-    marginTop: '4rem',
-  },
-  contactCard: {
-    padding: '2rem',
-    borderRadius: '24px',
-    background: '#111827',
-    color: 'white',
-    textAlign: 'center',
-    display: 'flex',
-    flexDirection: 'column',
-    alignItems: 'center',
-    gap: '1rem',
-  },
-  contactButton: {
-    marginTop: '1rem',
-    padding: '0.75rem 1.5rem',
-    borderRadius: '12px',
-    background: '#f97316',
-    color: 'white',
-    fontWeight: '600',
-    border: 'none',
-    cursor: 'pointer',
-    transition: 'opacity 0.2s',
-  }
-};
+import s from './HelpPage.module.css';
 
 const HELP_CATEGORIES = [
   {
@@ -284,33 +114,25 @@ export default function HelpPage() {
   }, [searchQuery, activeCategory]);
 
   return (
-    <div style={styles.container}>
-      <header style={styles.header}>
-        <div style={styles.headerContent}>
+    <div className={s.container}>
+      <header className={s.header}>
+        <div className={s.headerContent}>
           <button
             onClick={() => navigate('/dashboard')}
-            style={styles.backButton}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.borderColor = '#f97316';
-              e.currentTarget.style.color = '#f97316';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.borderColor = '#e5e7eb';
-              e.currentTarget.style.color = '#374151';
-            }}
+            className={s.backButton}
           >
             <ArrowLeft size={20} />
           </button>
-          <span style={{ fontWeight: '600', color: '#6b7280' }}>Help Center</span>
+          <span style={{ fontWeight: '600', color: 'var(--text-400)' }}>Help Center</span>
         </div>
       </header>
 
-      <section style={styles.hero}>
-        <h1 style={styles.heroTitle}>How can we help?</h1>
-        <p style={styles.heroSubtitle}>
+      <section className={s.hero}>
+        <h1 className={s.heroTitle}>How can we help?</h1>
+        <p className={s.heroSubtitle}>
           Everything you need to know about Aria, the intelligent scheduling assistant.
         </p>
-        <div style={styles.searchContainer}>
+        <div className={s.searchContainer}>
           <Search
             size={20}
             color="#9ca3af"
@@ -319,80 +141,60 @@ export default function HelpPage() {
           <input
             type="text"
             placeholder="Search for guides, features, and tips..."
-            style={styles.searchInput}
+            className={s.searchInput}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            onFocus={(e) => {
-              e.currentTarget.style.borderColor = '#f97316';
-              e.currentTarget.style.boxShadow = '0 10px 25px -5px rgba(249, 115, 22, 0.1)';
-            }}
-            onBlur={(e) => {
-              e.currentTarget.style.borderColor = '#e5e7eb';
-              e.currentTarget.style.boxShadow = '0 10px 25px -5px rgba(0, 0, 0, 0.05)';
-            }}
           />
         </div>
       </section>
 
-      <main style={styles.main}>
+      <main className={s.main}>
         {!searchQuery && (
-          <div style={styles.grid}>
+          <div className={s.grid}>
             {HELP_CATEGORIES.map((cat) => (
               <div
                 key={cat.id}
+                className={s.categoryCard}
                 style={{
-                  ...styles.categoryCard,
-                  borderColor: activeCategory === cat.id ? cat.color : '#e5e7eb',
+                  borderColor: activeCategory === cat.id ? cat.color : 'var(--border-gray-200)',
                   boxShadow: activeCategory === cat.id ? `0 10px 20px -5px ${cat.color}20` : 'none',
                   transform: activeCategory === cat.id ? 'translateY(-4px)' : 'none'
                 }}
                 onClick={() => setActiveCategory(activeCategory === cat.id ? null : cat.id)}
-                onMouseEnter={(e) => {
-                  if (activeCategory !== cat.id) {
-                    e.currentTarget.style.borderColor = cat.color;
-                    e.currentTarget.style.transform = 'translateY(-4px)';
-                  }
-                }}
-                onMouseLeave={(e) => {
-                  if (activeCategory !== cat.id) {
-                    e.currentTarget.style.borderColor = '#e5e7eb';
-                    e.currentTarget.style.transform = 'translateY(0)';
-                  }
-                }}
               >
-                <div style={{ ...styles.iconBox, background: cat.bg, color: cat.color }}>
+                <div className={s.iconBox} style={{ background: cat.bg, color: cat.color }}>
                   <cat.icon size={24} />
                 </div>
                 <div>
                   <h3 style={{ fontWeight: '700', fontSize: '1.125rem', marginBottom: '0.25rem' }}>{cat.title}</h3>
-                  <p style={{ fontSize: '0.875rem', color: '#6b7280', lineHeight: '1.5' }}>{cat.desc}</p>
+                  <p style={{ fontSize: '0.875rem', color: 'var(--text-500)', lineHeight: '1.5' }}>{cat.desc}</p>
                 </div>
               </div>
             ))}
           </div>
         )}
 
-        <h2 style={styles.sectionTitle}>
+        <h2 className={s.sectionTitle}>
           {searchQuery ? `Search Results for "${searchQuery}"` : activeCategory ? `${HELP_CATEGORIES.find(c => c.id === activeCategory)?.title} FAQ` : 'Common Questions'}
         </h2>
 
-        <div style={styles.faqList}>
+        <div className={s.faqList}>
           {filteredFaqs.length > 0 ? filteredFaqs.map((faq, i) => (
             <div
               key={i}
+              className={s.faqItem}
               style={{
-                ...styles.faqItem,
-                borderColor: openFaq === faq.question ? '#f97316' : '#e5e7eb'
+                borderColor: openFaq === faq.question ? 'var(--brand-primary)' : 'var(--border-gray-200)'
               }}
             >
               <div
-                style={styles.faqHeader}
+                className={s.faqHeader}
                 onClick={() => setOpenFaq(openFaq === faq.question ? null : faq.question)}
               >
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                  <div style={{ padding: '0.5rem', background: '#f9fafb', borderRadius: '8px' }}>
+                  <div style={{ padding: '0.5rem', background: 'var(--bg-gray-50)', borderRadius: '8px' }}>
                     {faq.category === 'ai' && <Sparkles size={16} color="#8b5cf6" />}
-                    {faq.category === 'timetable' && <MousePointer2 size={16} color="#f97316" />}
+                    {faq.category === 'timetable' && <MousePointer2 size={16} color="var(--brand-primary)" />}
                     {faq.category === 'forms' && <Users size={16} color="#06b6d4" />}
                     {faq.category === 'account' && <Lock size={16} color="#ec4899" />}
                   </div>
@@ -408,7 +210,7 @@ export default function HelpPage() {
                 />
               </div>
               {openFaq === faq.question && (
-                <div style={styles.faqContent}>
+                <div className={s.faqContent}>
                   {faq.answer.split('\n').map((line, idx) => (
                     <p key={idx} style={{ margin: '0 0 0.5rem 0' }}>{line}</p>
                   ))}
@@ -421,33 +223,34 @@ export default function HelpPage() {
                 <Search size={32} color="#9ca3af" />
               </div>
               <h3 style={{ fontWeight: '600' }}>No matches found</h3>
-              <p style={{ color: '#6b7280' }}>Try using broader keywords or check another category.</p>
+              <p style={{ color: 'var(--text-400)' }}>Try using broader keywords or check another category.</p>
             </div>
           )}
         </div>
 
-        <div style={styles.contactGrid}>
-          <div style={styles.contactCard}>
-            <div style={{ ...styles.iconBox, background: 'rgba(255,255,255,0.1)', color: 'white' }}>
+        <div className={s.contactGrid}>
+          <div className={s.contactCard}>
+            <div className={s.iconBox} style={{ background: 'rgba(255,255,255,0.1)', color: 'white' }}>
               <Mail size={24} />
             </div>
             <h3 style={{ fontWeight: '700' }}>Technical Support</h3>
             <p style={{ opacity: 0.7, fontSize: '0.875rem' }}>Have a bug or feature request? Our engineering team is here to help.</p>
             <button
-              style={styles.contactButton}
+              className={s.contactButton}
               onClick={() => window.location.href = 'mailto:support@aria.app'}
             >
               Email Support
             </button>
           </div>
-          <div style={{ ...styles.contactCard, background: '#f97316' }}>
-            <div style={{ ...styles.iconBox, background: 'rgba(255,255,255,0.2)', color: 'white' }}>
+          <div className={s.contactCard} style={{ background: 'var(--brand-primary)' }}>
+            <div className={s.iconBox} style={{ background: 'rgba(255,255,255,0.2)', color: 'white' }}>
               <MessageSquare size={24} />
             </div>
             <h3 style={{ fontWeight: '700' }}>Feature Guides</h3>
             <p style={{ opacity: 0.9, fontSize: '0.875rem' }}>Want to see Aria in action? Check out our visual tutorials and community forum.</p>
             <button
-              style={{ ...styles.contactButton, background: 'white', color: '#f97316' }}
+              className={s.contactButton}
+              style={{ background: 'white', color: 'var(--brand-primary)' }}
             >
               View Tutorials
             </button>
