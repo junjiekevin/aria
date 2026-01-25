@@ -75,10 +75,10 @@ export default function AboutPage() {
           Aria started with a simple observation about the weight of organization.
         </div>
         <div className={s.textBlock}>
-          I noticed that instructors and organizers spent an enormous amount of time dealing with scheduling. Slot conflicts, last-minute changes, initial placements, and constant coordination. It often took more time and energy than the actual work they were passionate about. Over time, I realized this was not unique to any one field. The same frustration came up across faculty, managers, and independent professionals everywhere.
+          I noticed how much time people spent just trying to manage schedules. Collecting availability. Placing people on a timetable. Handling conflicts and changes when plans shifted. Capable, passionate people were spending hours managing logistics instead of doing the work they actually cared about.
         </div>
         <div className={s.textBlock}>
-          Capable, passionate people were spending hours managing logistics instead of doing the work they actually cared about.
+          Over time, it became clear this wasn’t limited to one role or industry. The same frustration showed up across faculty, managers, administrators, and independent professionals.
         </div>
         <div className={s.textBlock}>
           The tools they had were not wrong. They were just heavy. Over time, many became complicated, rigid, or exhausting to use. The intention was always good, but the experience slowly drifted away from the people using them.
@@ -94,10 +94,10 @@ export default function AboutPage() {
           <h2 className={s.sectionHeading} style={{ marginBottom: 0 }}>Built With Simplicity in Mind</h2>
         </div>
         <div className={s.textBlock}>
-          My background in music shaped how I think about structure, flow, and clarity. In that world, we often spoke about simplicity—about removing what was unnecessary so the intent could come through clearly and effortlessly.
+          My background in music shaped how I think about structure, flow, and clarity. In that world, we often speak about simplicity. About removing what is unnecessary so the intent can come through clearly and effortlessly.
         </div>
         <div className={s.textBlock}>
-          During one of those experiences, I encountered a quote that later became the guiding principle behind Aria:
+          During one of such conversations with my teacher, she shared a quote that stayed with me, one that continues to guide my life and eventually became the guiding principle behind Aria:
         </div>
         <blockquote className={s.quote}>
           “Everything should be made as simple as possible, but not simpler.”
@@ -163,7 +163,7 @@ export default function AboutPage() {
       </div>
 
       <div className={`${s.section} ${s.reveal}`} style={{ textAlign: 'center' }}>
-        <h2 className={s.sectionHeading}>Responsibility</h2>
+        <h2 className={s.sectionHeading}>The Goal</h2>
         <p className={s.textBlock} style={{ maxWidth: '600px', margin: '0 auto 2rem auto' }}>
           Aria is something I am proud of, and something I feel responsible for.
         </p>
