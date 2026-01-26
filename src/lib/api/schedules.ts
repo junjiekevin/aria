@@ -10,6 +10,11 @@ import {
     updateFormResponseAssigned,
     getPreferredTimings
 } from './form-responses';
+import {
+    scheduleParticipants,
+    createEntryFromAssignment,
+    dayToIndex
+} from '../scheduling';
 
 export interface Schedule {
     id: string;
@@ -90,6 +95,54 @@ function findFirstDayOccurrence(scheduleStartDate: string, dayName: string): str
     const mm = String(first.getMonth() + 1).padStart(2, '0');
     const dd = String(first.getDate()).padStart(2, '0');
     return `${yyyy}-${mm}-${dd}`;
+}
+
+// Helper to update just the BYDAY in recurrence rule while preserving frequency
+function updateRecurrenceDay(rule: string | null, newDateStr: string): string {
+    if (!rule) return ''; // "Once" frequency
+
+    const date = new Date(newDateStr);
+    if (isNaN(date.getTime())) return rule || '';
+
+    const dayAbbrevs = ['SU', 'MO', 'TU', 'WE', 'TH', 'FR', 'SA'];
+    const newDayAbbrev = dayAbbrevs[date.getDay()];
+
+    // Determine frequency type
+    if (rule.includes('INTERVAL=2')) {
+        return `FREQ=WEEKLY;INTERVAL=2;BYDAY=${newDayAbbrev}`;
+    }
+    if (rule.includes('FREQ=MONTHLY') || rule.includes('INTERVAL=4')) {
+        return `FREQ=WEEKLY;INTERVAL=4;BYDAY=${newDayAbbrev}`;
+    }
+    if (rule.includes('FREQ=WEEKLY')) {
+        return `FREQ=WEEKLY;BYDAY=${newDayAbbrev}`;
+    }
+
+    return `FREQ=WEEKLY;BYDAY=${newDayAbbrev}`;
+}
+
+// Ported helper from SchedulePage.tsx to ensure Aria and UI see the SAME days
+function parseRecurrenceRule(rule: string | null) {
+    if (!rule) return null;
+
+    const freqMatch = rule.match(/FREQ=(\w+)/);
+    const intervalMatch = rule.match(/INTERVAL=(\d+)/);
+    const byDayMatch = rule.match(/BYDAY=(\w+)/);
+
+    let freq = freqMatch ? freqMatch[1] : 'WEEKLY';
+    let interval = intervalMatch ? parseInt(intervalMatch[1]) : 1;
+
+    // Handle INTERVAL as frequency indicators (standard iCal format shared with UI)
+    if (freq === 'WEEKLY') {
+        if (interval === 4) freq = 'MONTHLY';
+        else if (interval === 2) freq = '2WEEKLY';
+    }
+
+    const byDayStr = byDayMatch ? byDayMatch[1] : '';
+    const dayAbbrevs = ['SU', 'MO', 'TU', 'WE', 'TH', 'FR', 'SA'];
+    const dayIndex = dayAbbrevs.indexOf(byDayStr);
+
+    return { freq, interval, dayIndex: dayIndex >= 0 ? dayIndex : null };
 }
 
 export interface ScheduleValidationError extends Error {
@@ -747,6 +800,9 @@ export async function updateEventInSchedule(args: {
 
         updates.start_time = `${firstDate}T${start}:00`;
         updates.end_time = `${firstDate}T${end}:00`;
+
+        // Ensure recurrence rule stays in sync with the new day
+        updates.recurrence_rule = updateRecurrenceDay(originalEntry.recurrence_rule, updates.start_time);
     } else if (args.start_time !== undefined) {
         updates.start_time = args.start_time;
     } else if (args.end_time !== undefined) {
@@ -781,16 +837,20 @@ export async function swapEvents(event1_id: string, event2_id: string) {
         end_time: tempEnd.toISOString()
     });
 
-    // 3. Move Event 2 to Event 1's ORIGINAL time
+    // 3. Move Event 2 to Event 1's ORIGINAL time AND update its recurrence rule
+    const newRule2 = updateRecurrenceDay(entry2.recurrence_rule, time1.start);
     await updateScheduleEntry(event2_id, {
         start_time: time1.start,
-        end_time: time1.end
+        end_time: time1.end,
+        recurrence_rule: newRule2
     });
 
-    // 4. Move Event 1 (from temp) to Event 2's ORIGINAL time
+    // 4. Move Event 1 (from temp) to Event 2's ORIGINAL time AND update its recurrence rule
+    const newRule1 = updateRecurrenceDay(entry1.recurrence_rule, time2.start);
     const updatedEntry1 = await updateScheduleEntry(event1_id, {
         start_time: time2.start,
-        end_time: time2.end
+        end_time: time2.end,
+        recurrence_rule: newRule1
     });
 
     // Re-fetch Entry 2 to return updated state
@@ -823,17 +883,20 @@ export async function deleteEventFromSchedule(args: { event_id: string }) {
 // Returns event IDs so AI can update/delete events
 export async function getEventSummaryInSchedule(scheduleId: string) {
     const entries = await getScheduleEntries(scheduleId);
-
-    // Group by day (Sunday = 0, Monday = 1, etc. in JS)
     const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-    const summary: Record<string, Array<{ id: string; name: string; time: string }>> = {};
+    const summary: Record<string, Array<{ id: string; name: string; time: string; rule: string }>> = {};
 
     days.forEach(day => summary[day] = []);
 
     entries.forEach(entry => {
-        // Parse date in LOCAL time (new Date() converts UTC to local automatically)
+        // IMPORTANT: Use the SAME logic as SchedulePage.tsx to determine the day
+        // Prefer the recurrence rule's BYDAY, fallback to the local start_time day
+        const rule = parseRecurrenceRule(entry.recurrence_rule);
         const date = new Date(entry.start_time);
-        const dayName = days[date.getDay()];
+
+        // Use == null for 0-index safety (Sunday)
+        const dayIndex = rule?.dayIndex != null ? rule.dayIndex : date.getDay();
+        const dayName = days[dayIndex];
 
         // Format time in local timezone (HH:MM format)
         const hours = date.getHours().toString().padStart(2, '0');
@@ -841,9 +904,10 @@ export async function getEventSummaryInSchedule(scheduleId: string) {
         const time = `${hours}:${minutes}`;
 
         summary[dayName].push({
-            id: entry.id,  // Include ID so AI can delete/update
+            id: entry.id,
             name: entry.student_name,
-            time: time
+            time: time,
+            rule: entry.recurrence_rule // Include rule so AI can see 'BYDAY' etc.
         });
     });
 
@@ -895,4 +959,110 @@ export async function getParticipantPreferences(participantId: string) {
 // Mark a participant as assigned
 export async function markParticipantAssigned(participantId: string, assigned: boolean = true) {
     return updateFormResponseAssigned(participantId, assigned);
+}
+// Auto-schedule all unassigned participants
+// If commit=false, returns the proposed assignments without saving to DB (for preview UI)
+export async function autoScheduleParticipants(scheduleId: string, commit: boolean = true) {
+    const { data: { user } } = await supabase.auth.getUser();
+
+    if (!user) {
+        throw new Error('User not authenticated');
+    }
+
+    // 1. Fetch Schedule Config (Working Hours)
+    const { data: schedule, error: startError } = await supabase
+        .from('schedules')
+        .select('*')
+        .eq('id', scheduleId)
+        .eq('user_id', user.id)
+        .single();
+
+    if (startError) throw new Error(`Schedule not found: ${startError.message}`);
+
+    // 2. Fetch Unassigned Participants
+    const unassigned = await listUnassignedParticipants(scheduleId);
+    if (unassigned.length === 0) {
+        return { message: 'No unassigned participants found.' };
+    }
+
+    // 3. Fetch Existing Entries (to prevent conflicts)
+    const existingEntries = await getScheduleEntries(scheduleId);
+
+    // 4. Run Scheduling Algorithm
+    // Calculate total weeks based on schedule duration
+    const startDate = new Date(schedule.start_date);
+    const endDate = new Date(schedule.end_date);
+    const totalWeeks = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24 * 7));
+
+    const result = scheduleParticipants(
+        unassigned,
+        existingEntries,
+        startDate,
+        totalWeeks,
+        schedule.working_hours_start,
+        schedule.working_hours_end
+    );
+
+    // 5. Commit Assignments to Database (if commit=true)
+    const newEntries: any[] = [];
+    const assignedIds: string[] = [];
+
+    // Always generate the proposed entries for preview
+    const proposedAssignments = result.assignments.map(assignment => {
+        if (!assignment.isScheduled) return null;
+
+        // Create entry for week 0 (first occurrence)
+        // Use createEntryFromAssignment utility from scheduling.ts
+        const entryData = createEntryFromAssignment(assignment, startDate, 0);
+
+        // Adjust recurrence rule if needed (e.g. weekly)
+        // The utility returns empty recurrence for single instances
+        // We need to apply the frequency from the assignment
+        let finalRule = '';
+        const dayAbbrev = ['SU', 'MO', 'TU', 'WE', 'TH', 'FR', 'SA'][dayToIndex(assignment.timing.day)];
+
+        if (assignment.timing.frequency === 'weekly') {
+            finalRule = `FREQ=WEEKLY;BYDAY=${dayAbbrev}`;
+        } else if (assignment.timing.frequency === '2weekly') {
+            finalRule = `FREQ=WEEKLY;INTERVAL=2;BYDAY=${dayAbbrev}`;
+        } else if (assignment.timing.frequency === 'monthly') {
+            finalRule = `FREQ=WEEKLY;INTERVAL=4;BYDAY=${dayAbbrev}`;
+        }
+
+        const entry = {
+            schedule_id: scheduleId,
+            student_name: assignment.participant.student_name,
+            start_time: entryData.start_time,
+            end_time: entryData.end_time,
+            recurrence_rule: finalRule
+        };
+
+        newEntries.push(entry);
+        assignedIds.push(assignment.participant.id);
+        return entry;
+    });
+
+    if (commit && newEntries.length > 0) {
+        const { error: insertError } = await supabase
+            .from('schedule_entries')
+            .insert(newEntries);
+
+        if (insertError) throw new Error(`Failed to create entries: ${insertError.message}`);
+
+        // Mark participants as assigned
+        for (const pid of assignedIds) {
+            await markParticipantAssigned(pid, true);
+        }
+    }
+
+    return {
+        message: commit
+            ? `Successfully scheduled ${result.totalScheduled} participants.`
+            : `Preview generated for ${result.totalScheduled} participants.`,
+        scheduledCount: result.totalScheduled,
+        unassignedCount: result.totalUnassigned,
+        details: result,
+        proposedEntries: newEntries, // Return formatted entries for UI preview
+        previewHelper: !commit // Flag to tell UI this is a preview
+    };
 }

@@ -69,13 +69,13 @@ FUNCTION_CALL: {"name":"createSchedule","arguments":{"label":"Spring 2026","star
     name: 'updateSchedule',
     category: 'schedule',
     priority: 6,
-    triggers: ['update schedule', 'change schedule', 'edit schedule', 'rename schedule', 'modify schedule'],
+    triggers: ['update schedule', 'change schedule', 'edit schedule', 'rename schedule', 'modify schedule', 'change hours', 'operating hours'],
     synonyms: ['alter', 'adjust'],
     excludeWhen: ['event', 'lesson', 'delete', 'trash'],
     requiresIds: ['schedule_id'],
     providesIds: [],
     prerequisites: ['listSchedules'],
-    prompt: 'Update schedule label, dates, or status. Needs schedule_id.',
+    prompt: 'Update schedule label, dates, working_hours_start (0-23), working_hours_end (0-23). Needs schedule_id.',
   },
   {
     name: 'trashSchedule',
@@ -113,6 +113,39 @@ FUNCTION_CALL: {"name":"createSchedule","arguments":{"label":"Spring 2026","star
     prerequisites: [],
     prompt: 'PERMANENTLY delete ALL trashed schedules. ASK FOR CONFIRMATION FIRST!',
   },
+  {
+    name: 'updateFormConfig',
+    category: 'schedule',
+    priority: 5,
+    triggers: ['configure form', 'form instructions', 'form deadline', 'max choices', 'change form'],
+    synonyms: ['setup form', 'instructions', 'deadline'],
+    excludeWhen: ['event', 'lesson'],
+    requiresIds: ['schedule_id'],
+    providesIds: [],
+    prerequisites: ['listSchedules'],
+    prompt: 'Update form settings: max_choices (1-3), form_instructions, form_deadline (YYYY-MM-DD), working_hours_start, working_hours_end.',
+    example: `User: "Change the form deadline to tomorrow"
+<thought>
+User wants to update form config. I need a valid UUID for schedule_id, not a name.
+</thought>
+"Let me find your schedule first..."
+FUNCTION_CALL: {"name":"listSchedules","arguments":{}}
+[Turn 2 - After ID retrieved]
+"Updating your form settings now!"
+FUNCTION_CALL: {"name":"updateFormConfig","arguments":{"schedule_id":"...","form_deadline":"2026-01-26"}}`
+  },
+  {
+    name: 'checkScheduleOverlaps',
+    category: 'schedule',
+    priority: 6,
+    triggers: ['check overlaps', 'clash', 'conflict', 'overlap', 'double booked'],
+    synonyms: ['audit', 'verify dates'],
+    excludeWhen: [],
+    requiresIds: [],
+    providesIds: [],
+    prerequisites: [],
+    prompt: 'Checks if a date range overlaps with other schedules. Returns conflicting schedule names.',
+  },
 
   // ============================================
   // Event Functions (4)
@@ -144,7 +177,7 @@ FUNCTION_CALL: {"name":"addEventToSchedule","arguments":{"schedule_id":"...","st
     requiresIds: ['event_id'],
     providesIds: [],
     prerequisites: ['getEventSummaryInSchedule'],
-    prompt: 'Update/move an event. Needs event_id (get from getEventSummaryInSchedule first). Can change: student_name, day, hour.',
+    prompt: 'Update/move an event. Needs event_id (get from getEventSummaryInSchedule first). Can change: student_name, day, hour, recurrence_rule.',
     example: `User: "Move Singing to Monday at 3pm"
 You: "Let me find that event first..."
 FUNCTION_CALL: {"name":"getEventSummaryInSchedule","arguments":{"schedule_id":"..."}}
@@ -215,6 +248,15 @@ FUNCTION_CALL: {"name":"swapEvents","arguments":{"event1_id":"abc","event2_id":"
     providesIds: ['participant_id'],
     prerequisites: ['listSchedules'],
     prompt: 'List participants who submitted the form but have no event slot yet. Needs schedule_id.',
+    example: `User: "Who hasn't been scheduled yet?"
+<thought>
+I need schedule_id.
+</thought>
+"Checking the waiting list for you..."
+FUNCTION_CALL: {"name":"listSchedules","arguments":{}}
+[Turn 2 - After ID retrieved]
+"Here are the unassigned students!"
+FUNCTION_CALL: {"name":"listUnassignedParticipants","arguments":{"schedule_id":"..."}}`
   },
   {
     name: 'getParticipantPreferences',
@@ -239,6 +281,24 @@ FUNCTION_CALL: {"name":"swapEvents","arguments":{"event1_id":"abc","event2_id":"
     providesIds: [],
     prerequisites: ['listUnassignedParticipants'],
     prompt: 'Mark a participant as assigned (true) or unassigned (false). Needs participant_id and assigned boolean.',
+  },
+  {
+    name: 'autoScheduleParticipants',
+    category: 'schedule',
+    priority: 8,
+    triggers: ['schedule all', 'auto schedule', 'bulk schedule', 'assign unassigned', 'schedule everyone', 'fill schedule'],
+    synonyms: ['populate', 'arrange', 'optimize'],
+    excludeWhen: ['one', 'single'],
+    requiresIds: ['schedule_id'],
+    providesIds: [],
+    prerequisites: ['listSchedules'],
+    prompt: 'Automatically schedules ALL unassigned participants based on their preferences and available slots. Needs schedule_id. Equivalent to "Schedule All" button.',
+    example: `User: "Schedule everyone who hasn't been assigned yet"
+<thought>
+User wants bulk scheduling. I need schedule_id.
+</thought>
+"Auto-scheduling your participants now..."
+FUNCTION_CALL: {"name":"listSchedules","arguments":{}}`
   },
 ];
 

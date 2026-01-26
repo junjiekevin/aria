@@ -100,8 +100,15 @@ export default function SchedulePage() {
     const handleAriaChange = () => {
       loadScheduleData();
     };
+    const handleAutoSchedule = () => {
+      setShowSchedulingPreview(true);
+    };
     window.addEventListener('aria-schedule-change', handleAriaChange);
-    return () => window.removeEventListener('aria-schedule-change', handleAriaChange);
+    window.addEventListener('aria-show-auto-schedule', handleAutoSchedule);
+    return () => {
+      window.removeEventListener('aria-schedule-change', handleAriaChange);
+      window.removeEventListener('aria-show-auto-schedule', handleAutoSchedule);
+    };
   }, [scheduleId]);
 
 

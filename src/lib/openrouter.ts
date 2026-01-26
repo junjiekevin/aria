@@ -3,7 +3,7 @@
 
 const OPENROUTER_API_URL = 'https://openrouter.ai/api/v1/chat/completions';
 // Using TNG DeepSeek R1T2 Chimera - free, fast model optimized for dialogue and function calling
-const GEMINI_MODEL = 'tngtech/deepseek-r1t2-chimera:free';
+const GEMINI_MODEL = 'google/gemma-3-27b-it:free';
 
 export interface Message {
   role: 'user' | 'assistant' | 'system';
@@ -31,6 +31,7 @@ interface OpenRouterRequest {
   messages: OpenRouterMessage[];
   temperature?: number;
   max_tokens?: number;
+  stop?: string[];
 }
 
 interface OpenRouterResponse {
@@ -64,7 +65,9 @@ export async function sendChatMessage(
     model: GEMINI_MODEL,
     messages: openRouterMessages,
     temperature: 0.7,
-    max_tokens: 400, // Reduced for shorter, punchier responses
+    max_tokens: 150, // Aggressively reduced to save cost and force conciseness
+    // Stop sequences - prevent model from roleplaying future turns or hallucinating results
+    stop: ['[Turn', 'User:', 'Aria:', 'FUNCTION_CALL:', '<start_of_turn>', '\nUser:', '\nAria:'],
   };
 
   try {
@@ -103,11 +106,29 @@ export async function sendChatMessage(
     const assistantMessage = data.choices[0].message.content;
     console.log('[Aria Debug] Raw assistant message:', assistantMessage);
 
-    // Strip <think>...</think> reasoning tags from R1-style models (DeepSeek R1, etc.)
-    // These models output chain-of-thought reasoning that should not be shown to users
-    // or interfere with function call parsing
-    const cleanedMessage = assistantMessage.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
-    console.log('[Aria Debug] Cleaned message (think tags removed):', cleanedMessage);
+    // Strip <think>...</think> reasoning tags
+    let cleanedMessage = assistantMessage.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
+
+    // 1. Force-remove "Aria:" prefix if the model stubbornly ignores the prompt
+    if (cleanedMessage.startsWith('Aria:')) {
+      cleanedMessage = cleanedMessage.substring(5).trim();
+    } else if (cleanedMessage.startsWith('"') && cleanedMessage.includes('Aria: "')) {
+      // Catch scenarios like: "Aria: "Message""
+      cleanedMessage = cleanedMessage.replace(/^"?Aria:\s*"/, '').replace(/"$/, '');
+    }
+
+    // 2. Client-Side Stop Sequence Enforcement (Hallucination Slayer)
+    // If the model generates a script (User: ... Aria: ...), we cut it off at the first sign of a new turn.
+    const stopTriggers = ['\nUser:', '\nAria:', '[Turn', '<start_of_turn>'];
+    for (const trigger of stopTriggers) {
+      const index = cleanedMessage.indexOf(trigger);
+      if (index !== -1) {
+        console.log(`[Aria Debug] Detected stop trigger "${trigger}" at index ${index}. Truncating.`);
+        cleanedMessage = cleanedMessage.substring(0, index).trim();
+      }
+    }
+
+    console.log('[Aria Debug] Final sanitized message:', cleanedMessage);
 
     // Helper: Strip ALL function call syntax from message for display
     const stripFunctionCalls = (msg: string): string => {

@@ -17,6 +17,9 @@ import {
   listUnassignedParticipants,
   getParticipantPreferences,
   markParticipantAssigned,
+  updateFormConfig,
+  checkScheduleOverlaps,
+  autoScheduleParticipants,
   type CreateScheduleInput,
   type UpdateScheduleInput
 } from './api/schedules';
@@ -101,6 +104,24 @@ export async function executeFunction(
         };
       }
 
+      case 'updateFormConfig': {
+        const { schedule_id, ...config } = args;
+        const result = await updateFormConfig(schedule_id, config);
+        return {
+          success: true,
+          data: result,
+        };
+      }
+
+      case 'checkScheduleOverlaps': {
+        const { start_date, end_date, exclude_id } = args;
+        const result = await checkScheduleOverlaps(start_date, end_date, exclude_id);
+        return {
+          success: true,
+          data: result,
+        };
+      }
+
       // ============================================
       // Event Functions
       // ============================================
@@ -137,6 +158,9 @@ export async function executeFunction(
       }
 
       case 'swapEvents': {
+        if (!args.event1_id || !args.event2_id) {
+          throw new Error('Missing event IDs. You must provide both event1_id and event2_id. Call getEventSummaryInSchedule first to find them.');
+        }
         const events = await swapEvents(args.event1_id, args.event2_id);
         return {
           success: true,
@@ -184,6 +208,15 @@ export async function executeFunction(
         return {
           success: true,
           data: { message: args.assigned ? 'Participant marked as assigned' : 'Participant marked as unassigned' },
+        };
+      }
+
+      case 'autoScheduleParticipants': {
+        // Default to preview mode (commit=false) so UI can show the confirmation modal
+        const result = await autoScheduleParticipants(args.schedule_id, false);
+        return {
+          success: true,
+          data: result,
         };
       }
 

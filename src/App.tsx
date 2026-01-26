@@ -44,6 +44,11 @@ const App = () => {
         window.dispatchEvent(new CustomEvent('aria-schedule-change'));
     }, []);
 
+    // Callback to open auto-schedule preview from chat
+    const handleShowAutoSchedule = useCallback(() => {
+        window.dispatchEvent(new CustomEvent('aria-show-auto-schedule'));
+    }, []);
+
     // Show chat on all pages except auth page
     const showChat = !loading && isAuthenticated && location.pathname !== '/';
 
@@ -59,7 +64,7 @@ const App = () => {
                 <Route path="/about" element={<ProtectedRoute><AboutPage /></ProtectedRoute>} />
                 <Route path="*" element={<Navigate to="/" />} />
             </Routes>
-            {showChat && <FloatingChat onScheduleChange={handleScheduleChange} />}
+            {showChat && <FloatingChat onScheduleChange={handleScheduleChange} onShowAutoSchedule={handleShowAutoSchedule} />}
         </React.Suspense>
     )
 }

@@ -15,6 +15,7 @@ interface ChatMessage extends Message {
 
 interface FloatingChatProps {
   onScheduleChange?: () => void;
+  onShowAutoSchedule?: () => void;
 }
 
 const styles: Record<string, React.CSSProperties> = {
@@ -264,7 +265,7 @@ function AnimatedIcon({ children }: { children: React.ReactNode }) {
   );
 }
 
-export default function FloatingChat({ onScheduleChange }: FloatingChatProps) {
+export default function FloatingChat({ onScheduleChange, onShowAutoSchedule }: FloatingChatProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState('');
@@ -369,6 +370,10 @@ export default function FloatingChat({ onScheduleChange }: FloatingChatProps) {
         displayContent = '✓ Trash emptied';
         llmContent = `[Function Result] ${name} succeeded: Trash emptied`;
         scheduleModified = true;
+      } else if (name === 'swapEvents') {
+        displayContent = '✓ Events swapped';
+        llmContent = `[Function Result] ${name} succeeded: Events swapped`;
+        scheduleModified = true;
       } else if (name === 'markParticipantAssigned') {
         displayContent = '✓ Participant status updated';
         llmContent = `[Function Result] ${name} succeeded: Participant status updated`;
@@ -422,7 +427,8 @@ export default function FloatingChat({ onScheduleChange }: FloatingChatProps) {
         { role: 'user', content: userMessage.content },
       ];
 
-      const systemPrompt = getSystemPrompt(userMessage.content, promptContext);
+      const systemPrompt = getSystemPrompt(userMessage.content, promptContext) +
+        `\n\n---\n\n## SYSTEM CONTEXT\nCurrent Date & Time: ${new Date().toLocaleString()}\nIMPORTANT: Wrap your internal thinking in <thought>...</thought> tags. These will be hidden from the user.`;
 
       // Agentic loop - keep processing until no more function calls
       const MAX_ITERATIONS = 10; // Safety limit
@@ -450,16 +456,24 @@ export default function FloatingChat({ onScheduleChange }: FloatingChatProps) {
         const shouldShowMessage = iterations === 1 || !response.functionCall;
 
         if (shouldShowMessage && response.message && response.message.trim()) {
-          const assistantMessage: ChatMessage = {
-            id: (Date.now() + iterations * 10).toString(),
-            role: 'assistant',
-            content: response.message,
-            timestamp: new Date(),
-          };
-          setMessages((prev) => {
-            const updated = [...prev, assistantMessage];
-            return updated.length > MAX_MESSAGES ? updated.slice(-MAX_MESSAGES) : updated;
-          });
+          // Strip <thought>...</thought> tags and any legacy THOUGHT: blocks
+          const displayMessage = response.message
+            .replace(/<thought>[\s\S]*?<\/thought>/gi, '')
+            .replace(/THOUGHT:[\s\S]*?(?=\n|$)/gi, '')
+            .trim();
+
+          if (displayMessage) {
+            const assistantMessage: ChatMessage = {
+              id: (Date.now() + iterations * 10).toString(),
+              role: 'assistant',
+              content: displayMessage,
+              timestamp: new Date(),
+            };
+            setMessages((prev) => {
+              const updated = [...prev, assistantMessage];
+              return updated.length > MAX_MESSAGES ? updated.slice(-MAX_MESSAGES) : updated;
+            });
+          }
         }
 
         // If no function call, we're done
@@ -477,6 +491,14 @@ export default function FloatingChat({ onScheduleChange }: FloatingChatProps) {
 
         if (scheduleModified) {
           anyScheduleModified = true;
+        }
+
+        // Special handling for Auto-Schedule Preview
+        if (name === 'autoScheduleParticipants' && result.success && (result.data as any)?.previewHelper) {
+          console.log('[FloatingChat] Triggering Auto-Schedule Preview UI');
+          if (onShowAutoSchedule) {
+            onShowAutoSchedule();
+          }
         }
 
         // Show result to user ONLY IF ERROR
