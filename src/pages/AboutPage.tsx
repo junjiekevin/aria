@@ -178,29 +178,29 @@ export default function AboutPage() {
       <footer className={s.footer}>
         <div className={s.legalSection}>
           <LegalItem title="Privacy Policy" icon={Shield}>
-            <p style={{ marginBottom: '1.5rem' }}>Your privacy is a core priority at Aria. We believe in total transparency regarding how your information is handled.</p>
+            <p style={{ marginBottom: '1.5rem', fontSize: '1.05rem', color: '#fff' }}>Your trust is not something we take for granted. We believe that privacy should be simple, transparent, and respectful.</p>
 
-            <p style={{ marginBottom: '0.5rem', color: '#ccc', fontWeight: 600 }}>Data Collection & Usage</p>
-            <p style={{ marginBottom: '1rem' }}>We only collect the minimum amount of personal information necessary to provide our scheduling services. This includes your name and email provided via Google OAuth. We do not sell, rent, or trade your personal data with third parties for marketing purposes.</p>
+            <p style={{ marginBottom: '0.5rem', color: '#ccc', fontWeight: 600 }}>Respecting Your Information</p>
+            <p style={{ marginBottom: '1.25rem' }}>We collect only what is essential: your name and email to identify you. We do not sell, trade, or share your personal history with advertisers. Your data belongs to you, not us.</p>
 
-            <p style={{ marginBottom: '0.5rem', color: '#ccc', fontWeight: 600 }}>Security & Infrastructure</p>
-            <p style={{ marginBottom: '1rem' }}>Aria leverages enterprise-grade security via Supabase and PostgreSQL. All class data and schedules are protected by Row Level Security (RLS) policies, ensuring that only you can access or modify your information. All data is encrypted both in transit and at rest.</p>
+            <p style={{ marginBottom: '0.5rem', color: '#ccc', fontWeight: 600 }}>Stewardship & Security</p>
+            <p style={{ marginBottom: '1.25rem' }}>We treat your schedules with the care they deserve. Aria uses industry-leading encryption and security architecture to ensure your work stays private. Only you hold the keys to your data.</p>
 
-            <p style={{ marginBottom: '0.5rem', color: '#ccc', fontWeight: 600 }}>User Control</p>
-            <p>You maintain full ownership of your data. You can access, update, or request the permanent deletion of your account and all associated schedules at any time through your account settings or by contacting our support team.</p>
+            <p style={{ marginBottom: '0.5rem', color: '#ccc', fontWeight: 600 }}>Freedom of Choice</p>
+            <p>You remain in full control. Whether you want to export your data or leave the platform entirely, we ensure the door is always open. You can request a complete deletion of your account at any time.</p>
           </LegalItem>
 
           <LegalItem title="Terms of Service" icon={FileText} isLast>
-            <p style={{ marginBottom: '1.5rem' }}>By using Aria, you agree to the following terms and conditions designed to ensure a safe and reliable environment for all educators.</p>
+            <p style={{ marginBottom: '1.5rem', fontSize: '1.05rem', color: '#fff' }}>Aria is built on a foundation of mutual respect. These terms outline how we can build a reliable space together.</p>
 
-            <p style={{ marginBottom: '0.5rem', color: '#ccc', fontWeight: 600 }}>Account Stewardship</p>
-            <p style={{ marginBottom: '1rem' }}>Aria is intended for legitimate educational and professional scheduling. You are responsible for maintaining the confidentiality of your account credentials and for all activities that occur under your profile.</p>
+            <p style={{ marginBottom: '0.5rem', color: '#ccc', fontWeight: 600 }}>Responsible Use</p>
+            <p style={{ marginBottom: '1.25rem' }}>Aria is designed to bring order to your professional life. We ask that you use it with the same integrity you bring to your work. Please keep your account secure and use the platform as intended.</p>
 
-            <p style={{ marginBottom: '0.5rem', color: '#ccc', fontWeight: 600 }}>Service Quality & Liability</p>
-            <p style={{ marginBottom: '1rem' }}>While we strive for 99.9% uptime and a bug-free experience, Aria is provided "as is." We are not liable for any incidental or consequential damages resulting from service interruptions or data handling beyond our reasonable control.</p>
+            <p style={{ marginBottom: '0.5rem', color: '#ccc', fontWeight: 600 }}>Our Commitment</p>
+            <p style={{ marginBottom: '1.25rem' }}>We pour our energy into making Aria reliable, accurate, and helpful. While we strive for perfection, technology is a partner, not a guarantee. We provide the service "as is," but we promise to always work earnestly to resolve any issues that arise.</p>
 
-            <p style={{ marginBottom: '0.5rem', color: '#ccc', fontWeight: 600 }}>Future Evolution</p>
-            <p>We reserve the right to evolve Aria's features and terms. Significant changes to service terms will be communicated ahead of time to ensure you remain in control of your scheduling workflow.</p>
+            <p style={{ marginBottom: '0.5rem', color: '#ccc', fontWeight: 600 }}>Growing Together</p>
+            <p>As we learn and improve, Aria may evolve. We promise to communicate significant changes clearly, ensuring you always feel at home with the tools you rely on.</p>
           </LegalItem>
         </div>
 
