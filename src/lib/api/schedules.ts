@@ -1008,7 +1008,7 @@ export async function autoScheduleParticipants(scheduleId: string, commit: boole
     const assignedIds: string[] = [];
 
     // Always generate the proposed entries for preview
-    const proposedAssignments = result.assignments.map(assignment => {
+    result.assignments.forEach(assignment => {
         if (!assignment.isScheduled) return null;
 
         // Create entry for week 0 (first occurrence)
@@ -1039,7 +1039,6 @@ export async function autoScheduleParticipants(scheduleId: string, commit: boole
 
         newEntries.push(entry);
         assignedIds.push(assignment.participant.id);
-        return entry;
     });
 
     if (commit && newEntries.length > 0) {
