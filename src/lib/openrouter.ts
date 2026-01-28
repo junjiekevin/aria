@@ -65,9 +65,10 @@ export async function sendChatMessage(
     model: GEMINI_MODEL,
     messages: openRouterMessages,
     temperature: 0.7,
-    max_tokens: 150, // Aggressively reduced to save cost and force conciseness
+    max_tokens: 1000, // Increased to prevent JSON truncation during complex thought chains
     // Stop sequences - prevent model from roleplaying future turns or hallucinating results
-    stop: ['[Turn', 'User:', 'Aria:', 'FUNCTION_CALL:', '<start_of_turn>', '\nUser:', '\nAria:'],
+    // Stop sequences - prevent model from roleplaying future turns or hallucinating results
+    stop: ['[Turn', 'User:', 'Aria:', '<start_of_turn>', '\nUser:', '\nAria:'],
   };
 
   try {
@@ -106,8 +107,8 @@ export async function sendChatMessage(
     const assistantMessage = data.choices[0].message.content;
     console.log('[Aria Debug] Raw assistant message:', assistantMessage);
 
-    // Strip <think>...</think> reasoning tags
-    let cleanedMessage = assistantMessage.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
+    // Strip <think>...</think> and <thought>...</thought> reasoning tags
+    let cleanedMessage = assistantMessage.replace(/<(thought|think)>[\s\S]*?<\/(thought|think)>/gi, '').trim();
 
     // 1. Force-remove "Aria:" prefix if the model stubbornly ignores the prompt
     if (cleanedMessage.startsWith('Aria:')) {
@@ -196,7 +197,7 @@ export async function sendChatMessage(
         console.log('Successfully parsed function call:', functionCall);
 
         return {
-          message: textResponse || 'Processing...',
+          message: textResponse || 'On it! One moment, please',
           rawContent: cleanedMessage, // Keep cleaned message for history (think tags removed, FUNCTION_CALL preserved)
           functionCall: {
             name: functionCall.name,
@@ -220,7 +221,7 @@ export async function sendChatMessage(
       try {
         const functionCall = JSON.parse(toolCallMatch[1]);
         return {
-          message: textResponse || 'Processing...',
+          message: textResponse || 'On it! One moment, please',
           rawContent: cleanedMessage, // Keep cleaned message for history
           functionCall: {
             name: functionCall.name,

@@ -736,30 +736,55 @@ export async function addEventToSchedule(args: {
     // Get the schedule to find its start date
     const schedule = await getSchedule(resolvedScheduleId);
 
+    // Sanitize Day: Handle "Fridays" -> "Friday" and capitalization
+    let dayClean = args.day.trim();
+    if (dayClean.toLowerCase().endsWith('s')) {
+        dayClean = dayClean.slice(0, -1);
+    }
+    // Capitalize first letter
+    dayClean = dayClean.charAt(0).toUpperCase() + dayClean.slice(1).toLowerCase();
+
     // Calculate the first occurrence of the requested day within the schedule's date range
-    const firstDate = findFirstDayOccurrence(schedule.start_date, args.day);
+    const firstDate = findFirstDayOccurrence(schedule.start_date, dayClean);
 
-    const start = args.start_time || `${args.hour.toString().padStart(2, '0')}:00`;
-    const end = args.end_time || `${(args.hour + 1).toString().padStart(2, '0')}:00`;
+    // Sanitize Hour/Time
+    let start = args.start_time;
+    let end = args.end_time;
 
-    // Create Date objects in local time, then convert to ISO string
-    // This ensures the time displays correctly in the user's timezone
+    // If start_time/end_time not provided or invalid format, fall back to hour
+    const timeRegex = /^\d{1,2}:\d{2}$/;
+    if (!start || !timeRegex.test(start)) {
+        // Ensure hour is a valid integer 0-23
+        const hourInt = parseInt(String(args.hour), 10);
+        if (isNaN(hourInt) || hourInt < 0 || hourInt > 23) {
+            throw new Error(`Invalid time provided. Hour must be 0-23, got: ${args.hour}`);
+        }
+        start = `${hourInt.toString().padStart(2, '0')}:00`;
+        end = `${(hourInt + 1).toString().padStart(2, '0')}:00`;
+    }
+
+    // Safely Construct Dates
+    // We use the computed firstDate (YYYY-MM-DD from findFirstDayOccurrence)
+    // and append the time strings.
     const startDate = new Date(`${firstDate}T${start}:00`);
-    const endDate = new Date(`${firstDate}T${end}:00`);
+    const endDate = new Date(`${firstDate}T${end}:00`); // args.end_time or hour+1
+
+    if (isNaN(startDate.getTime())) {
+        throw new Error(`Failed to construct valid start date from day "${dayClean}" and time "${start}"`);
+    }
+    if (isNaN(endDate.getTime())) {
+        throw new Error(`Failed to construct valid end date from day "${dayClean}" and time "${end}"`);
+    }
 
     // Use toISOString() which converts local time to UTC - this is correct
     // because when the SchedulePage reads it back, new Date() will convert UTC back to local
     const start_time = startDate.toISOString();
     const end_time = endDate.toISOString();
 
-    // Default to weekly recurrence if day is specified but no recurrence_rule provided
-    // Map day name to RRULE BYDAY abbreviation
-    const dayAbbrevMap: Record<string, string> = {
-        'Sunday': 'SU', 'Monday': 'MO', 'Tuesday': 'TU', 'Wednesday': 'WE',
-        'Thursday': 'TH', 'Friday': 'FR', 'Saturday': 'SA'
-    };
-    const dayAbbrev = dayAbbrevMap[args.day];
-    const defaultRecurrence = dayAbbrev ? `FREQ=WEEKLY;BYDAY=${dayAbbrev}` : '';
+    // Default recurrence: NONE (One-time event) unless specified
+    // Only set default if user explicitly requests "Weekly" but provides no rule (which is rare, usually handled by LLM)
+    // We defer to the LLM to pass the correct recurrence_rule based on user input (e.g. "Fridays" vs "Friday")
+    const defaultRecurrence = '';
 
     return createScheduleEntry({
         schedule_id: resolvedScheduleId,
@@ -772,7 +797,6 @@ export async function addEventToSchedule(args: {
 
 // (removed duplicate function)
 
-// Update or move an event in a schedule
 export async function updateEventInSchedule(args: {
     event_id: string;
     student_name?: string;
@@ -785,7 +809,12 @@ export async function updateEventInSchedule(args: {
     const updates: { student_name?: string; start_time?: string; end_time?: string; recurrence_rule?: string } = {};
 
     if (args.student_name !== undefined) updates.student_name = args.student_name;
-    if (args.recurrence_rule !== undefined) updates.recurrence_rule = args.recurrence_rule;
+
+    // CRITICAL: If user explicitly provides recurrence_rule, use it and don't auto-calculate
+    const hasExplicitRecurrence = args.recurrence_rule !== undefined;
+    if (hasExplicitRecurrence) {
+        updates.recurrence_rule = args.recurrence_rule;
+    }
 
     if (args.day !== undefined && args.hour !== undefined) {
         // Get the original event to find the schedule and calculate new date
@@ -801,8 +830,10 @@ export async function updateEventInSchedule(args: {
         updates.start_time = `${firstDate}T${start}:00`;
         updates.end_time = `${firstDate}T${end}:00`;
 
-        // Ensure recurrence rule stays in sync with the new day
-        updates.recurrence_rule = updateRecurrenceDay(originalEntry.recurrence_rule, updates.start_time);
+        // Only auto-update recurrence rule if user didn't explicitly provide one
+        if (!hasExplicitRecurrence) {
+            updates.recurrence_rule = updateRecurrenceDay(originalEntry.recurrence_rule, updates.start_time);
+        }
     } else if (args.start_time !== undefined) {
         updates.start_time = args.start_time;
     } else if (args.end_time !== undefined) {

@@ -160,12 +160,18 @@ FUNCTION_CALL: {"name":"updateFormConfig","arguments":{"schedule_id":"...","form
     requiresIds: ['schedule_id'],
     providesIds: ['event_id'],
     prerequisites: ['listSchedules'],
-    prompt: `Add event to schedule. Needs: schedule_id, student_name (EVENT TITLE), day, hour (24h format).
-IMPORTANT: student_name is the EVENT TITLE - use exactly what user says ("Singing", "Piano lesson", "John's lesson", etc.)
-REQUIRED: Must have event name, day, AND time before calling. Ask if any are missing.`,
-    example: `User: "Add Singing on Friday at 4pm"
-You: "Adding Singing to Friday at 4pm!"
-FUNCTION_CALL: {"name":"addEventToSchedule","arguments":{"schedule_id":"...","student_name":"Singing","day":"Friday","hour":16}}`
+    prompt: `Add event to schedule. Needs: schedule_id, student_name (EVENT TITLE), day, hour (24h format), recurrence_rule.
+student_name is the EVENT TITLE.
+FREQUENCY: ALWAYS ask user to specify frequency if not provided. Options:
+- Once: "" (empty string)
+- Weekly: "FREQ=WEEKLY;BYDAY=XX" (XX = MO,TU,WE,TH,FR,SA,SU)
+- Bi-Weekly: "FREQ=WEEKLY;INTERVAL=2;BYDAY=XX"
+- Monthly: "FREQ=WEEKLY;INTERVAL=4;BYDAY=XX"
+DO NOT guess frequency. If user doesn't specify, ask: "Would you like this to be Once, Weekly, Bi-Weekly, or Monthly?"`,
+    example: `User: "Add Singing on Fridays at 4pm"
+You: "Would you like Singing to be Once, Weekly, Bi-Weekly, or Monthly?"
+[After user responds "Weekly"]
+FUNCTION_CALL: {"name":"addEventToSchedule","arguments":{"schedule_id":"...","student_name":"Singing","day":"Friday","hour":16,"recurrence_rule":"FREQ=WEEKLY;BYDAY=FR"}}`
   },
   {
     name: 'updateEventInSchedule',
@@ -177,13 +183,19 @@ FUNCTION_CALL: {"name":"addEventToSchedule","arguments":{"schedule_id":"...","st
     requiresIds: ['event_id'],
     providesIds: [],
     prerequisites: ['getEventSummaryInSchedule'],
-    prompt: 'Update/move an event. Needs event_id (get from getEventSummaryInSchedule first). Can change: student_name, day, hour, recurrence_rule.',
-    example: `User: "Move Singing to Monday at 3pm"
-You: "Let me find that event first..."
+    prompt: `Update/move an event. Needs event_id (get from getEventSummaryInSchedule first). Can change: student_name, day, hour, recurrence_rule.
+IMPORTANT: When ONLY changing frequency, pass ONLY event_id and recurrence_rule. Do NOT pass day or hour.
+RECURRENCE EXAMPLES:
+- Weekly: "FREQ=WEEKLY;BYDAY=MO" (Monday)
+- Bi-Weekly: "FREQ=WEEKLY;INTERVAL=2;BYDAY=TU" (Tuesday)
+- Monthly: "FREQ=WEEKLY;INTERVAL=4;BYDAY=WE" (Wednesday)
+- Once: "" (Empty string)`,
+    example: `User: "Change frequency to biweekly"
+You: "Let me find that event..."
 FUNCTION_CALL: {"name":"getEventSummaryInSchedule","arguments":{"schedule_id":"..."}}
-[After getting event_id from result]
-You: "Moving Singing to Monday at 3pm!"
-FUNCTION_CALL: {"name":"updateEventInSchedule","arguments":{"event_id":"abc-123","day":"Monday","hour":15}}`
+[After getting event on Tuesday]
+You: "Updating to every 2 weeks!"
+FUNCTION_CALL: {"name":"updateEventInSchedule","arguments":{"event_id":"...","recurrence_rule":"FREQ=WEEKLY;INTERVAL=2;BYDAY=TU"}}`
   },
   {
     name: 'deleteEventFromSchedule',

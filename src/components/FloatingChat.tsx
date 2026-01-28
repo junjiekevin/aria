@@ -309,6 +309,11 @@ export default function FloatingChat({ onScheduleChange, onShowAutoSchedule }: F
     }
   }, [messages]);
 
+  // Auto-scroll to bottom
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages, loading]);
+
   // Focus input when chat opens
   useEffect(() => {
     if (isOpen && inputRef.current) {
@@ -455,12 +460,30 @@ export default function FloatingChat({ onScheduleChange, onShowAutoSchedule }: F
         // 3. Show FINAL message (no function call)
         const shouldShowMessage = iterations === 1 || !response.functionCall;
 
-        if (shouldShowMessage && response.message && response.message.trim()) {
-          // Strip <thought>...</thought> tags and any legacy THOUGHT: blocks
-          const displayMessage = response.message
-            .replace(/<thought>[\s\S]*?<\/thought>/gi, '')
-            .replace(/THOUGHT:[\s\S]*?(?=\n|$)/gi, '')
-            .trim();
+        if (shouldShowMessage) {
+          let displayMessage = '';
+
+          if (response.message && response.message.trim()) {
+            // Strip <thought>...</thought> tags, legacy THOUGHT: blocks, and wrapping quotes
+            displayMessage = response.message
+              .replace(/<thought>[\s\S]*?<\/thought>/gi, '')
+              .replace(/THOUGHT:[\s\S]*?(?=\n|$)/gi, '')
+              .trim();
+          }
+
+          // If the agent is calling a function but didn't provide a friendly message, 
+          // provide a default acknowledgement so the user knows something is happening.
+          if (response.functionCall && !displayMessage) {
+            displayMessage = "On it! One moment, please";
+          }
+
+          // Strip markdown code blocks (```tool_code, ```json, etc.)
+          displayMessage = displayMessage.replace(/```[\s\S]*?```/g, '').trim();
+
+          // Remove leading/trailing quotes if they exist (common LLM artifact)
+          if (displayMessage.length > 1 && /^["']|["']$/g.test(displayMessage)) {
+            displayMessage = displayMessage.replace(/^["']|["']$/g, '');
+          }
 
           if (displayMessage) {
             const assistantMessage: ChatMessage = {
