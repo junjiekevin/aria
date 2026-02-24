@@ -1,6 +1,6 @@
 // src/components/ConfigureFormModal.tsx
 import { useState, useEffect } from 'react';
-import { updateFormConfig, type Schedule } from '../lib/api/schedules';
+import { updateFormConfig, type Schedule } from '../lib/services/scheduleService';
 
 interface ConfigureFormModalProps {
     isOpen: boolean;

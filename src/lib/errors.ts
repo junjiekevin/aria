@@ -21,8 +21,8 @@ export class AriaError extends Error {
         this.code = code;
         this.statusHint = statusHint;
         // Maintains proper stack trace in V8
-        if (Error.captureStackTrace) {
-            Error.captureStackTrace(this, this.constructor);
+        if ('captureStackTrace' in Error) {
+            (Error as any).captureStackTrace(this, this.constructor);
         }
     }
 }

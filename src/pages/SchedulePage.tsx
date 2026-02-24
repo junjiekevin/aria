@@ -4,7 +4,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { ArrowLeft, ChevronLeft, ChevronRight, Trash2, Settings, List, Sparkles, Copy, Check, Layout, Calendar, FileText } from 'lucide-react';
 import { exportToICS, exportToPDF } from '../lib/export';
 import s from './SchedulePage.module.css';
-import { getSchedule, updateSchedule, type Schedule } from '../lib/api/schedules';
+import { getSchedule, updateSchedule, type Schedule } from '../lib/services/scheduleService';
 import { getScheduleEntries, createScheduleEntry, updateScheduleEntry, deleteScheduleEntry, type ScheduleEntry } from '../lib/api/schedule-entries';
 import { getFormResponses, deleteFormResponse, updateFormResponseAssigned, getPreferredTimings, type FormResponse } from '../lib/api/form-responses';
 import {
@@ -887,29 +887,31 @@ export default function SchedulePage() {
                         <div className={s.centerSection}>
                             <button
                                 onClick={goToPreviousWeek}
-                                className={s.backButton}
+                                className={s.iconButton}
                                 disabled={currentWeekOffset === 0}
                                 style={{ opacity: currentWeekOffset === 0 ? 0.4 : 1 }}
+                                title="Previous Week"
                             >
-                                <ChevronLeft size={20} />
+                                <ChevronLeft size={18} />
                             </button>
-                            <div style={{ fontSize: '0.875rem', fontWeight: 600, minWidth: '220px', textAlign: 'center' }}>
+                            <div style={{ fontSize: '0.875rem', fontWeight: 600, minWidth: '180px', textAlign: 'center' }}>
                                 {weekStart && weekEnd ? (
                                     <>
                                         {weekStart.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })} – {weekEnd.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
-                                        <span style={{ color: 'var(--text-400)', fontWeight: 400, marginLeft: '0.5rem' }}>
-                                            (Week {weekNumber} of {totalWeeks})
-                                        </span>
+                                        <div style={{ color: 'var(--text-400)', fontWeight: 400, fontSize: '0.75rem', marginTop: '2px' }}>
+                                            Week {weekNumber} of {totalWeeks}
+                                        </div>
                                     </>
                                 ) : `Week ${weekNumber} of ${totalWeeks}`}
                             </div>
                             <button
                                 onClick={goToNextWeek}
-                                className={s.backButton}
+                                className={s.iconButton}
                                 disabled={currentWeekOffset >= totalWeeks - 1}
                                 style={{ opacity: currentWeekOffset >= totalWeeks - 1 ? 0.4 : 1 }}
+                                title="Next Week"
                             >
-                                <ChevronRight size={20} />
+                                <ChevronRight size={18} />
                             </button>
                         </div>
 
@@ -918,13 +920,15 @@ export default function SchedulePage() {
                             {/* Events Dropdown */}
                             <div style={{ position: 'relative' }}>
                                 <button
-                                    className={s.toolbarButton}
+                                    className={s.iconButton}
                                     onClick={() => { setIsEventsOpen(!isEventsOpen); setIsInfoOpen(false); }}
+                                    title="Unassigned Events"
                                 >
-                                    <List size={16} />
-                                    <span>Events</span>
+                                    <List size={18} />
                                     {getUnassignedParticipants().length > 0 && (
-                                        <div className={s.badge}>{getUnassignedParticipants().length}</div>
+                                        <div className={s.badge} style={{ position: 'absolute', top: -4, right: -4 }}>
+                                            {getUnassignedParticipants().length}
+                                        </div>
                                     )}
                                 </button>
 
@@ -975,11 +979,11 @@ export default function SchedulePage() {
                             {/* Settings Dropdown */}
                             <div style={{ position: 'relative' }}>
                                 <button
-                                    className={s.toolbarButton}
+                                    className={s.iconButton}
                                     onClick={() => { setIsInfoOpen(!isInfoOpen); setIsEventsOpen(false); }}
+                                    title="Schedule Settings Options"
                                 >
-                                    <Settings size={16} />
-                                    <span>Settings</span>
+                                    <Settings size={18} />
                                 </button>
 
                                 {isInfoOpen && (
@@ -1055,36 +1059,54 @@ export default function SchedulePage() {
                                 )}
                             </div>
 
-                            {/* Form Link & Publish */}
+                            {/* Form Link & Publish Actions */}
                             <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                                {schedule.status === 'collecting' && !isViewOnly && (
-                                    <>
-                                        <button
-                                            className={s.activateButton}
-                                            onClick={handlePublish}
-                                            disabled={isPublishing || entries.length === 0}
-                                            title={entries.length === 0 ? 'Add events before publishing' : 'Send emails and finish schedule'}
-                                        >
-                                            <Sparkles size={16} />
-                                            <span>{isPublishing ? 'Publishing...' : 'Publish & Notify'}</span>
-                                        </button>
-                                        <button
-                                            className={`${s.toolbarButton} ${isCopied ? s.successButton : ''}`}
-                                            onClick={handleCopyLink}
-                                            style={{ borderColor: 'var(--brand-primary)', color: 'var(--brand-primary)' }}
-                                        >
-                                            <div className={s.pulse} />
-                                            <span>{isCopied ? 'Copied!' : 'Copy Form Link'}</span>
-                                            {isCopied ? <Check size={14} /> : <Copy size={14} />}
-                                        </button>
-                                    </>
-                                )}
-                                {schedule.status === 'draft' && !isViewOnly && (
-                                    <button onClick={() => setShowConfigureFormModal(true)} className={s.activateButton}>
-                                        <Sparkles size={16} />
-                                        <span>Configure & Activate</span>
-                                    </button>
-                                )}
+                                {(() => {
+                                    if (isViewOnly) return null;
+
+                                    switch (schedule.status) {
+                                        case 'draft':
+                                            return (
+                                                <button onClick={() => setShowConfigureFormModal(true)} className={s.activateButton}>
+                                                    <Sparkles size={16} />
+                                                    <span>Configure & Activate</span>
+                                                </button>
+                                            );
+                                        case 'collecting':
+                                            return (
+                                                <>
+                                                    <button
+                                                        className={`${s.toolbarButton} ${isCopied ? s.successButton : ''}`}
+                                                        onClick={handleCopyLink}
+                                                        style={{ borderColor: 'var(--brand-primary)', color: 'var(--brand-primary)' }}
+                                                    >
+                                                        <div className={s.pulse} />
+                                                        <span>{isCopied ? 'Copied!' : 'Copy Form Link'}</span>
+                                                        {isCopied ? <Check size={14} /> : <Copy size={14} />}
+                                                    </button>
+
+                                                    <button
+                                                        className={s.activateButton}
+                                                        onClick={handlePublish}
+                                                        disabled={isPublishing || entries.length === 0}
+                                                        title={entries.length === 0 ? 'Add events before publishing' : 'Lock schedule and notify participants'}
+                                                    >
+                                                        <Sparkles size={16} />
+                                                        <span>{isPublishing ? 'Publishing...' : 'Publish Schedule'}</span>
+                                                    </button>
+                                                </>
+                                            );
+                                        case 'published':
+                                            return (
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--status-success-bg)', fontWeight: 600, padding: '0.5rem 0.85rem', background: 'var(--bg-orange-50)', borderRadius: '9999px', border: '1px solid currentColor' }}>
+                                                    <Check size={16} />
+                                                    <span>Published</span>
+                                                </div>
+                                            );
+                                        default:
+                                            return null;
+                                    }
+                                })()}
                             </div>
                         </div>
                     </div>

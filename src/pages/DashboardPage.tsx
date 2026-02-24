@@ -1,7 +1,7 @@
 // src/pages/DashboardPage.tsx
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { getAllSchedules, type Schedule, restoreSchedule, permanentDeleteAllTrashed, updateSchedule, permanentDeleteSchedule, trashSchedule } from '../lib/api/schedules';
+import { getAllSchedules, type Schedule, restoreSchedule, permanentDeleteAllTrashed, updateSchedule, permanentDeleteSchedule, trashSchedule } from '../lib/services/scheduleService';
 import { supabase } from '../lib/supabase';
 import { Plus, Calendar, Clock, Archive, Trash2, FileText, RotateCcw, XCircle, Sparkles } from 'lucide-react';
 import CreateScheduleModal from '../components/CreateScheduleModal';
@@ -25,6 +25,11 @@ function StatusBadge({ status }: StatusBadgeProps) {
 		collecting: {
 			label: 'Active',
 			icon: Clock,
+			className: s.statusBadgeCollecting
+		},
+		published: {
+			label: 'Published',
+			icon: Sparkles,
 			className: s.statusBadgeCollecting
 		},
 		archived: {

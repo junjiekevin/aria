@@ -1,7 +1,7 @@
 // src/components/EditScheduleModal.tsx
 import { useState, useEffect } from 'react';
 import Modal from './Modal';
-import { updateSchedule, type Schedule, type UpdateScheduleInput } from '../lib/api/schedules';
+import { updateSchedule, type Schedule, type UpdateScheduleInput } from '../lib/services/scheduleService';
 
 interface EditScheduleModalProps {
   isOpen: boolean;
