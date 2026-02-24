@@ -1,9 +1,9 @@
 // src/lib/openrouter.ts
-// OpenRouter API client for Gemini 2.0 Flash integration
+// OpenRouter API client for ARIA AI integration
 
 const OPENROUTER_API_URL = 'https://openrouter.ai/api/v1/chat/completions';
-// Using TNG DeepSeek R1T2 Chimera - free, fast model optimized for dialogue and function calling
-const GEMINI_MODEL = 'google/gemma-3-27b-it:free';
+// Using Gemini 2.5 Flash Lite - Optimized for ultra-low latency and agentic reasoning (Next-gen Flash)
+const AI_MODEL = 'google/gemini-2.5-flash-lite';
 
 export interface Message {
   role: 'user' | 'assistant' | 'system';
@@ -44,7 +44,7 @@ interface OpenRouterResponse {
 }
 
 /**
- * Send a chat message to Gemini 2.0 Flash via OpenRouter
+ * Send a chat message to the configured AI model via OpenRouter
  */
 export async function sendChatMessage(
   messages: Message[],
@@ -62,7 +62,7 @@ export async function sendChatMessage(
     : messages;
 
   const requestBody: OpenRouterRequest = {
-    model: GEMINI_MODEL,
+    model: AI_MODEL,
     messages: openRouterMessages,
     temperature: 0.7,
     max_tokens: 1000, // Increased to prevent JSON truncation during complex thought chains
@@ -101,7 +101,7 @@ export async function sendChatMessage(
 
     if (!data.choices || data.choices.length === 0) {
       console.error('[Aria Debug] No choices in response');
-      throw new Error('No response from Gemini');
+      throw new Error('No response from AI');
     }
 
     const assistantMessage = data.choices[0].message.content;
