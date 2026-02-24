@@ -13,6 +13,7 @@ const SchedulePage = React.lazy(() => import('./pages/SchedulePage.tsx'))
 const AccountPage = React.lazy(() => import('./pages/AccountPage.tsx'))
 const HelpPage = React.lazy(() => import('./pages/HelpPage.tsx'))
 const AboutPage = React.lazy(() => import('./pages/AboutPage.tsx'))
+const CancelPage = React.lazy(() => import('./pages/CancelPage.tsx'))
 
 const App = () => {
     const location = useLocation();
@@ -57,6 +58,7 @@ const App = () => {
             <Routes>
                 <Route path="/" element={<AuthPage />} />
                 <Route path="/form/:scheduleId" element={<AvailabilityFormPage />} />
+                <Route path="/cancel/:entryId" element={<CancelPage />} />
                 <Route path="/dashboard" element={<ProtectedRoute><DashboardPage /></ProtectedRoute>} />
                 <Route path="/schedule/:scheduleId" element={<ProtectedRoute><SchedulePage /></ProtectedRoute>} />
                 <Route path="/account" element={<ProtectedRoute><AccountPage /></ProtectedRoute>} />

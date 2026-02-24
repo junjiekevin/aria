@@ -6,6 +6,7 @@ yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
+docs/
 
 # Dependencies
 node_modules/
@@ -37,9 +38,6 @@ supabase/config.json
 *.njsproj
 *.sln
 *.sw?
-
-# Aria logs folder (contains docs - NOT tracked in git)
-Aria logs/
 
 # OS files
 Thumbs.db

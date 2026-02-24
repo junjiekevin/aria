@@ -1,7 +1,7 @@
 // src/components/CreateScheduleModal.tsx
 import { useState } from 'react';
 import Modal from './Modal';
-import { createSchedule, type CreateScheduleInput } from '../lib/api/schedules';
+import { createSchedule, type CreateScheduleInput } from '../lib/services/scheduleService';
 
 interface CreateScheduleModalProps {
   isOpen: boolean;

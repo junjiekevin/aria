@@ -1,33 +1,26 @@
-import { supabase } from "../supabase";
-import {
-    getScheduleEntries,
-    createScheduleEntry,
-    updateScheduleEntry,
-    deleteScheduleEntry
-} from './schedule-entries';
-import {
-    getFormResponses,
-    updateFormResponseAssigned,
-    getPreferredTimings
-} from './form-responses';
-import {
-    scheduleParticipants,
-    createEntryFromAssignment,
-    dayToIndex
-} from '../scheduling';
+// src/lib/api/schedules.ts
+// Data access layer for the schedules table.
+// Pure Supabase CRUD only. No business logic, no validation, no orchestration.
+// All business logic lives in src/lib/services/scheduleService.ts.
+
+import { supabase } from '../supabase';
+
+// ============================================
+// Types
+// ============================================
 
 export interface Schedule {
     id: string;
     user_id: string;
     label: string;
-    start_date: string; // YYYY-MM-DD Format
-    end_date: string; // YYYY-MM-DD Format
-    status: 'draft' | 'collecting' | 'archived' | 'trashed';
+    start_date: string;
+    end_date: string;
+    status: 'draft' | 'collecting' | 'published' | 'archived' | 'trashed';
     deleted_at: string | null;
-    previous_status: 'draft' | 'collecting' | 'archived' | null; // Store status before trashing
-    send_confirmation_email: boolean; // Whether to send confirmation emails
+    previous_status: 'draft' | 'collecting' | 'published' | 'archived' | null;
+    send_confirmation_email: boolean;
+    cancellation_policy_hours: number;
     created_at: string;
-    // Form configuration
     max_choices: number;
     form_instructions: string | null;
     form_deadline: string | null;
@@ -41,232 +34,95 @@ export interface FormConfigInput {
     form_deadline?: string | null;
     working_hours_start?: number;
     working_hours_end?: number;
+    cancellation_policy_hours?: number;
 }
 
 export interface CreateScheduleInput {
     label: string;
-    start_date: string; // YYYY-MM-DD Format
-    end_date: string; // YYYY-MM-DD Format
+    start_date: string;
+    end_date: string;
     working_hours_start?: number;
     working_hours_end?: number;
 }
 
 export interface UpdateScheduleInput {
     label?: string;
-    start_date?: string; // YYYY-MM-DD Format
-    end_date?: string;   // YYYY-MM-DD Format
-    status?: 'draft' | 'collecting' | 'archived' | 'trashed';
+    start_date?: string;
+    end_date?: string;
+    status?: 'draft' | 'collecting' | 'published' | 'archived' | 'trashed';
     send_confirmation_email?: boolean;
-    previous_status?: 'draft' | 'collecting' | 'archived' | null;
+    previous_status?: 'draft' | 'collecting' | 'published' | 'archived' | null;
     working_hours_start?: number;
     working_hours_end?: number;
+    cancellation_policy_hours?: number;
 }
 
-// (Removed duplicate findFirstDayOccurrence to keep a single implementation elsewhere)
+// ============================================
+// Helpers
+// ============================================
 
-// Resolve a schedule UUID by its label (case-insensitive). Returns null if not found or ambiguous.
-export async function resolveScheduleIdByLabel(label: string): Promise<string | null> {
-    const schedules = await getSchedules();
-    const matches = schedules.filter(s => s.label.toLowerCase() === label.toLowerCase());
-    if (matches.length === 1) return matches[0].id;
-    return null;
-}
-
-// Helper: find first occurrence of a day within a schedule's start date
-// IMPORTANT: Parse date in LOCAL time to avoid timezone offset issues
-function findFirstDayOccurrence(scheduleStartDate: string, dayName: string): string {
-    const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-    const targetIndex = days.findIndex(d => d.toLowerCase() === dayName.toLowerCase());
-    if (targetIndex < 0) throw new Error(`Invalid day name: ${dayName}`);
-
-    // Parse YYYY-MM-DD in LOCAL time (not UTC) to avoid day offset
-    const [year, month, day] = scheduleStartDate.split('-').map(Number);
-    const start = new Date(year, month - 1, day); // month is 0-indexed
-    if (isNaN(start.getTime())) throw new Error(`Invalid start date: ${scheduleStartDate}`);
-
-    const currentIndex = start.getDay();
-    let diff = targetIndex - currentIndex;
-    if (diff < 0) diff += 7;
-    const first = new Date(start);
-    first.setDate(start.getDate() + diff);
-
-    // Return YYYY-MM-DD in local time
-    const yyyy = first.getFullYear();
-    const mm = String(first.getMonth() + 1).padStart(2, '0');
-    const dd = String(first.getDate()).padStart(2, '0');
-    return `${yyyy}-${mm}-${dd}`;
-}
-
-// Helper to update just the BYDAY in recurrence rule while preserving frequency
-function updateRecurrenceDay(rule: string | null, newDateStr: string): string {
-    if (!rule) return ''; // "Once" frequency
-
-    const date = new Date(newDateStr);
-    if (isNaN(date.getTime())) return rule || '';
-
-    const dayAbbrevs = ['SU', 'MO', 'TU', 'WE', 'TH', 'FR', 'SA'];
-    const newDayAbbrev = dayAbbrevs[date.getDay()];
-
-    // Determine frequency type
-    if (rule.includes('INTERVAL=2')) {
-        return `FREQ=WEEKLY;INTERVAL=2;BYDAY=${newDayAbbrev}`;
-    }
-    if (rule.includes('FREQ=MONTHLY') || rule.includes('INTERVAL=4')) {
-        return `FREQ=WEEKLY;INTERVAL=4;BYDAY=${newDayAbbrev}`;
-    }
-    if (rule.includes('FREQ=WEEKLY')) {
-        return `FREQ=WEEKLY;BYDAY=${newDayAbbrev}`;
-    }
-
-    return `FREQ=WEEKLY;BYDAY=${newDayAbbrev}`;
-}
-
-// Ported helper from SchedulePage.tsx to ensure Aria and UI see the SAME days
-function parseRecurrenceRule(rule: string | null) {
-    if (!rule) return null;
-
-    const freqMatch = rule.match(/FREQ=(\w+)/);
-    const intervalMatch = rule.match(/INTERVAL=(\d+)/);
-    const byDayMatch = rule.match(/BYDAY=(\w+)/);
-
-    let freq = freqMatch ? freqMatch[1] : 'WEEKLY';
-    let interval = intervalMatch ? parseInt(intervalMatch[1]) : 1;
-
-    // Handle INTERVAL as frequency indicators (standard iCal format shared with UI)
-    if (freq === 'WEEKLY') {
-        if (interval === 4) freq = 'MONTHLY';
-        else if (interval === 2) freq = '2WEEKLY';
-    }
-
-    const byDayStr = byDayMatch ? byDayMatch[1] : '';
-    const dayAbbrevs = ['SU', 'MO', 'TU', 'WE', 'TH', 'FR', 'SA'];
-    const dayIndex = dayAbbrevs.indexOf(byDayStr);
-
-    return { freq, interval, dayIndex: dayIndex >= 0 ? dayIndex : null };
-}
-
-export interface ScheduleValidationError extends Error {
-    code: 'SCHEDULE_LIMIT_EXCEEDED' | 'INVALID_DATE_RANGE' | 'INVALID_STATUS_TRANSITION' | 'SCHEDULE_NOT_FOUND' | 'UNAUTHORIZED';
-}
-
-// Create new schedule
-export async function createSchedule(scheduleData: CreateScheduleInput) {
+async function getAuthenticatedUserId(): Promise<string> {
     const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error('UNAUTHORIZED');
+    return user.id;
+}
 
-    if (!user) {
-        const error = new Error('User not authenticated') as ScheduleValidationError;
-        error.code = 'UNAUTHORIZED'
-        throw error;
-    }
+// ============================================
+// CRUD
+// ============================================
 
-    // Validate date range
-    const startDate = new Date(scheduleData.start_date);
-    const endDate = new Date(scheduleData.end_date);
+export async function createSchedule(input: CreateScheduleInput): Promise<Schedule> {
+    const userId = await getAuthenticatedUserId();
 
-    if (startDate >= endDate) {
-        const error = new Error('End date must be after start date') as ScheduleValidationError;
-        error.code = 'INVALID_DATE_RANGE';
-        throw error;
-    }
-
-    // Check schedule limit (max 3)
-    const { data: existingSchedules, error: countError } = await supabase
+    // Check schedule limit (max 3 active)
+    const { data: existing, error: countErr } = await supabase
         .from('schedules')
         .select('id')
-        .eq('user_id', user.id)
+        .eq('user_id', userId)
         .neq('status', 'trashed');
 
-    if (countError) {
-        throw new Error(`Failed to check schedule limit: ${countError.message}`);
+    if (countErr) throw new Error(`Failed to check schedule limit: ${countErr.message}`);
+    if (existing && existing.length >= 3) {
+        throw new Error('SCHEDULE_LIMIT_EXCEEDED');
     }
 
-    if (existingSchedules && existingSchedules.length >= 3) {
-        const error = new Error('Maximum of 3 schedules allowed. Please archive or delete existing schedules.') as ScheduleValidationError;
-        error.code = 'SCHEDULE_LIMIT_EXCEEDED';
-        throw error;
-    }
-
-    // Create schedule
     const { data, error } = await supabase
         .from('schedules')
-        .insert([
-            {
-                user_id: user.id,
-                label: scheduleData.label.trim(),
-                start_date: scheduleData.start_date,
-                end_date: scheduleData.end_date,
-                status: 'draft',
-                working_hours_start: scheduleData.working_hours_start ?? 8,
-                working_hours_end: scheduleData.working_hours_end ?? 21
-            }
-        ])
+        .insert([{
+            user_id: userId,
+            label: input.label.trim(),
+            start_date: input.start_date,
+            end_date: input.end_date,
+            status: 'draft',
+            working_hours_start: input.working_hours_start ?? 8,
+            working_hours_end: input.working_hours_end ?? 21,
+        }])
         .select()
         .single();
 
-    if (error) {
-        throw new Error(`Failed to create schedule: ${error.message}`);
-    }
-
+    if (error) throw new Error(`Failed to create schedule: ${error.message}`);
     return data;
 }
 
-// Get all schedules for current user (excluding trashed)
-export async function getSchedules() {
-    const { data: { user } } = await supabase.auth.getUser();
-
-    if (!user) {
-        const error = new Error('User not authenticated') as ScheduleValidationError;
-        error.code = 'UNAUTHORIZED';
-        throw error;
-    }
-
-    const { data, error } = await supabase
-        .from('schedules')
-        .select('*')
-        .eq('user_id', user.id)
-        .neq('status', 'trashed')
-        .order('created_at', { ascending: false });
-
-    if (error) {
-        throw new Error(`Failed to fetch schedules: ${error.message}`);
-    }
-
-    return data || [];
-}
-
-// Get single schedule by ID (Owner version - requires auth)
-export async function getSchedule(scheduleId: string) {
-    const { data: { user } } = await supabase.auth.getUser();
-
-    if (!user) {
-        const error = new Error('User not authenticated') as ScheduleValidationError;
-        error.code = 'UNAUTHORIZED';
-        throw error;
-    }
+export async function getSchedule(scheduleId: string): Promise<Schedule> {
+    const userId = await getAuthenticatedUserId();
 
     const { data, error } = await supabase
         .from('schedules')
         .select('*')
         .eq('id', scheduleId)
-        .eq('user_id', user.id)
+        .eq('user_id', userId)
         .single();
 
     if (error) {
-        if (error.code === 'PGRST116') {
-            const notFoundError = new Error('Schedule not found') as ScheduleValidationError;
-            notFoundError.code = 'SCHEDULE_NOT_FOUND';
-            throw notFoundError;
-        }
+        if (error.code === 'PGRST116') throw new Error('NOT_FOUND');
         throw new Error(`Failed to fetch schedule: ${error.message}`);
     }
-
     return data;
 }
 
-// Get single schedule for public consumption (No auth required)
-// Only allows fetching if status is 'collecting' or 'archived' (enforced by RLS)
-export async function getPublicSchedule(scheduleId: string) {
-    // Note: We does NOT check for user session here
+// Public read — no auth. RLS enforces status = collecting | archived.
+export async function getPublicSchedule(scheduleId: string): Promise<Partial<Schedule>> {
     const { data, error } = await supabase
         .from('schedules')
         .select('id, label, start_date, end_date, status, max_choices, form_instructions, form_deadline, working_hours_start, working_hours_end')
@@ -274,825 +130,208 @@ export async function getPublicSchedule(scheduleId: string) {
         .single();
 
     if (error) {
-        if (error.code === 'PGRST116') {
-            const notFoundError = new Error('Schedule not found') as ScheduleValidationError;
-            notFoundError.code = 'SCHEDULE_NOT_FOUND';
-            throw notFoundError;
-        }
-        throw new Error(`Failed to fetch form details: ${error.message}`);
+        if (error.code === 'PGRST116') throw new Error('NOT_FOUND');
+        throw new Error(`Failed to fetch public schedule: ${error.message}`);
     }
-
     return data;
 }
 
-// Update schedule
-export async function updateSchedule(scheduleId: string, updates: UpdateScheduleInput) {
-    const { data: { user } } = await supabase.auth.getUser();
-
-    if (!user) {
-        const error = new Error('User not authenticated') as ScheduleValidationError;
-        error.code = 'UNAUTHORIZED';
-        throw error;
-    }
-
-    // Get current scheudle to validate status transitions
-    const currentSchedule = await getSchedule(scheduleId);
-
-    // Validate status transitions
-    if (updates.status) {
-        const isValidTransition = validateStatusTransition(currentSchedule.status, updates.status);
-        if (!isValidTransition) {
-            const error = new Error(`Invalid status transition from ${currentSchedule.status} to ${updates.status}`) as ScheduleValidationError;
-            error.code = 'INVALID_STATUS_TRANSITION';
-            throw error;
-        }
-    }
-
-    // Validate date range if dates updated
-    const startDate = updates.start_date || currentSchedule.start_date;
-    const endDate = updates.end_date || currentSchedule.end_date;
-
-    if (new Date(startDate) >= new Date(endDate)) {
-        const error = new Error('End date must be after start date') as ScheduleValidationError;
-        error.code = 'INVALID_DATE_RANGE';
-        throw error;
-    }
-
-    const updatePayload: any = {};
-
-    if (updates.label !== undefined) {
-        updatePayload.label = updates.label.trim();
-    }
-    if (updates.start_date !== undefined) {
-        updatePayload.start_date = updates.start_date;
-    }
-    if (updates.end_date !== undefined) {
-        updatePayload.end_date = updates.end_date;
-    }
-    if (updates.status !== undefined) {
-        updatePayload.status = updates.status;
-    }
-    if (updates.send_confirmation_email !== undefined) {
-        updatePayload.send_confirmation_email = updates.send_confirmation_email;
-    }
-    if (updates.working_hours_start !== undefined) {
-        updatePayload.working_hours_start = updates.working_hours_start;
-    }
-    if (updates.working_hours_end !== undefined) {
-        updatePayload.working_hours_end = updates.working_hours_end;
-    }
+export async function getSchedules(): Promise<Schedule[]> {
+    const userId = await getAuthenticatedUserId();
 
     const { data, error } = await supabase
         .from('schedules')
-        .update(updatePayload)
+        .select('*')
+        .eq('user_id', userId)
+        .neq('status', 'trashed')
+        .order('created_at', { ascending: false });
+
+    if (error) throw new Error(`Failed to fetch schedules: ${error.message}`);
+    return data || [];
+}
+
+export async function getAllSchedules(): Promise<Schedule[]> {
+    const userId = await getAuthenticatedUserId();
+
+    const { data, error } = await supabase
+        .from('schedules')
+        .select('*')
+        .eq('user_id', userId)
+        .order('created_at', { ascending: false });
+
+    if (error) throw new Error(`Failed to fetch all schedules: ${error.message}`);
+    return data || [];
+}
+
+export async function getTrashedSchedules(): Promise<Schedule[]> {
+    const userId = await getAuthenticatedUserId();
+
+    const { data, error } = await supabase
+        .from('schedules')
+        .select('*')
+        .eq('user_id', userId)
+        .eq('status', 'trashed')
+        .order('deleted_at', { ascending: false });
+
+    if (error) throw new Error(`Failed to fetch trashed schedules: ${error.message}`);
+    return data || [];
+}
+
+export async function updateSchedule(
+    scheduleId: string,
+    updates: UpdateScheduleInput
+): Promise<Schedule> {
+    const userId = await getAuthenticatedUserId();
+
+    const payload: Record<string, unknown> = {};
+    if (updates.label !== undefined)                     payload.label = updates.label.trim();
+    if (updates.start_date !== undefined)                payload.start_date = updates.start_date;
+    if (updates.end_date !== undefined)                  payload.end_date = updates.end_date;
+    if (updates.status !== undefined)                    payload.status = updates.status;
+    if (updates.send_confirmation_email !== undefined)   payload.send_confirmation_email = updates.send_confirmation_email;
+    if (updates.previous_status !== undefined)           payload.previous_status = updates.previous_status;
+    if (updates.working_hours_start !== undefined)       payload.working_hours_start = updates.working_hours_start;
+    if (updates.working_hours_end !== undefined)         payload.working_hours_end = updates.working_hours_end;
+    if (updates.cancellation_policy_hours !== undefined) payload.cancellation_policy_hours = updates.cancellation_policy_hours;
+
+    const { data, error } = await supabase
+        .from('schedules')
+        .update(payload)
         .eq('id', scheduleId)
-        .eq('user_id', user.id)
+        .eq('user_id', userId)
         .select()
         .single();
 
     if (error) {
-        if (error.code === 'PGRST116') {
-            const notFoundError = new Error('Schedule not found') as ScheduleValidationError;
-            notFoundError.code = 'SCHEDULE_NOT_FOUND';
-            throw notFoundError;
-        }
+        if (error.code === 'PGRST116') throw new Error('NOT_FOUND');
         throw new Error(`Failed to update schedule: ${error.message}`);
     }
-
     return data;
 }
 
-// Transition schedule to collecting status (when form link is generated)
-export async function activateSchedule(scheduleId: string) {
-    return updateSchedule(scheduleId, { status: 'collecting' });
-}
+// Soft delete — moves to trash, saves previous_status for restore
+export async function deleteSchedule(scheduleId: string): Promise<{ success: boolean }> {
+    const userId = await getAuthenticatedUserId();
 
-// Transition schedule to archived status (manual close or deadline hit)
-export async function archiveSchedule(scheduleId: string) {
-    return updateSchedule(scheduleId, { status: 'archived' });
-}
-
-// Soft delete -> move to trash
-export async function deleteSchedule(scheduleId: string) {
-    const { data: { user } } = await supabase.auth.getUser();
-
-    if (!user) {
-        const error = new Error('User not authenticated') as ScheduleValidationError;
-        error.code = 'UNAUTHORIZED';
-        throw error;
-    }
-
-    // First get current status of the schedule
-    const { data: existingSchedule, error: fetchError } = await supabase
+    const { data: existing, error: fetchErr } = await supabase
         .from('schedules')
-        .select('id, status, previous_status')
+        .select('id, status')
         .eq('id', scheduleId)
+        .eq('user_id', userId)
         .single();
 
-    if (fetchError || !existingSchedule) {
-        const notFoundError = new Error('Schedule not found') as ScheduleValidationError;
-        notFoundError.code = 'SCHEDULE_NOT_FOUND';
-        throw notFoundError;
-    }
+    if (fetchErr || !existing) throw new Error('NOT_FOUND');
 
-    // Update to trashed status (RLS will handle user check)
     const { error } = await supabase
         .from('schedules')
         .update({
             status: 'trashed',
             deleted_at: new Date().toISOString(),
-            previous_status: existingSchedule.status
+            previous_status: existing.status,
         })
-        .eq('id', scheduleId);
+        .eq('id', scheduleId)
+        .eq('user_id', userId);
 
-    if (error) {
-        throw new Error(`Failed to delete schedule: ${error.message}`);
-    }
-
+    if (error) throw new Error(`Failed to trash schedule: ${error.message}`);
     return { success: true };
 }
 
-// Restore from trash (restore to previous_status, or draft if not available)
-export async function restoreSchedule(scheduleId: string) {
-    const { data: { user } } = await supabase.auth.getUser();
-
-    if (!user) {
-        const error = new Error('User not authenticated') as ScheduleValidationError;
-        error.code = 'UNAUTHORIZED';
-        throw error;
-    }
-
-    // Get current schedule to get previous_status
-    const currentSchedule = await getSchedule(scheduleId);
-
-    // Check schedule limit before restoring
-    const { data: existingSchedules, error: countError } = await supabase
-        .from('schedules')
-        .select('id')
-        .eq('user_id', user.id)
-        .neq('status', 'trashed');
-
-    if (countError) {
-        throw new Error(`Failed to check schedule limit: ${countError.message}`);
-    }
-
-    if (existingSchedules && existingSchedules.length >= 3) {
-        const error = new Error('Maximum of 3 schedules allowed. Please archive or delete existing schedules before restoring.') as ScheduleValidationError;
-        error.code = 'SCHEDULE_LIMIT_EXCEEDED';
-        throw error;
-    }
-
-    // Restore to previous_status, or 'collecting' if not available (archived schedules restore to collecting)
-    const restoreStatus = currentSchedule.previous_status || 'collecting';
-
-    // Validate status transition (allow restoring archived schedules to previous_status)
-    if (currentSchedule.status === 'archived') {
-        // Allow restoring archived schedule to its previous status (or collecting if not available)
-        const { data: updateResult, error } = await supabase
-            .from('schedules')
-            .update({
-                status: restoreStatus,
-                deleted_at: null,
-                previous_status: null
-            })
-            .eq('id', scheduleId)
-            .eq('user_id', user.id)
-            .select()
-            .single();
-
-        if (error) {
-            throw new Error(`Failed to restore schedule: ${error.message}`);
-        }
-        return updateResult;
-    }
-
-    // For non-archived schedules being restored from trash, use updateSchedule with validation
-    const { data, error } = await supabase
-        .from('schedules')
-        .update({
-            status: restoreStatus,
-            deleted_at: null,
-            previous_status: null
-        })
-        .eq('id', scheduleId)
-        .eq('user_id', user.id)
-        .select()
-        .single();
-
-    if (error) {
-        if (error.code === 'PGRST116') {
-            const notFoundError = new Error('Schedule not found') as ScheduleValidationError;
-            notFoundError.code = 'SCHEDULE_NOT_FOUND';
-            throw notFoundError;
-        }
-        throw new Error(`Failed to restore schedule: ${error.message}`);
-    }
-
-    return data;
-}
-
-// Get trashed schedules
-export async function getTrashedSchedules() {
-    const { data: { user } } = await supabase.auth.getUser();
-
-    if (!user) {
-        const error = new Error('User not authenticated') as ScheduleValidationError;
-        error.code = 'UNAUTHORIZED';
-        throw error;
-    }
-
-    const { data, error } = await supabase
-        .from('schedules')
-        .select('*')
-        .eq('user_id', user.id)
-        .eq('status', 'trashed')
-        .order('deleted_at', { ascending: false });
-
-    if (error) {
-        throw new Error(`Failed to fetch trashed schedules: ${error.message}`);
-    }
-
-    return data || [];
-}
-
-// Get all schedules including trashed (for "All" filter)
-export async function getAllSchedules() {
-    const { data: { user } } = await supabase.auth.getUser();
-
-    if (!user) {
-        const error = new Error('User not authenticated') as ScheduleValidationError;
-        error.code = 'UNAUTHORIZED';
-        throw error;
-    }
-
-    const { data, error } = await supabase
-        .from('schedules')
-        .select('*')
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false });
-
-    if (error) {
-        throw new Error(`Failed to fetch schedules: ${error.message}`);
-    }
-
-    return data || [];
-}
-
-// Permanent delete a single schedule (hard delete from database)
-export async function permanentDeleteSchedule(scheduleId: string) {
-    const { data: { user } } = await supabase.auth.getUser();
-
-    if (!user) {
-        const error = new Error('User not authenticated') as ScheduleValidationError;
-        error.code = 'UNAUTHORIZED';
-        throw error;
-    }
+export async function permanentDeleteSchedule(
+    scheduleId: string
+): Promise<{ success: boolean }> {
+    const userId = await getAuthenticatedUserId();
 
     const { error } = await supabase
         .from('schedules')
         .delete()
         .eq('id', scheduleId)
-        .eq('user_id', user.id);
+        .eq('user_id', userId);
 
-    if (error) {
-        throw new Error(`Failed to permanently delete schedule: ${error.message}`);
-    }
-
+    if (error) throw new Error(`Failed to permanently delete schedule: ${error.message}`);
     return { success: true };
 }
 
-// Permanently delete all trashed schedules
-export async function permanentDeleteAllTrashed() {
-    const { data: { user } } = await supabase.auth.getUser();
-
-    if (!user) {
-        const error = new Error('User not authenticated') as ScheduleValidationError;
-        error.code = 'UNAUTHORIZED';
-        throw error;
-    }
+export async function permanentDeleteAllTrashed(): Promise<{
+    success: boolean;
+    count: number;
+}> {
+    const userId = await getAuthenticatedUserId();
 
     const { data, error } = await supabase
         .from('schedules')
         .delete()
-        .eq('user_id', user.id)
+        .eq('user_id', userId)
         .eq('status', 'trashed')
         .select('id');
 
-    if (error) {
-        throw new Error(`Failed to permanently delete trashed schedules: ${error.message}`);
-    }
-
-    return { success: true, count: data?.length || 0 };
+    if (error) throw new Error(`Failed to empty trash: ${error.message}`);
+    return { success: true, count: data?.length ?? 0 };
 }
 
-// Helper function to validate status transitions
-function validateStatusTransition(currentStatus: string, newStatus: string): boolean {
-    // Same status transition is always valid (allows editing same schedule)
-    if (currentStatus === newStatus) return true;
+export async function updateFormConfig(
+    scheduleId: string,
+    config: FormConfigInput
+): Promise<Schedule> {
+    const userId = await getAuthenticatedUserId();
 
-    const validTransitions: Record<string, string[]> = {
-        draft: ['collecting', 'trashed'],
-        collecting: ['archived', 'trashed'],
-        archived: ['collecting', 'trashed'], // Can restore to collecting or trash
-        trashed: ['draft', 'collecting', 'archived'] // Can restore to any status
-    };
+    const payload: Record<string, unknown> = { status: 'collecting' };
+    if (config.max_choices !== undefined)               payload.max_choices = config.max_choices;
+    if (config.form_instructions !== undefined)         payload.form_instructions = config.form_instructions;
+    if (config.form_deadline !== undefined)             payload.form_deadline = config.form_deadline;
+    if (config.working_hours_start !== undefined)       payload.working_hours_start = config.working_hours_start;
+    if (config.working_hours_end !== undefined)         payload.working_hours_end = config.working_hours_end;
+    if (config.cancellation_policy_hours !== undefined) payload.cancellation_policy_hours = config.cancellation_policy_hours;
 
-    return validTransitions[currentStatus]?.includes(newStatus) || false;
-}
-
-// Utility function to check for date overlaps (for UI warnings)
-export async function checkScheduleOverlaps(startDate: string, endDate: string, excludeScheduleId?: string) {
-    const { data: { user } } = await supabase.auth.getUser();
-
-    if (!user) {
-        return [];
-    }
-
-    let query = supabase
-        .from('schedules')
-        .select('id, label, start_date, end_date')
-        .eq('user_id', user.id)
-        .neq('status', 'trashed');
-
-    if (excludeScheduleId) {
-        query = query.neq('id', excludeScheduleId);
-    }
-
-    const { data: schedules } = await query;
-
-    if (!schedules) return [];
-
-    // Check for date range overlaps
-    const overlaps = schedules.filter(schedule => {
-        const scheduleStart = new Date(schedule.start_date);
-        const scheduleEnd = new Date(schedule.end_date);
-        const newStart = new Date(startDate);
-        const newEnd = new Date(endDate);
-
-        // Check if date ranges overlap
-        return newStart <= scheduleEnd && newEnd >= scheduleStart;
-    });
-
-    return overlaps;
-}
-
-// Configure form settings and activate schedule
-export async function updateFormConfig(scheduleId: string, config: FormConfigInput): Promise<Schedule> {
-    const { data: { user } } = await supabase.auth.getUser();
-
-    if (!user) {
-        const error = new Error('User not authenticated') as ScheduleValidationError;
-        error.code = 'UNAUTHORIZED';
-        throw error;
-    }
-
-    // Validate max_choices
-    if (config.max_choices !== undefined && (config.max_choices < 1 || config.max_choices > 3)) {
-        throw new Error('max_choices must be between 1 and 3');
-    }
-
-    // Build update payload
-    const updatePayload: any = {};
-    if (config.max_choices !== undefined) updatePayload.max_choices = config.max_choices;
-    if (config.form_instructions !== undefined) updatePayload.form_instructions = config.form_instructions;
-    if (config.form_deadline !== undefined) updatePayload.form_deadline = config.form_deadline;
-    if (config.working_hours_start !== undefined) updatePayload.working_hours_start = config.working_hours_start;
-    if (config.working_hours_end !== undefined) updatePayload.working_hours_end = config.working_hours_end;
-
-    // Update schedule configuration and set status to 'collecting'
     const { data, error } = await supabase
         .from('schedules')
-        .update({
-            ...updatePayload,
-            status: 'collecting'
-        })
+        .update(payload)
         .eq('id', scheduleId)
-        .eq('user_id', user.id)
+        .eq('user_id', userId)
         .select()
         .single();
 
     if (error) {
-        if (error.code === 'PGRST116') {
-            const notFoundError = new Error('Schedule not found') as ScheduleValidationError;
-            notFoundError.code = 'SCHEDULE_NOT_FOUND';
-            throw notFoundError;
-        }
-        throw new Error(`Failed to configure form: ${error.message}`);
+        if (error.code === 'PGRST116') throw new Error('NOT_FOUND');
+        throw new Error(`Failed to update form config: ${error.message}`);
     }
-
     return data;
 }
 
-// ============================================
-// AI Assistant Wrapper Functions
-// These wrap the core functions for Aria to use
-// ============================================
+export async function checkScheduleOverlaps(
+    startDate: string,
+    endDate: string,
+    excludeScheduleId?: string
+): Promise<Schedule[]> {
+    const userId = await getAuthenticatedUserId();
 
-// Alias for deleteSchedule - moves schedule to trash
-export async function trashSchedule(scheduleId: string) {
-    return deleteSchedule(scheduleId);
-}
-
-// Alias for restoreSchedule - restores from trash to previous status
-export async function recoverSchedule(scheduleId: string) {
-    return restoreSchedule(scheduleId);
-}
-
-// Permanently delete all trashed schedules (use with confirmation)
-export async function emptyTrash() {
-    return permanentDeleteAllTrashed();
-}
-
-// ============================================
-// Event Wrapper Functions for AI Assistant
-// ============================================
-
-// Add an event to a schedule
-export async function addEventToSchedule(args: {
-    schedule_id: string;
-    student_name: string;
-    day: string;         // 'Monday', 'Tuesday', etc.
-    hour: number;        // 0-23 (e.g., 15 for 3pm)
-    start_time?: string; // HH:MM format (optional, defaults to hour:00)
-    end_time?: string;   // HH:MM format (optional, defaults to hour+1:00)
-    recurrence_rule?: string; // e.g., 'FREQ=WEEKLY;BYDAY=MO' for weekly
-}) {
-    // Resolve schedule_id: allow passing a label; fetch actual UUID if needed
-    let resolvedScheduleId = args.schedule_id;
-    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-    if (!uuidRegex.test(resolvedScheduleId)) {
-        // Load all schedules to resolve exact match or report ambiguity
-        const all = await getSchedules();
-        const exactMatches = all.filter(s => s.label.toLowerCase() === String(args.schedule_id).toLowerCase());
-        if (exactMatches.length === 1) {
-            resolvedScheduleId = exactMatches[0].id;
-        } else if (exactMatches.length > 1) {
-            throw new Error(`Multiple schedules match '${args.schedule_id}'. Available: ${all.map(s => s.label).join(', ')}`);
-        } else {
-            throw new Error(`Schedule not found: ${args.schedule_id}. Available: ${all.map(s => s.label).join(', ')}`);
-        }
-        // resolvedScheduleId now is a UUID
-    }
-    // Get the schedule to find its start date
-    const schedule = await getSchedule(resolvedScheduleId);
-
-    // Sanitize Day: Handle "Fridays" -> "Friday" and capitalization
-    let dayClean = args.day.trim();
-    if (dayClean.toLowerCase().endsWith('s')) {
-        dayClean = dayClean.slice(0, -1);
-    }
-    // Capitalize first letter
-    dayClean = dayClean.charAt(0).toUpperCase() + dayClean.slice(1).toLowerCase();
-
-    // Calculate the first occurrence of the requested day within the schedule's date range
-    const firstDate = findFirstDayOccurrence(schedule.start_date, dayClean);
-
-    // Sanitize Hour/Time
-    let start = args.start_time;
-    let end = args.end_time;
-
-    // If start_time/end_time not provided or invalid format, fall back to hour
-    const timeRegex = /^\d{1,2}:\d{2}$/;
-    if (!start || !timeRegex.test(start)) {
-        // Ensure hour is a valid integer 0-23
-        const hourInt = parseInt(String(args.hour), 10);
-        if (isNaN(hourInt) || hourInt < 0 || hourInt > 23) {
-            throw new Error(`Invalid time provided. Hour must be 0-23, got: ${args.hour}`);
-        }
-        start = `${hourInt.toString().padStart(2, '0')}:00`;
-        end = `${(hourInt + 1).toString().padStart(2, '0')}:00`;
-    }
-
-    // Safely Construct Dates
-    // We use the computed firstDate (YYYY-MM-DD from findFirstDayOccurrence)
-    // and append the time strings.
-    const startDate = new Date(`${firstDate}T${start}:00`);
-    const endDate = new Date(`${firstDate}T${end}:00`); // args.end_time or hour+1
-
-    if (isNaN(startDate.getTime())) {
-        throw new Error(`Failed to construct valid start date from day "${dayClean}" and time "${start}"`);
-    }
-    if (isNaN(endDate.getTime())) {
-        throw new Error(`Failed to construct valid end date from day "${dayClean}" and time "${end}"`);
-    }
-
-    // Use toISOString() which converts local time to UTC - this is correct
-    // because when the SchedulePage reads it back, new Date() will convert UTC back to local
-    const start_time = startDate.toISOString();
-    const end_time = endDate.toISOString();
-
-    // Default recurrence: NONE (One-time event) unless specified
-    // Only set default if user explicitly requests "Weekly" but provides no rule (which is rare, usually handled by LLM)
-    // We defer to the LLM to pass the correct recurrence_rule based on user input (e.g. "Fridays" vs "Friday")
-    const defaultRecurrence = '';
-
-    return createScheduleEntry({
-        schedule_id: resolvedScheduleId,
-        student_name: args.student_name,
-        start_time,
-        end_time,
-        recurrence_rule: args.recurrence_rule ?? defaultRecurrence
-    });
-}
-
-// (removed duplicate function)
-
-export async function updateEventInSchedule(args: {
-    event_id: string;
-    student_name?: string;
-    day?: string;
-    hour?: number;
-    start_time?: string;
-    end_time?: string;
-    recurrence_rule?: string;
-}) {
-    const updates: { student_name?: string; start_time?: string; end_time?: string; recurrence_rule?: string } = {};
-
-    if (args.student_name !== undefined) updates.student_name = args.student_name;
-
-    // CRITICAL: If user explicitly provides recurrence_rule, use it and don't auto-calculate
-    const hasExplicitRecurrence = args.recurrence_rule !== undefined;
-    if (hasExplicitRecurrence) {
-        updates.recurrence_rule = args.recurrence_rule;
-    }
-
-    if (args.day !== undefined && args.hour !== undefined) {
-        // Get the original event to find the schedule and calculate new date
-        const originalEntry = await getScheduleEntryById(args.event_id);
-        const schedule = await getSchedule(originalEntry.schedule_id);
-
-        // Calculate the first occurrence of the new day within the schedule's date range
-        const firstDate = findFirstDayOccurrence(schedule.start_date, args.day);
-
-        const start = args.start_time || `${args.hour.toString().padStart(2, '0')}:00`;
-        const end = args.end_time || `${(args.hour + 1).toString().padStart(2, '0')}:00`;
-
-        updates.start_time = `${firstDate}T${start}:00`;
-        updates.end_time = `${firstDate}T${end}:00`;
-
-        // Only auto-update recurrence rule if user didn't explicitly provide one
-        if (!hasExplicitRecurrence) {
-            updates.recurrence_rule = updateRecurrenceDay(originalEntry.recurrence_rule, updates.start_time);
-        }
-    } else if (args.start_time !== undefined) {
-        updates.start_time = args.start_time;
-    } else if (args.end_time !== undefined) {
-        updates.end_time = args.end_time;
-    }
-
-    return updateScheduleEntry(args.event_id, updates);
-}
-
-// Atomic-like swap of two events
-// Uses a 3-step process to avoid collision constraints: A -> Temp, B -> A, Temp -> B
-export async function swapEvents(event1_id: string, event2_id: string) {
-    // 1. Get both events
-    const entry1 = await getScheduleEntryById(event1_id);
-    const entry2 = await getScheduleEntryById(event2_id);
-
-    // Store original times
-    const time1 = { start: entry1.start_time, end: entry1.end_time };
-    const time2 = { start: entry2.start_time, end: entry2.end_time };
-
-    // 2. Move Event 1 to a temporary safe holding spot (e.g., 100 years in the future to keep day of week)
-    // We add 5200 weeks (~100 years) to maintain the same day-of-week logic if needed, 
-    // though for single events just shifting the year is enough.
-    // Let's just use a very far future date.
-    const tempStart = new Date(time1.start);
-    tempStart.setFullYear(tempStart.getFullYear() + 100);
-    const tempEnd = new Date(time1.end);
-    tempEnd.setFullYear(tempEnd.getFullYear() + 100);
-
-    await updateScheduleEntry(event1_id, {
-        start_time: tempStart.toISOString(),
-        end_time: tempEnd.toISOString()
-    });
-
-    // 3. Move Event 2 to Event 1's ORIGINAL time AND update its recurrence rule
-    const newRule2 = updateRecurrenceDay(entry2.recurrence_rule, time1.start);
-    await updateScheduleEntry(event2_id, {
-        start_time: time1.start,
-        end_time: time1.end,
-        recurrence_rule: newRule2
-    });
-
-    // 4. Move Event 1 (from temp) to Event 2's ORIGINAL time AND update its recurrence rule
-    const newRule1 = updateRecurrenceDay(entry1.recurrence_rule, time2.start);
-    const updatedEntry1 = await updateScheduleEntry(event1_id, {
-        start_time: time2.start,
-        end_time: time2.end,
-        recurrence_rule: newRule1
-    });
-
-    // Re-fetch Entry 2 to return updated state
-    const updatedEntry2 = await getScheduleEntryById(event2_id);
-
-    return [updatedEntry1, updatedEntry2];
-}
-
-// Helper to get a single schedule entry by ID
-async function getScheduleEntryById(entryId: string) {
-    const { data, error } = await supabase
-        .from('schedule_entries')
-        .select('*')
-        .eq('id', entryId)
-        .single();
-
-    if (error || !data) {
-        throw new Error('Event not found');
-    }
-
-    return data;
-}
-
-// Delete an event from a schedule
-export async function deleteEventFromSchedule(args: { event_id: string }) {
-    return deleteScheduleEntry(args.event_id);
-}
-
-// Get event summary grouped by day (for AI context)
-// Returns event IDs so AI can update/delete events
-export async function getEventSummaryInSchedule(scheduleId: string) {
-    const entries = await getScheduleEntries(scheduleId);
-    const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-    const summary: Record<string, Array<{ id: string; name: string; time: string; rule: string }>> = {};
-
-    days.forEach(day => summary[day] = []);
-
-    entries.forEach(entry => {
-        // IMPORTANT: Use the SAME logic as SchedulePage.tsx to determine the day
-        // Prefer the recurrence rule's BYDAY, fallback to the local start_time day
-        const rule = parseRecurrenceRule(entry.recurrence_rule);
-        const date = new Date(entry.start_time);
-
-        // Use == null for 0-index safety (Sunday)
-        const dayIndex = rule?.dayIndex != null ? rule.dayIndex : date.getDay();
-        const dayName = days[dayIndex];
-
-        // Format time in local timezone (HH:MM format)
-        const hours = date.getHours().toString().padStart(2, '0');
-        const minutes = date.getMinutes().toString().padStart(2, '0');
-        const time = `${hours}:${minutes}`;
-
-        summary[dayName].push({
-            id: entry.id,
-            name: entry.student_name,
-            time: time,
-            rule: entry.recurrence_rule // Include rule so AI can see 'BYDAY' etc.
-        });
-    });
-
-    return summary;
-}
-
-// ============================================
-// Participant Wrapper Functions for AI Assistant
-// ============================================
-
-// List unassigned participants in a schedule
-export async function listUnassignedParticipants(scheduleId: string) {
-    const responses = await getFormResponses(scheduleId);
-    return responses.filter(r => !r.assigned);
-}
-
-// Get participant preferences
-export async function getParticipantPreferences(participantId: string) {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) {
-        throw new Error('User not authenticated');
-    }
-
-    const { data, error } = await supabase
-        .from('form_responses')
-        .select('*')
-        .eq('id', participantId)
-        .eq('user_id', user.id)
-        .single();
-
-    if (error) {
-        throw new Error(`Failed to fetch participant: ${error.message}`);
-    }
-
-    if (!data) {
-        throw new Error('Participant not found');
-    }
-
-    // Return formatted preferences
-    return {
-        id: data.id,
-        student_name: data.student_name,
-        email: data.email,
-        preferences: getPreferredTimings(data),
-        assigned: data.assigned
-    };
-}
-
-// Mark a participant as assigned
-export async function markParticipantAssigned(participantId: string, assigned: boolean = true) {
-    return updateFormResponseAssigned(participantId, assigned);
-}
-// Auto-schedule all unassigned participants
-// If commit=false, returns the proposed assignments without saving to DB (for preview UI)
-export async function autoScheduleParticipants(scheduleId: string, commit: boolean = true) {
-    const { data: { user } } = await supabase.auth.getUser();
-
-    if (!user) {
-        throw new Error('User not authenticated');
-    }
-
-    // 1. Fetch Schedule Config (Working Hours)
-    const { data: schedule, error: startError } = await supabase
+    let query = supabase
         .from('schedules')
-        .select('*')
-        .eq('id', scheduleId)
-        .eq('user_id', user.id)
-        .single();
+        .select('id, label, start_date, end_date')
+        .eq('user_id', userId)
+        .neq('status', 'trashed');
 
-    if (startError) throw new Error(`Schedule not found: ${startError.message}`);
+    if (excludeScheduleId) query = query.neq('id', excludeScheduleId);
 
-    // 2. Fetch Unassigned Participants
-    const unassigned = await listUnassignedParticipants(scheduleId);
-    if (unassigned.length === 0) {
-        return { message: 'No unassigned participants found.' };
-    }
+    const { data: schedules } = await query;
+    if (!schedules) return [];
 
-    // 3. Fetch Existing Entries (to prevent conflicts)
-    const existingEntries = await getScheduleEntries(scheduleId);
+    const newStart = new Date(startDate);
+    const newEnd = new Date(endDate);
 
-    // 4. Run Scheduling Algorithm
-    // Calculate total weeks based on schedule duration
-    const startDate = new Date(schedule.start_date);
-    const endDate = new Date(schedule.end_date);
-    const totalWeeks = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24 * 7));
+    return schedules.filter(s => {
+        const sStart = new Date(s.start_date);
+        const sEnd = new Date(s.end_date);
+        return newStart <= sEnd && newEnd >= sStart;
+    }) as Schedule[];
+}
 
-    const result = scheduleParticipants(
-        unassigned,
-        existingEntries,
-        startDate,
-        totalWeeks,
-        schedule.working_hours_start,
-        schedule.working_hours_end
+// Resolves a schedule UUID from a label string.
+// Returns null if not found or ambiguous.
+export async function resolveScheduleIdByLabel(label: string): Promise<string | null> {
+    const schedules = await getSchedules();
+    const matches = schedules.filter(
+        s => s.label.toLowerCase() === label.toLowerCase()
     );
-
-    // 5. Commit Assignments to Database (if commit=true)
-    const newEntries: any[] = [];
-    const assignedIds: string[] = [];
-
-    // Always generate the proposed entries for preview
-    result.assignments.forEach(assignment => {
-        if (!assignment.isScheduled) return null;
-
-        // Create entry for week 0 (first occurrence)
-        // Use createEntryFromAssignment utility from scheduling.ts
-        const entryData = createEntryFromAssignment(assignment, startDate, 0);
-
-        // Adjust recurrence rule if needed (e.g. weekly)
-        // The utility returns empty recurrence for single instances
-        // We need to apply the frequency from the assignment
-        let finalRule = '';
-        const dayAbbrev = ['SU', 'MO', 'TU', 'WE', 'TH', 'FR', 'SA'][dayToIndex(assignment.timing.day)];
-
-        if (assignment.timing.frequency === 'weekly') {
-            finalRule = `FREQ=WEEKLY;BYDAY=${dayAbbrev}`;
-        } else if (assignment.timing.frequency === '2weekly') {
-            finalRule = `FREQ=WEEKLY;INTERVAL=2;BYDAY=${dayAbbrev}`;
-        } else if (assignment.timing.frequency === 'monthly') {
-            finalRule = `FREQ=WEEKLY;INTERVAL=4;BYDAY=${dayAbbrev}`;
-        }
-
-        const entry = {
-            schedule_id: scheduleId,
-            student_name: assignment.participant.student_name,
-            start_time: entryData.start_time,
-            end_time: entryData.end_time,
-            recurrence_rule: finalRule
-        };
-
-        newEntries.push(entry);
-        assignedIds.push(assignment.participant.id);
-    });
-
-    if (commit && newEntries.length > 0) {
-        const { error: insertError } = await supabase
-            .from('schedule_entries')
-            .insert(newEntries);
-
-        if (insertError) throw new Error(`Failed to create entries: ${insertError.message}`);
-
-        // Mark participants as assigned
-        for (const pid of assignedIds) {
-            await markParticipantAssigned(pid, true);
-        }
-    }
-
-    return {
-        message: commit
-            ? `Successfully scheduled ${result.totalScheduled} participants.`
-            : `Preview generated for ${result.totalScheduled} participants.`,
-        scheduledCount: result.totalScheduled,
-        unassignedCount: result.totalUnassigned,
-        details: result,
-        proposedEntries: newEntries, // Return formatted entries for UI preview
-        previewHelper: !commit // Flag to tell UI this is a preview
-    };
+    if (matches.length === 1) return matches[0].id;
+    return null;
 }
