@@ -8,6 +8,7 @@ import ariaProfile from '../assets/images/aria-profile.png';
 
 const CHAT_STORAGE_KEY = 'aria_chat_messages';
 const MAX_MESSAGES = 100;
+const DEBUG = import.meta.env.DEV;
 
 interface PlanData {
   planId: string;
@@ -464,7 +465,7 @@ export default function FloatingChat({ onScheduleChange, onShowAutoSchedule }: F
       };
 
       if (currentScheduleId) {
-        console.log('[FloatingChat Debug] Current schedule context:', currentScheduleId);
+        if (DEBUG) console.log('[FloatingChat Debug] Current schedule context:', currentScheduleId);
       }
 
       // ─── Conversation history ───────────────────────────────────────────────
@@ -493,7 +494,7 @@ export default function FloatingChat({ onScheduleChange, onShowAutoSchedule }: F
 
       while (iterations < MAX_ITERATIONS) {
         iterations++;
-        console.log(`[FloatingChat Debug] Agentic loop iteration ${iterations}, last fn: ${lastFunctionCalled ?? 'none'}`);
+        if (DEBUG) console.log(`[FloatingChat Debug] Agentic loop iteration ${iterations}, last fn: ${lastFunctionCalled ?? 'none'}`);
 
         // ── Tier 2: Dynamic tool block ────────────────────────────────────────
         // Rebuilt every iteration based on what Aria just called.
@@ -516,7 +517,7 @@ export default function FloatingChat({ onScheduleChange, onShowAutoSchedule }: F
         }
 
         const response = await sendChatMessage(messagesForThisCall, systemPrompt);
-        console.log('[FloatingChat Debug] Got response:', response);
+        if (DEBUG) console.log('[FloatingChat Debug] Got response:', response);
 
         // Store raw content in history so Aria remembers her own function calls
         conversationHistory = [
@@ -560,13 +561,13 @@ export default function FloatingChat({ onScheduleChange, onShowAutoSchedule }: F
 
         // No function call → Aria is done
         if (!response.functionCall) {
-          console.log('[FloatingChat Debug] No function call — loop complete');
+          if (DEBUG) console.log('[FloatingChat Debug] No function call — loop complete');
           break;
         }
 
         // ── Execute function ──────────────────────────────────────────────────
         const { name, arguments: args } = response.functionCall;
-        console.log(`[FloatingChat Debug] Executing: ${name}`, args);
+        if (DEBUG) console.log(`[FloatingChat Debug] Executing: ${name}`, args);
 
         const result = await executeFunction(name, args);
         const { displayContent, llmContent, scheduleModified } = formatFunctionResult(name, result);
@@ -578,7 +579,7 @@ export default function FloatingChat({ onScheduleChange, onShowAutoSchedule }: F
 
         // ── Auto-schedule preview: hand off to modal, stop loop ───────────────
         if (name === 'autoScheduleParticipants' && result.success && (result.data as any)?.previewMode) {
-          console.log('[FloatingChat] Triggering Auto-Schedule Preview UI');
+          if (DEBUG) console.log('[FloatingChat] Triggering Auto-Schedule Preview UI');
           if (onShowAutoSchedule) onShowAutoSchedule();
           break;
         }
@@ -610,7 +611,7 @@ export default function FloatingChat({ onScheduleChange, onShowAutoSchedule }: F
           });
 
           if (isPlanPreview) {
-            console.log('[FloatingChat Debug] Plan preview shown — waiting for user');
+            if (DEBUG) console.log('[FloatingChat Debug] Plan preview shown — waiting for user');
             break;
           }
         }
@@ -642,13 +643,13 @@ export default function FloatingChat({ onScheduleChange, onShowAutoSchedule }: F
 
         // Hard stop on failure — don't keep trying blindly
         if (!result.success) {
-          console.log('[FloatingChat Debug] Function failed — stopping loop');
+          if (DEBUG) console.log('[FloatingChat Debug] Function failed — stopping loop');
           break;
         }
       }
 
       if (iterations >= MAX_ITERATIONS) {
-        console.warn('[FloatingChat Debug] Max iterations reached');
+        if (DEBUG) console.warn('[FloatingChat Debug] Max iterations reached');
       }
 
       // Trigger schedule refresh if any modifications were made

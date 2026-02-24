@@ -1,12 +1,17 @@
 // src/lib/openrouter.ts
-// OpenRouter API client for ARIA AI integration
+// OpenRouter API client for ARIA AI integration.
+// All OpenRouter requests are proxied through a Supabase Edge Function
+// so the API key is never exposed in the browser bundle.
 
-const OPENROUTER_API_URL = 'https://openrouter.ai/api/v1/chat/completions';
+import { supabase } from './supabase';
+
+const OPENROUTER_PROXY_FUNCTION = 'openrouter-chat';
 const MODELS = [
   'google/gemini-2.5-flash-lite',
   'z-ai/glm-4.7-flash',
   'google/gemma-3-27b-it',
 ];
+const DEBUG = import.meta.env.DEV;
 
 export interface Message {
   role: 'user' | 'assistant' | 'system';
@@ -22,6 +27,11 @@ export interface ChatResponse {
   message: string;
   rawContent?: string; // Original unstripped message for history
   functionCall?: FunctionCall;
+}
+
+interface ParsedFunctionCall {
+  name: string;
+  arguments?: Record<string, unknown>;
 }
 
 interface OpenRouterMessage {
@@ -46,6 +56,40 @@ interface OpenRouterResponse {
   }>;
 }
 
+interface OpenRouterProxyResponse {
+  ok: boolean;
+  status: number;
+  statusText: string;
+  data?: OpenRouterResponse;
+  errorData?: unknown;
+}
+
+function debugLog(...args: unknown[]) {
+  if (DEBUG) console.log(...args);
+}
+
+function debugWarn(...args: unknown[]) {
+  if (DEBUG) console.warn(...args);
+}
+
+async function callOpenRouterProxy(
+  requestBody: OpenRouterRequest
+): Promise<OpenRouterProxyResponse> {
+  const { data, error } = await supabase.functions.invoke(OPENROUTER_PROXY_FUNCTION, {
+    body: requestBody,
+  });
+
+  if (error) {
+    throw new Error(`OpenRouter proxy invoke failed: ${error.message}`);
+  }
+
+  if (!data || typeof data !== 'object') {
+    throw new Error('OpenRouter proxy returned an invalid payload');
+  }
+
+  return data as OpenRouterProxyResponse;
+}
+
 /**
  * Send a chat message to the configured AI model via OpenRouter
  */
@@ -53,18 +97,12 @@ export async function sendChatMessage(
   messages: Message[],
   systemPrompt?: string
 ): Promise<ChatResponse> {
-  const apiKey = import.meta.env.VITE_OPENROUTER_API_KEY;
-
-  if (!apiKey) {
-    throw new Error('OpenRouter API key not configured');
-  }
-
   // Build messages array with optional system prompt
   const openRouterMessages: OpenRouterMessage[] = systemPrompt
     ? [{ role: 'system', content: systemPrompt }, ...messages]
     : messages;
 
-  let lastError: any = null;
+  let lastError: Error | null = null;
 
   for (const model of MODELS) {
     const requestBody: OpenRouterRequest = {
@@ -77,47 +115,37 @@ export async function sendChatMessage(
     };
 
     try {
-      console.log(`[Aria Debug] Attempting request using model: ${model}`);
-      console.log('[Aria Debug] Messages:', JSON.stringify(openRouterMessages.slice(-3), null, 2));
+      debugLog(`[Aria Debug] Attempting request using model: ${model}`);
+      debugLog('[Aria Debug] Messages:', JSON.stringify(openRouterMessages.slice(-3), null, 2));
 
-      const response = await fetch(OPENROUTER_API_URL, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${apiKey}`,
-          'HTTP-Referer': window.location.origin,
-          'X-Title': 'Aria - Scheduling Assistant',
-        },
-        body: JSON.stringify(requestBody),
-      });
+      const proxyResponse = await callOpenRouterProxy(requestBody);
 
-      console.log(`[Aria Debug] ${model} Response status:`, response.status, response.statusText);
+      debugLog(`[Aria Debug] ${model} Response status:`, proxyResponse.status, proxyResponse.statusText);
 
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        console.warn(`[Aria Debug] ${model} Failed:`, errorData);
+      if (!proxyResponse.ok) {
+        debugWarn(`[Aria Debug] ${model} Failed:`, proxyResponse.errorData);
 
         // If it's a rate limit (429) or server error (500+), try the next model
-        if (response.status === 429 || response.status >= 500) {
-          lastError = new Error(`Model ${model} failed (${response.status}). Trying fallback...`);
+        if (proxyResponse.status === 429 || proxyResponse.status >= 500) {
+          lastError = new Error(`Model ${model} failed (${proxyResponse.status}). Trying fallback...`);
           continue;
         }
 
         throw new Error(
-          `OpenRouter API error: ${response.status} ${response.statusText}. ${JSON.stringify(errorData)}`
+          `OpenRouter API error: ${proxyResponse.status} ${proxyResponse.statusText}. ${JSON.stringify(proxyResponse.errorData ?? {})}`
         );
       }
 
-      const data: OpenRouterResponse = await response.json();
-      console.log('[Aria Debug] Full API response:', JSON.stringify(data, null, 2));
+      const data = proxyResponse.data;
+      debugLog('[Aria Debug] Full API response:', JSON.stringify(data, null, 2));
 
-      if (!data.choices || data.choices.length === 0) {
+      if (!data || !data.choices || data.choices.length === 0) {
         console.error('[Aria Debug] No choices in response');
         throw new Error('No response from AI');
       }
 
       const assistantMessage = data.choices[0].message.content;
-      console.log('[Aria Debug] Raw assistant message:', assistantMessage);
+      debugLog('[Aria Debug] Raw assistant message:', assistantMessage);
 
       // Strip <think>...</think> and <thought>...</thought> reasoning tags
       let cleanedMessage = assistantMessage.replace(/<(thought|think)>[\s\S]*?<\/(thought|think)>/gi, '').trim();
@@ -136,12 +164,12 @@ export async function sendChatMessage(
       for (const trigger of stopTriggers) {
         const index = cleanedMessage.indexOf(trigger);
         if (index !== -1) {
-          console.log(`[Aria Debug] Detected stop trigger "${trigger}" at index ${index}. Truncating.`);
+          debugLog(`[Aria Debug] Detected stop trigger "${trigger}" at index ${index}. Truncating.`);
           cleanedMessage = cleanedMessage.substring(0, index).trim();
         }
       }
 
-      console.log('[Aria Debug] Final sanitized message:', cleanedMessage);
+      debugLog('[Aria Debug] Final sanitized message:', cleanedMessage);
 
       // Helper: Strip ALL function call syntax from message for display
       const stripFunctionCalls = (msg: string): string => {
@@ -194,25 +222,40 @@ export async function sendChatMessage(
 
           jsonString = endIndex !== -1 ? potentialJson.substring(0, endIndex) : potentialJson;
 
-          let functionCall: any;
+          let functionCall: ParsedFunctionCall;
 
           // --- 3-TIER JSON RECOVERY ---
           try {
             // Tier 1: Standard Parse
-            functionCall = JSON.parse(jsonString);
-          } catch (e) {
-            console.warn('[Aria Debug] Stage 1 JSON Parse failed. Trying Stage 2 (Heuristics)...');
+            const parsed = JSON.parse(jsonString) as Partial<ParsedFunctionCall>;
+            if (typeof parsed.name !== 'string') throw new Error('Parsed function call missing "name"');
+            functionCall = {
+              name: parsed.name,
+              arguments: parsed.arguments && typeof parsed.arguments === 'object'
+                ? parsed.arguments as Record<string, unknown>
+                : {},
+            };
+          } catch {
+            debugWarn('[Aria Debug] Stage 1 JSON Parse failed. Trying Stage 2 (Heuristics)...');
             const repaired = repairJsonHeuristics(jsonString);
             try {
               // Tier 2: Heuristic Repair
-              functionCall = JSON.parse(repaired);
-              console.log('[Aria Debug] Stage 2 Recovery Successful');
-            } catch (e2) {
-              console.warn('[Aria Debug] Stage 2 Heuristics failed. Trying Stage 3 (AI Repair)...');
+              const parsed = JSON.parse(repaired) as Partial<ParsedFunctionCall>;
+              if (typeof parsed.name !== 'string') throw new Error('Repaired function call missing "name"');
+              functionCall = {
+                name: parsed.name,
+                arguments: parsed.arguments && typeof parsed.arguments === 'object'
+                  ? parsed.arguments as Record<string, unknown>
+                  : {},
+              };
+              debugLog('[Aria Debug] Stage 2 Recovery Successful');
+            } catch {
+              debugWarn('[Aria Debug] Stage 2 Heuristics failed. Trying Stage 3 (AI Repair)...');
               // Tier 3: AI-Powered Recovery
-              functionCall = await fixJsonWithAI(jsonString);
-              if (!functionCall) throw new Error('AI Repair returned null');
-              console.log('[Aria Debug] Stage 3 Recovery Successful');
+              const repairedByAi = await fixJsonWithAI(jsonString);
+              if (!repairedByAi) throw new Error('AI Repair returned null');
+              functionCall = repairedByAi;
+              debugLog('[Aria Debug] Stage 3 Recovery Successful');
             }
           }
 
@@ -239,35 +282,46 @@ export async function sendChatMessage(
         // as that's what the prompt uses. 
 
         try {
-          const functionCall = JSON.parse(toolCallMatch[1]);
+          const parsed = JSON.parse(toolCallMatch[1]) as Partial<ParsedFunctionCall>;
+          if (typeof parsed.name !== 'string') {
+            throw new Error('tool_call payload missing "name"');
+          }
           return {
             message: textResponse || 'On it! One moment, please',
             rawContent: cleanedMessage, // Keep cleaned message for history
             functionCall: {
-              name: functionCall.name,
-              arguments: functionCall.arguments || {},
+              name: parsed.name,
+              arguments: parsed.arguments && typeof parsed.arguments === 'object'
+                ? parsed.arguments as Record<string, unknown>
+                : {},
             }
           }
-        } catch (e) {
+        } catch {
           // ignore
         }
       }
 
-      console.log('[Aria Debug] No function call detected, returning plain message');
+      debugLog('[Aria Debug] No function call detected, returning plain message');
       return {
         message: textResponse,
         rawContent: cleanedMessage, // Keep cleaned message for history
         functionCall: undefined,
       };
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error(`[Aria Debug] Error with ${model}:`, error);
-      lastError = error;
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      lastError = error instanceof Error ? error : new Error(errorMessage);
       // Continue to next model if it's a transient or fallback-eligible error
-      if (error.message?.includes('429') || error.message?.includes('500') || error.message?.includes('fetch')) {
+      if (
+        errorMessage.includes('429') ||
+        errorMessage.includes('500') ||
+        errorMessage.includes('fetch') ||
+        errorMessage.includes('proxy')
+      ) {
         continue;
       }
       // Otherwise re-throw
-      throw error;
+      throw lastError;
     }
   }
 
@@ -298,10 +352,7 @@ export function repairJsonHeuristics(input: string): string {
  * Stage 3: AI-Powered JSON Recovery
  * Uses an ultra-cheap model to fix complex syntax errors.
  */
-async function fixJsonWithAI(malformedJson: string): Promise<any> {
-  const apiKey = import.meta.env.VITE_OPENROUTER_API_KEY;
-  if (!apiKey) return null;
-
+async function fixJsonWithAI(malformedJson: string): Promise<ParsedFunctionCall | null> {
   const repairPrompt = `You are a specialized JSON repair utility. 
 The following snippet is a malformed JSON object representing a function call.
 Fix the syntax errors (missing braces, quotes, commas, etc.) and return ONLY the valid JSON object.
@@ -311,27 +362,26 @@ MALFORMED JSON:
 ${malformedJson}`;
 
   try {
-    const response = await fetch(OPENROUTER_API_URL, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify({
-        model: 'qwen/qwen3-4b:free',
-        messages: [{ role: 'user', content: repairPrompt }],
-        temperature: 0,
-      }),
+    const proxyResponse = await callOpenRouterProxy({
+      model: 'qwen/qwen3-4b:free',
+      messages: [{ role: 'user', content: repairPrompt }],
+      temperature: 0,
     });
 
-    if (!response.ok) return null;
-    const data = await response.json();
-    const content = data.choices[0]?.message?.content?.trim();
+    if (!proxyResponse.ok || !proxyResponse.data) return null;
+    const content = proxyResponse.data.choices[0]?.message?.content?.trim();
     if (!content) return null;
 
     // Strip backticks if the model ignores the "no markdown" rule
     const jsonOnly = content.replace(/```json\s*|```/g, '').trim();
-    return JSON.parse(jsonOnly);
+    const parsed = JSON.parse(jsonOnly) as Partial<ParsedFunctionCall>;
+    if (typeof parsed.name !== 'string') return null;
+    return {
+      name: parsed.name,
+      arguments: parsed.arguments && typeof parsed.arguments === 'object'
+        ? parsed.arguments as Record<string, unknown>
+        : {},
+    };
   } catch (e) {
     console.error('[Aria Debug] AI JSON Repair failed:', e);
     return null;

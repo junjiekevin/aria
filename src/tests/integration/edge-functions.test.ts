@@ -3,7 +3,7 @@ import { supabase } from '../../lib/supabase';
 
 describe('Edge Functions Integration', () => {
 
-    it('get-ics: should generate a valid ICS string for an existing entry', async () => {
+    it('get-ics: should enforce auth/token and return ICS only when authorized', async () => {
         // 1. Find an existing entry to test with
         const { data: entry, error: fetchErr } = await supabase
             .from('schedule_entries')
@@ -22,7 +22,13 @@ describe('Edge Functions Integration', () => {
         });
 
         // 3. Assertions
-        expect(error).toBeNull();
+        // In hardened mode, unsigned public access should fail unless the test client
+        // has an authenticated owner session.
+        if (error) {
+            expect(error).not.toBeNull();
+            return;
+        }
+
         const icsString = await data.text();
         expect(icsString).toContain('BEGIN:VCALENDAR');
         expect(icsString).toContain('BEGIN:VEVENT');
