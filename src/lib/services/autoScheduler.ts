@@ -6,7 +6,6 @@
 import { supabase } from '../supabase';
 import {
     getScheduleEntries as apiGetScheduleEntries,
-    createScheduleEntry as apiCreateScheduleEntry,
     type ScheduleEntry,
 } from '../api/schedule-entries';
 import {
@@ -17,7 +16,6 @@ import {
 import {
     scheduleParticipants,
     createEntryFromAssignment,
-    dayToIndex,
 } from '../scheduling';
 import {
     buildRecurrenceRule,
@@ -114,8 +112,6 @@ export async function autoScheduleParticipants(
     // Build proposed entries from algorithm output
     const proposedEntries: ProposedEntry[] = [];
     const assignedParticipantIds: string[] = [];
-
-    const DAY_ABBREVS = ['SU', 'MO', 'TU', 'WE', 'TH', 'FR', 'SA'];
 
     for (const assignment of result.assignments) {
         if (!assignment.isScheduled) continue;

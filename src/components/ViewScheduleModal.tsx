@@ -92,6 +92,10 @@ const statusConfig = {
     label: 'Trashed',
     style: { backgroundColor: '#fce7e7', color: '#991b1b', border: '1px solid #fca5a5' },
   },
+  published: {
+    label: 'Published',
+    style: { backgroundColor: '#ffedd5', color: '#c2410c', border: '1px solid #fed7aa' },
+  },
 };
 
 export default function ViewScheduleModal({ isOpen, onClose, schedule }: ViewScheduleModalProps) {

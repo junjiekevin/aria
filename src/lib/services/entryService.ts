@@ -16,7 +16,6 @@ import {
     buildRecurrenceRule,
     updateRecurrenceRule,
     parseRecurrenceRule,
-    getNthWeekdayOfMonth,
     type FrequencyType,
 } from '../recurrence';
 import { ValidationError, NotFoundError, ConflictError } from '../errors';
@@ -32,7 +31,7 @@ const DAY_NAMES = [
     'Thursday', 'Friday', 'Saturday'
 ];
 
-const DAY_ABBREVS = ['SU', 'MO', 'TU', 'WE', 'TH', 'FR', 'SA'];
+
 
 // Finds the first occurrence of a weekday on or after a schedule's start date.
 // Parsed in LOCAL time to avoid UTC offset issues.
@@ -272,7 +271,7 @@ export async function swapEvents(
 
     const time1 = { start: entry1.start_time, end: entry1.end_time };
     const time2 = { start: entry2.start_time, end: entry2.end_time };
-    const updatedAt1 = entry1.updated_at;
+    // const updatedAt1 = entry1.updated_at; (Removed unused variable)
     const updatedAt2 = entry2.updated_at;
 
     // Step 1: Move entry1 to a safe temp time (100 years ahead) to avoid unique constraint collisions
@@ -290,7 +289,7 @@ export async function swapEvents(
 
     try {
         // Step 2: Re-read both entries to validate nothing changed while we were working
-        const [fresh1, fresh2] = await Promise.all([
+        const [, fresh2] = await Promise.all([
             getEntryById(event1Id),
             getEntryById(event2Id),
         ]);

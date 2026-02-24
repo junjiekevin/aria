@@ -9,7 +9,6 @@ import { toAriaError } from './errors';
 import {
     createSchedule,
     getSchedules,
-    getAllSchedules,
     getTrashedSchedules,
     updateSchedule,
     trashSchedule,
@@ -27,7 +26,6 @@ import {
     swapEvents,
     deleteEvent,
     getEventSummary,
-    getScheduleEntries,
 } from './services/entryService';
 
 import { autoScheduleParticipants } from './services/autoScheduler';

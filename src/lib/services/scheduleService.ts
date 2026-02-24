@@ -15,7 +15,6 @@ import {
     permanentDeleteAllTrashed as apiPermanentDeleteAllTrashed,
     updateFormConfig as apiUpdateFormConfig,
     checkScheduleOverlaps as apiCheckScheduleOverlaps,
-    resolveScheduleIdByLabel as apiResolveScheduleIdByLabel,
     type Schedule,
     type CreateScheduleInput,
     type UpdateScheduleInput,
@@ -38,11 +37,11 @@ function validateDateRange(startDate: string, endDate: string): void {
 
 function validateStatusTransition(current: string, next: string): void {
     const valid: Record<string, string[]> = {
-        draft:      ['collecting', 'trashed'],
+        draft: ['collecting', 'trashed'],
         collecting: ['archived', 'published', 'trashed'],
-        published:  ['archived', 'trashed'],
-        archived:   ['collecting', 'trashed'],
-        trashed:    ['draft', 'collecting', 'archived'],
+        published: ['archived', 'trashed'],
+        archived: ['collecting', 'trashed'],
+        trashed: ['draft', 'collecting', 'archived'],
     };
     if (current === next) return;
     if (!valid[current]?.includes(next)) {
