@@ -1,6 +1,5 @@
 // src/lib/aria/index.ts
 // Aria AI Module - Function Registry and Prompt Builder
-
 export {
   FUNCTION_REGISTRY,
   getFunctionsByCategory,
@@ -11,12 +10,11 @@ export {
   type FunctionCategory,
   type RequiredId,
 } from './functionRegistry';
-
 export {
   buildSystemPrompt,
+  buildToolBlock,
   getSystemPrompt,
   getMinimalPrompt,
-  detectRelevantFunctions,
   isSimpleQuery,
   type PromptContext,
 } from './promptBuilder';

@@ -8,7 +8,7 @@
 //   Once:     "" (empty string)
 
 export type FunctionCategory = 'schedule' | 'event' | 'participant';
-export type RequiredId = 'schedule_id' | 'event_id' | 'participant_id';
+export type RequiredId = 'schedule_id' | 'event_id' | 'participant_id' | 'plan_id';
 
 export interface FunctionMeta {
     name: string;
@@ -56,7 +56,7 @@ FUNCTION_CALL: {"name":"createSchedule","arguments":{"label":"Spring 2026","star
         requiresIds: [],
         providesIds: ['schedule_id'],
         prerequisites: [],
-        prompt: 'Lists all active schedules. Call this FIRST when you need a schedule_id and no CURRENT_SCHEDULE_ID is provided.',
+        prompt: 'Lists all active schedules. Returns schedule containers only — NOT events or participants. Call this FIRST when you need a schedule_id and no CURRENT_SCHEDULE_ID is provided. After getting schedules, ask the user which schedule to operate on if there are multiple.',
     },
 
     {
@@ -167,13 +167,82 @@ FUNCTION_CALL: {"name":"updateFormConfig","arguments":{"schedule_id":"...","form
         requiresIds: ['schedule_id'],
         providesIds: [],
         prerequisites: ['listSchedules'],
-        prompt: 'Automatically schedules ALL unassigned participants based on their preferences. Equivalent to the "Schedule All" button. Needs schedule_id.',
+        prompt: 'Automatically schedules ALL unassigned participants based on their preferences. You MUST call this tool when the user says "schedule all" or "assign everyone". DO NOT just say you did it without calling this.',
         example: `User: "Schedule everyone"
 <thought>I need schedule_id.</thought>
 "Auto-scheduling your participants now..."
 FUNCTION_CALL: {"name":"listSchedules","arguments":{}}
 [After ID retrieved]
 FUNCTION_CALL: {"name":"autoScheduleParticipants","arguments":{"schedule_id":"..."}}`,
+    },
+
+    {
+        name: 'publishSchedule',
+        category: 'schedule',
+        priority: 9,
+        triggers: ['publish', 'notify participants', 'send emails', 'go live', 'finalize schedule'],
+        synonyms: ['blast', 'announce'],
+        excludeWhen: ['draft', 'unpublish'],
+        requiresIds: ['schedule_id'],
+        providesIds: [],
+        prerequisites: ['listSchedules'],
+        prompt: 'Publishes the schedule and sends confirmation emails to all assigned participants. Needs schedule_id.',
+    },
+
+    {
+        name: 'getExportLink',
+        category: 'schedule',
+        priority: 5,
+        triggers: ['export', 'ical', 'download', 'csv', 'google calendar'],
+        synonyms: ['link'],
+        excludeWhen: [],
+        requiresIds: ['schedule_id'],
+        providesIds: [],
+        prerequisites: ['listSchedules'],
+        prompt: 'Provides the public iCal/ICS link for a schedule. Needs schedule_id.',
+    },
+
+    {
+        name: 'analyzeScheduleHealth',
+        category: 'schedule',
+        priority: 7,
+        triggers: ['audit schedule', 'how is my schedule', 'analyze', 'spot issues', 'health check', 'gaps'],
+        synonyms: ['review', 'inspect'],
+        excludeWhen: [],
+        requiresIds: ['schedule_id'],
+        providesIds: [],
+        prerequisites: ['getEventSummaryInSchedule'],
+        prompt: 'Analyzes the current schedule for gaps, overlaps, or low utilization. Call this to give the user advice.',
+    },
+
+    // ============================================
+    // Agentic Plan Tools (Plan → Confirm → Execute)
+    // ============================================
+
+    {
+        name: 'proposeScheduleChanges',
+        category: 'schedule',
+        priority: 10,
+        triggers: ['plan', 'propose', 'preview', 'what if', 'dry run', 'show me first', 'before you do', 'draft changes'],
+        synonyms: ['suggest', 'outline'],
+        excludeWhen: ['commit', 'confirm', 'apply'],
+        requiresIds: ['schedule_id'],
+        providesIds: ['plan_id'],
+        prerequisites: ['listSchedules', 'getEventSummaryInSchedule'],
+        prompt: 'Propose multi-step changes as a dry-run preview without modifying the schedule. Required: schedule_id, changes[] ({action: "add"|"move"|"swap"|"delete", target, description, before?, after?}). Returns plan_id for commitSchedulePlan.',
+    },
+
+    {
+        name: 'commitSchedulePlan',
+        category: 'schedule',
+        priority: 10,
+        triggers: ['commit', 'confirm', 'apply', 'yes do it', 'go ahead', 'approve', 'looks good', 'execute plan'],
+        synonyms: ['accept', 'proceed', 'finalize'],
+        excludeWhen: ['propose', 'preview', 'what if'],
+        requiresIds: ['plan_id'],
+        providesIds: [],
+        prerequisites: ['proposeScheduleChanges'],
+        prompt: 'Execute a proposed plan. Required: plan_id from proposeScheduleChanges. Only call after user confirms.',
     },
 
     // ============================================
@@ -190,40 +259,21 @@ FUNCTION_CALL: {"name":"autoScheduleParticipants","arguments":{"schedule_id":"..
         requiresIds: ['schedule_id'],
         providesIds: ['event_id'],
         prerequisites: ['listSchedules'],
-        prompt: `Add an event to a schedule. Required: schedule_id, student_name (the event title), day, hour (24h), recurrence_rule.
-
-RECURRENCE RULES — use EXACTLY these formats:
-- Once:     "" (empty string)
-- Daily:    "FREQ=DAILY"
-- Weekly:   "FREQ=WEEKLY;BYDAY=XX"       where XX = MO TU WE TH FR SA SU
-- Biweekly: "FREQ=WEEKLY;INTERVAL=2;BYDAY=XX"
-- Monthly:  "FREQ=MONTHLY;BYDAY=NXX"     where N = week number (1-4), XX = day abbrev
-            e.g. 2nd Tuesday = "FREQ=MONTHLY;BYDAY=2TU"
-
-IMPORTANT: ALWAYS ask the user to confirm frequency if not explicitly stated.
-Ask: "Would you like this to be Once, Daily, Weekly, Bi-Weekly, or Monthly?"`,
-        example: `User: "Add Piano on Tuesdays at 3pm weekly"
-FUNCTION_CALL: {"name":"addEventToSchedule","arguments":{"schedule_id":"...","student_name":"Piano","day":"Tuesday","hour":15,"recurrence_rule":"FREQ=WEEKLY;BYDAY=TU"}}
-
-User: "Add Singing on the 2nd Monday of each month at 10am"
-FUNCTION_CALL: {"name":"addEventToSchedule","arguments":{"schedule_id":"...","student_name":"Singing","day":"Monday","hour":10,"recurrence_rule":"FREQ=MONTHLY;BYDAY=2MO"}}
-
-User: "Add a one-time Guitar session on Friday at 2pm"
-FUNCTION_CALL: {"name":"addEventToSchedule","arguments":{"schedule_id":"...","student_name":"Guitar","day":"Friday","hour":14,"recurrence_rule":""}}`,
+        prompt: 'Add an event. Required: schedule_id, student_name, day (full English: "Monday" etc.), hour (24h integer), recurrence_rule (see RECURRENCE FORMAT above).',
     },
 
     {
         name: 'updateEventInSchedule',
         category: 'event',
         priority: 7,
-        triggers: ['move event', 'change event', 'update event', 'reschedule', 'shift', 'rename event'],
-        synonyms: ['relocate', 'transfer', 'modify'],
+        triggers: ['move event', 'change event', 'update event', 'reschedule', 'shift', 'rename event', 'move', 'change', 'update'],
+        synonyms: ['relocate', 'transfer', 'modify', 'change it', 'make it'],
         excludeWhen: ['delete', 'remove', 'cancel', 'add', 'create', 'new', 'swap', 'switch'],
         requiresIds: ['event_id'],
         providesIds: [],
         prerequisites: ['getEventSummaryInSchedule'],
         prompt: `Update or move an event. Needs event_id — call getEventSummaryInSchedule first.
-Can change: student_name, day, hour, recurrence_rule.
+Can change: student_name, day (full English name: "Monday", "Tuesday" etc.), hour (24h integer), recurrence_rule.
 
 IMPORTANT: When changing ONLY the frequency, pass ONLY event_id and recurrence_rule. Do NOT pass day or hour.
 
@@ -248,13 +298,13 @@ FUNCTION_CALL: {"name":"updateEventInSchedule","arguments":{"event_id":"...","da
         name: 'deleteEventFromSchedule',
         category: 'event',
         priority: 7,
-        triggers: ['delete event', 'remove event', 'cancel event', 'drop event'],
+        triggers: ['delete event', 'remove event', 'cancel event', 'drop event', 'delete', 'remove'],
         synonyms: ['erase', 'clear'],
         excludeWhen: ['add', 'create', 'new', 'move', 'update', 'schedule'],
         requiresIds: ['event_id'],
         providesIds: [],
         prerequisites: ['getEventSummaryInSchedule'],
-        prompt: 'Delete an event permanently. Needs event_id — call getEventSummaryInSchedule first.',
+        prompt: 'Delete an event permanently. Needs event_id — call getEventSummaryInSchedule first. If no CURRENT_SCHEDULE_ID is in context, call listSchedules first and ask the user which schedule the event is in.',
         example: `User: "Delete Singing on Friday"
 FUNCTION_CALL: {"name":"getEventSummaryInSchedule","arguments":{"schedule_id":"..."}}
 [After getting event_id]
@@ -271,7 +321,20 @@ FUNCTION_CALL: {"name":"deleteEventFromSchedule","arguments":{"event_id":"..."}}
         requiresIds: ['schedule_id'],
         providesIds: ['event_id'],
         prerequisites: ['listSchedules'],
-        prompt: 'Get all events grouped by day with their IDs. Call this before any update, delete, or swap.',
+        prompt: '**PREFERRED FOR FINDING SPECIFIC EVENTS.** Get full schedule grouped by day. Minified keys: i (id), n (name), t (time), r (rule).',
+    },
+
+    {
+        name: 'searchEventsInSchedule',
+        category: 'event',
+        priority: 10,
+        triggers: ['find event', 'search event', 'locate', 'where is', 'look for'],
+        synonyms: ['query', 'find'],
+        excludeWhen: [],
+        requiresIds: ['schedule_id'],
+        providesIds: ['event_id'],
+        prerequisites: ['listSchedules'],
+        prompt: 'Search for specific events by student name. Required: schedule_id, query (string — the name to search for). If no CURRENT_SCHEDULE_ID is in context, call listSchedules first and ask the user which schedule to search in.',
     },
 
     {
@@ -284,7 +347,7 @@ FUNCTION_CALL: {"name":"deleteEventFromSchedule","arguments":{"event_id":"..."}}
         requiresIds: ['event_id'],
         providesIds: [],
         prerequisites: ['getEventSummaryInSchedule'],
-        prompt: 'Atomically swaps two events including their recurrence rules. Needs TWO event IDs. Call getEventSummaryInSchedule first.',
+        prompt: 'Atomically swaps two events including their recurrence rules. Requires event1_id and event2_id. Call getEventSummaryInSchedule first to find these specific IDs.',
         example: `User: "Swap Piano and Singing"
 FUNCTION_CALL: {"name":"getEventSummaryInSchedule","arguments":{"schedule_id":"..."}}
 [After getting both IDs]

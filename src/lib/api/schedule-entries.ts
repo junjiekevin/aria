@@ -94,14 +94,20 @@ export async function updateScheduleEntry(
         recurrence_rule?: string;
     }
 ): Promise<ScheduleEntry> {
-    const { data, error } = await supabase
+    const { error } = await supabase
         .from('schedule_entries')
         .update(updates)
-        .eq('id', entryId)
-        .select()
-        .single();
+        .eq('id', entryId);
 
     if (error) throw new Error(`Failed to update schedule entry: ${error.message}`);
+
+    const { data, error: fetchError } = await supabase
+        .from('schedule_entries')
+        .select('*')
+        .eq('id', entryId)
+        .single();
+
+    if (fetchError || !data) throw new Error(`Failed to fetch updated entry: ${fetchError?.message}`);
     return data;
 }
 

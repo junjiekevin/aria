@@ -20,6 +20,7 @@ import {
     type UpdateScheduleInput,
     type FormConfigInput,
 } from '../api/schedules';
+import { supabase } from '../supabase';
 import { ValidationError, NotFoundError, ConflictError } from '../errors';
 import { withRetry } from '../retry';
 
@@ -88,6 +89,19 @@ export async function getSchedule(scheduleId: string): Promise<Schedule> {
 
 export async function getSchedules(): Promise<Schedule[]> {
     return withRetry(() => apiGetSchedules());
+}
+
+/**
+ * Returns a minified list of schedules for AI context.
+ */
+export async function getSchedulesSummary(): Promise<Array<{ id: string; label: string; start: string; end: string }>> {
+    const schedules = await getSchedules();
+    return schedules.map(s => ({
+        id: s.id,
+        label: s.label,
+        start: s.start_date,
+        end: s.end_date
+    }));
 }
 
 export async function getAllSchedules(): Promise<Schedule[]> {
@@ -179,6 +193,24 @@ export async function checkScheduleOverlaps(
     return withRetry(() =>
         apiCheckScheduleOverlaps(startDate, endDate, excludeScheduleId)
     );
+}
+
+export async function publishSchedule(scheduleId: string): Promise<{ success: boolean }> {
+    const { error } = await supabase.functions.invoke('publish-schedule', {
+        body: { scheduleId }
+    });
+
+    if (error) throw error;
+    return { success: true };
+}
+
+export function generateExportLink(scheduleId: string): string {
+    // The get-ics function works per entry, but for now we'll provide the schedule's public link
+    // with a hint that iCal is coming soon or use the existing dashboard URL.
+    // Actually, according to the plan, we should provide the iCal link.
+    // If we don't have a schedule-wide iCal edge function yet, we'll provide the public link.
+    const baseUrl = window.location.origin;
+    return `${baseUrl}/schedule/${scheduleId}/public`;
 }
 
 // Resolves a schedule UUID from either a UUID or a label string.

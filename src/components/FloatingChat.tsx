@@ -1,16 +1,25 @@
 import { useState, useRef, useEffect } from 'react';
 import { Send, Loader2, User, MessageCircle, X, Minimize2 } from 'lucide-react';
 import { sendChatMessage, type Message } from '../lib/openrouter';
-import { getSystemPrompt, type PromptContext } from '../lib/aria';
+import { buildSystemPrompt, buildToolBlock, isSimpleQuery, getMinimalPrompt, type PromptContext } from '../lib/aria';
 import { executeFunction } from '../lib/functions';
+import PlanPreviewCard from './PlanPreviewCard';
 import ariaProfile from '../assets/images/aria-profile.png';
 
 const CHAT_STORAGE_KEY = 'aria_chat_messages';
 const MAX_MESSAGES = 100;
 
+interface PlanData {
+  planId: string;
+  changes: { action: string; target: string; description: string }[];
+  conflicts: { type: string; description: string; severity: 'warning' | 'error' }[];
+  expiresAt: string;
+}
+
 interface ChatMessage extends Message {
   id: string;
   timestamp: Date;
+  planData?: PlanData;
 }
 
 interface FloatingChatProps {
@@ -328,6 +337,7 @@ export default function FloatingChat({ onScheduleChange, onShowAutoSchedule }: F
       'listSchedules',
       'listTrashedSchedules',
       'getEventSummaryInSchedule',
+      'searchEventsInSchedule',
       'listUnassignedParticipants',
       'getParticipantPreferences',
     ];
@@ -382,6 +392,37 @@ export default function FloatingChat({ onScheduleChange, onShowAutoSchedule }: F
       } else if (name === 'markParticipantAssigned') {
         displayContent = '✓ Participant status updated';
         llmContent = `[Function Result] ${name} succeeded: Participant status updated`;
+      } else if (name === 'publishSchedule') {
+        displayContent = '✓ Schedule published! Emails sent.';
+        llmContent = `[Function Result] ${name} succeeded: Schedule published and participants notified.`;
+      } else if (name === 'autoScheduleParticipants' && result.success) {
+        const data = result.data as any;
+        displayContent = data.previewMode
+          ? `✓ Auto-schedule preview generated for ${data.scheduledCount} participants.`
+          : `✓ Successfully scheduled ${data.scheduledCount} participants.`;
+        llmContent = `[Function Result] ${name} succeeded: ${displayContent}`;
+        if (!data.previewMode) scheduleModified = true;
+      } else if (name === 'getExportLink' && (result.data as any)?.link) {
+        const link = (result.data as any).link;
+        displayContent = `✓ Export link: ${link}`;
+        llmContent = `[Function Result] ${name} succeeded: Export link is ${link}`;
+      } else if (name === 'analyzeScheduleHealth' && (result.data as any)?.summary) {
+        displayContent = '✓ Schedule analysis complete. Reviewing now...';
+        // Minify JSON for LLM context
+        llmContent = `[Function Result] ${name} succeeded. Current schedule state: ${JSON.stringify((result.data as any).summary)}`;
+      } else if (name === 'proposeScheduleChanges' && result.data) {
+        const planData = result.data as any;
+        displayContent = `__PLAN_PREVIEW__${JSON.stringify({
+          planId: planData.plan_id,
+          changes: planData.changes,
+          conflicts: planData.conflicts,
+          expiresAt: planData.expires_at,
+        })}`;
+        llmContent = `[Function Result] ${name} succeeded. Plan ID: ${planData.plan_id}. ${planData.summary}. ${planData.conflicts?.length > 0 ? `Conflicts found: ${JSON.stringify(planData.conflicts)}` : 'No conflicts found.'} ${planData.message}`;
+      } else if (name === 'commitSchedulePlan' && result.data) {
+        displayContent = (result.data as any).message || '✓ Plan committed';
+        llmContent = `[Function Result] ${name} succeeded: ${(result.data as any).message}`;
+        scheduleModified = true;
       } else {
         displayContent = '✓ Action completed';
         llmContent = `[Function Result] ${name} succeeded`;
@@ -426,63 +467,81 @@ export default function FloatingChat({ onScheduleChange, onShowAutoSchedule }: F
         console.log('[FloatingChat Debug] Current schedule context:', currentScheduleId);
       }
 
-      // Build initial conversation history
+      // ─── Conversation history ───────────────────────────────────────────────
+      // Strip plan data from stored messages — the LLM only needs text content.
       let conversationHistory: Message[] = [
         ...messages.map((msg) => ({ role: msg.role, content: msg.content })),
         { role: 'user', content: userMessage.content },
       ];
 
-      const systemPrompt = getSystemPrompt(userMessage.content, promptContext) +
-        `\n\n---\n\n## SYSTEM CONTEXT\nCurrent Date & Time: ${new Date().toLocaleString()}\nIMPORTANT: Wrap your internal thinking in <thought>...</thought> tags. These will be hidden from the user.`;
+      // ─── Tier 1: Static system prompt ──────────────────────────────────────
+      // Built ONCE per user turn. Personality + rules only — no tools.
+      // Staying tool-free here keeps the system prompt short and cache-friendly.
+      const isSimple = isSimpleQuery(userMessage.content);
+      const systemPrompt = isSimple
+        ? getMinimalPrompt()
+        : buildSystemPrompt(promptContext);
 
-      // Agentic loop - keep processing until no more function calls
-      const MAX_ITERATIONS = 10; // Safety limit
+      // Track original goal and last function called for the loop
+      const originalGoal = userMessage.content;
+      let lastFunctionCalled: string | undefined = undefined;
+
+      // ─── Agentic loop ───────────────────────────────────────────────────────
+      const MAX_ITERATIONS = 10;
       let iterations = 0;
       let anyScheduleModified = false;
 
       while (iterations < MAX_ITERATIONS) {
         iterations++;
-        console.log(`[FloatingChat Debug] Agentic loop iteration ${iterations}`);
+        console.log(`[FloatingChat Debug] Agentic loop iteration ${iterations}, last fn: ${lastFunctionCalled ?? 'none'}`);
 
-        const response = await sendChatMessage(conversationHistory, systemPrompt);
+        // ── Tier 2: Dynamic tool block ────────────────────────────────────────
+        // Rebuilt every iteration based on what Aria just called.
+        // Injected as a user-role context message so it doesn't pollute
+        // assistant history and can be replaced cheaply each iteration.
+        const toolBlock = isSimple ? '' : buildToolBlock(originalGoal, promptContext, lastFunctionCalled);
+
+        // Build the messages array for this iteration:
+        // [system prompt] + [tool context (user role)] + [conversation history]
+        // The tool context is prepended fresh each call — not stored in history.
+        let messagesForThisCall: Message[] = conversationHistory;
+        if (toolBlock) {
+          // We inject the tool block as the first user message so it always appears
+          // at the top of the conversation, not buried under 10 turns of history.
+          messagesForThisCall = [
+            { role: 'user', content: `[Context for this step]\n${toolBlock}\n\nIMPORTANT: Wrap your planning in <thought>...</thought> tags.` },
+            { role: 'assistant', content: 'Understood. Ready to help.' },
+            ...conversationHistory,
+          ];
+        }
+
+        const response = await sendChatMessage(messagesForThisCall, systemPrompt);
         console.log('[FloatingChat Debug] Got response:', response);
 
-        // History Logic: Use RAW content to preserve Function Call for LLM memory
-        // This prevents the infinite loop "amnesia"
+        // Store raw content in history so Aria remembers her own function calls
         conversationHistory = [
           ...conversationHistory,
           { role: 'assistant', content: response.rawContent || response.message },
         ];
 
-        // UX Logic: Clean up usage
-        // 1. Show FIRST message ("I'm on it")
-        // 2. Hide intermediate messages (iterations > 1 with function calls)
-        // 3. Show FINAL message (no function call)
+        // ── UX: message display logic ─────────────────────────────────────────
+        // Show iteration 1 acknowledgement + all final messages.
+        // Hide intermediate "working" messages (iterations 2+ with function calls).
         const shouldShowMessage = iterations === 1 || !response.functionCall;
 
         if (shouldShowMessage) {
-          let displayMessage = '';
+          let displayMessage = response.message
+            .replace(/<thought>[\s\S]*?<\/thought>/gi, '')
+            .replace(/THOUGHT:[\s\S]*?(?=\n|$)/gi, '')
+            .replace(/```[\s\S]*?```/g, '')
+            .trim();
 
-          if (response.message && response.message.trim()) {
-            // Strip <thought>...</thought> tags, legacy THOUGHT: blocks, and wrapping quotes
-            displayMessage = response.message
-              .replace(/<thought>[\s\S]*?<\/thought>/gi, '')
-              .replace(/THOUGHT:[\s\S]*?(?=\n|$)/gi, '')
-              .trim();
-          }
-
-          // If the agent is calling a function but didn't provide a friendly message, 
-          // provide a default acknowledgement so the user knows something is happening.
-          if (response.functionCall && !displayMessage) {
-            displayMessage = "On it! One moment, please";
-          }
-
-          // Strip markdown code blocks (```tool_code, ```json, etc.)
-          displayMessage = displayMessage.replace(/```[\s\S]*?```/g, '').trim();
-
-          // Remove leading/trailing quotes if they exist (common LLM artifact)
           if (displayMessage.length > 1 && /^["']|["']$/g.test(displayMessage)) {
             displayMessage = displayMessage.replace(/^["']|["']$/g, '');
+          }
+
+          if (response.functionCall && !displayMessage) {
+            displayMessage = 'On it! One moment, please';
           }
 
           if (displayMessage) {
@@ -499,61 +558,91 @@ export default function FloatingChat({ onScheduleChange, onShowAutoSchedule }: F
           }
         }
 
-        // If no function call, we're done
+        // No function call → Aria is done
         if (!response.functionCall) {
-          console.log('[FloatingChat Debug] No function call, agentic loop complete');
+          console.log('[FloatingChat Debug] No function call — loop complete');
           break;
         }
 
-        // Execute the function
+        // ── Execute function ──────────────────────────────────────────────────
         const { name, arguments: args } = response.functionCall;
-        console.log(`[FloatingChat Debug] Executing function: ${name}`, args);
+        console.log(`[FloatingChat Debug] Executing: ${name}`, args);
 
         const result = await executeFunction(name, args);
         const { displayContent, llmContent, scheduleModified } = formatFunctionResult(name, result);
 
-        if (scheduleModified) {
-          anyScheduleModified = true;
-        }
+        if (scheduleModified) anyScheduleModified = true;
 
-        // Special handling for Auto-Schedule Preview
-        if (name === 'autoScheduleParticipants' && result.success && (result.data as any)?.previewHelper) {
+        // Track which function just ran — used by buildToolBlock next iteration
+        lastFunctionCalled = name;
+
+        // ── Auto-schedule preview: hand off to modal, stop loop ───────────────
+        if (name === 'autoScheduleParticipants' && result.success && (result.data as any)?.previewMode) {
           console.log('[FloatingChat] Triggering Auto-Schedule Preview UI');
-          if (onShowAutoSchedule) {
-            onShowAutoSchedule();
-          }
+          if (onShowAutoSchedule) onShowAutoSchedule();
+          break;
         }
 
-        // Show result to user ONLY IF ERROR
-        // Success messages are hidden to reduce noise
-        if (!result.success) {
+        // ── Plan preview: render card, stop loop, wait for user ───────────────
+        const isPlanPreview = displayContent.startsWith('__PLAN_PREVIEW__');
+
+        if (!result.success || isPlanPreview) {
+          let planData: PlanData | undefined;
+          let content = displayContent;
+
+          if (isPlanPreview) {
+            try {
+              planData = JSON.parse(displayContent.replace('__PLAN_PREVIEW__', ''));
+              content = '';
+            } catch { /* fallback to text */ }
+          }
+
           const resultMessage: ChatMessage = {
             id: (Date.now() + iterations * 10 + 1).toString(),
             role: 'assistant',
-            content: displayContent, // Shows "Error: ..."
+            content,
             timestamp: new Date(),
+            planData,
           };
           setMessages((prev) => {
             const updated = [...prev, resultMessage];
             return updated.length > MAX_MESSAGES ? updated.slice(-MAX_MESSAGES) : updated;
           });
+
+          if (isPlanPreview) {
+            console.log('[FloatingChat Debug] Plan preview shown — waiting for user');
+            break;
+          }
         }
 
-        // Add result to conversation history for LLM to continue
-        // IMPORTANT: Use 'user' role to signal this is system feedback, not assistant output
-        // This prompts the LLM to continue processing rather than assuming it's done
+        // ── Continuation prompt ───────────────────────────────────────────────
+        // Restates the original goal so Aria never "forgets" mid-chain.
+        // On failure: tells Aria to diagnose and either retry or explain.
         const continuationPrompt = result.success
-          ? `${llmContent}\n\n[System: Action completed. Check if there are more pending actions from the original request. If yes, proceed with the next FUNCTION_CALL. If all actions are complete, respond with a final confirmation.]`
-          : llmContent;
+          ? `${llmContent}\n\n[System: Step ${iterations} complete. Original goal: "${originalGoal}". If the goal is NOT fully achieved yet, output the next FUNCTION_CALL immediately. Do NOT summarize or confirm until the entire goal is done.]`
+          : `${llmContent}\n\n[System: The last action failed. Diagnose the error. Either retry with corrected arguments or explain the issue to the user clearly. Do NOT claim success.]`;
+
+        // ── Context slimming ──────────────────────────────────────────────────
+        // Replace older results from the same summary/list function with a
+        // placeholder. Prevents token bloat from repeated state snapshots.
+        const SLIM_FUNCTIONS = ['getEventSummaryInSchedule', 'listSchedules', 'listUnassignedParticipants', 'analyzeScheduleHealth'];
+        if (SLIM_FUNCTIONS.includes(name)) {
+          conversationHistory = conversationHistory.map(msg => {
+            if (msg.role === 'user' && msg.content.includes(`[Function Result] ${name}`)) {
+              return { ...msg, content: `[Superseded — see latest ${name} result below]` };
+            }
+            return msg;
+          });
+        }
 
         conversationHistory = [
           ...conversationHistory,
           { role: 'user', content: continuationPrompt },
         ];
 
-        // If the function failed, break the loop
+        // Hard stop on failure — don't keep trying blindly
         if (!result.success) {
-          console.log('[FloatingChat Debug] Function failed, stopping loop');
+          console.log('[FloatingChat Debug] Function failed — stopping loop');
           break;
         }
       }
@@ -708,15 +797,46 @@ export default function FloatingChat({ onScheduleChange, onShowAutoSchedule }: F
                         ...(message.role === 'user' ? styles.userBubble : styles.assistantBubble),
                       }}
                     >
-                      {message.content}
+                      {message.planData ? (
+                        <PlanPreviewCard
+                          planId={message.planData.planId}
+                          changes={message.planData.changes as any}
+                          conflicts={message.planData.conflicts as any}
+                          expiresAt={message.planData.expiresAt}
+                          onConfirm={(planId) => {
+                            setInput(`Yes, commit plan ${planId}`);
+                            setTimeout(() => {
+                              const form = document.querySelector('form');
+                              if (form) form.requestSubmit();
+                            }, 100);
+                          }}
+                          onReject={(planId) => {
+                            setInput(`Reject plan ${planId}`);
+                            setTimeout(() => {
+                              const form = document.querySelector('form');
+                              if (form) form.requestSubmit();
+                            }, 100);
+                          }}
+                        />
+                      ) : (
+                        message.content
+                      )}
                     </div>
                   </div>
                 ))}
                 {loading && (
                   <div style={{ ...styles.messageWrapper, ...styles.assistantMessageWrapper }}>
-                    <img src={ariaProfile} alt="Aria" style={{ width: '32px', height: '32px', borderRadius: '50%', objectFit: 'cover' }} />
-                    <div style={{ ...styles.messageBubble, ...styles.assistantBubble, display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-                      <span style={{ animation: 'spin 1s linear infinite', display: 'inline-block' }}>◉</span>
+                    <div
+                      style={{
+                        ...styles.avatar,
+                        background: '#f9fafb',
+                      }}
+                    >
+                      <img src={ariaProfile} alt="Aria" style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }} />
+                    </div>
+                    <div style={{ ...styles.messageBubble, ...styles.assistantBubble, display: 'flex', alignItems: 'center', gap: '0.4rem', color: '#6b7280', fontSize: '12px' }}>
+                      <Loader2 size={12} style={{ animation: 'spin 1s linear infinite' }} />
+                      <span>Thinking...</span>
                     </div>
                   </div>
                 )}

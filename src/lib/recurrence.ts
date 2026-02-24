@@ -100,7 +100,7 @@ export function updateRecurrenceRule(existingRule: string, newAnchorDate: Date):
     const parsed = parseRecurrenceRule(existingRule);
     if (!parsed) return existingRule;
 
-    const newDayAbbrev = DAY_ABBREVS[newAnchorDate.getDay()];
+    const newDayAbbrev = DAY_ABBREVS[newAnchorDate.getUTCDay()];
 
     if (parsed.freq === 'DAILY') return 'FREQ=DAILY';
 

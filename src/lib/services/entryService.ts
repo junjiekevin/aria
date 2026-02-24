@@ -225,7 +225,8 @@ export async function updateEvent(args: {
     }
 
     // Resolve new time if day or hour provided
-    if (args.day !== undefined && args.hour !== undefined) {
+    if (args.day !== undefined) {
+        const hour = args.hour ?? parseInt(original.start_time.substring(11, 13), 10);
         const { data: schedule, error: schedErr } = await supabase
             .from('schedules')
             .select('start_date')
@@ -237,11 +238,11 @@ export async function updateEvent(args: {
         const dayClean = normalizeDay(args.day);
         const firstDate = findFirstDayOccurrence(schedule.start_date, dayClean);
 
-        const startStr = args.start_time ?? `${args.hour.toString().padStart(2, '0')}:00`;
-        const endStr = args.end_time ?? `${(args.hour + 1).toString().padStart(2, '0')}:00`;
+        const startStr = args.start_time ?? `${hour.toString().padStart(2, '0')}:00`;
+        const endStr = args.end_time ?? `${Math.min(hour + 1, 23).toString().padStart(2, '0')}:00`;
 
-        updates.start_time = `${firstDate}T${startStr}:00`;
-        updates.end_time = `${firstDate}T${endStr}:00`;
+        updates.start_time = new Date(`${firstDate}T${startStr}:00Z`).toISOString();
+        updates.end_time = new Date(`${firstDate}T${endStr}:00Z`).toISOString();
 
         validateEntryInput(updates);
 
@@ -249,7 +250,7 @@ export async function updateEvent(args: {
         if (!hasExplicitRule) {
             updates.recurrence_rule = updateRecurrenceRule(
                 original.recurrence_rule,
-                new Date(updates.start_time)
+                new Date(updates.start_time + 'Z')
             );
         }
     }
@@ -341,18 +342,45 @@ export async function deleteEvent(eventId: string): Promise<void> {
     return withRetry(() => apiDeleteScheduleEntry(eventId));
 }
 
+/**
+ * Searches for specific events in a schedule for token efficiency.
+ * Prevents pulling the entire schedule summary when only one person/lesson is needed.
+ */
+export async function searchEventsInSchedule(
+    scheduleId: string,
+    query: string
+): Promise<Array<{ i: string; n: string; t: string; r: string }>> {
+    const entries = await withRetry(() => apiGetScheduleEntries(scheduleId));
+    const lowerQuery = query.toLowerCase();
+
+    const matches = entries.filter(entry =>
+        entry.student_name.toLowerCase().includes(lowerQuery)
+    );
+
+    return matches.map(entry => {
+        const date = new Date(entry.start_time);
+        const hours = date.getHours().toString().padStart(2, '0');
+        const minutes = date.getMinutes().toString().padStart(2, '0');
+        return {
+            i: entry.id,
+            n: entry.student_name,
+            t: `${hours}:${minutes}`,
+            r: entry.recurrence_rule,
+        };
+    });
+}
+
 // Get event summary grouped by day for AI context.
-// Returns event IDs so AI can reference specific events.
+// Returns minified keys (i, n, t, r) to save tokens.
 export async function getEventSummary(
     scheduleId: string
-): Promise<Record<string, Array<{ id: string; name: string; time: string; rule: string }>>> {
+): Promise<Record<string, Array<{ i: string; n: string; t: string; r: string }>>> {
     const entries = await withRetry(() => apiGetScheduleEntries(scheduleId));
 
-    const summary: Record<string, Array<{ id: string; name: string; time: string; rule: string }>> = {};
+    const summary: Record<string, Array<{ i: string; n: string; t: string; r: string }>> = {};
     DAY_NAMES.forEach(day => (summary[day] = []));
 
     entries.forEach(entry => {
-        // Prefer BYDAY from recurrence rule for day resolution — matches UI logic
         const rule = parseRecurrenceRule(entry.recurrence_rule);
         const date = new Date(entry.start_time);
         const dayIndex = rule?.dayIndex != null ? rule.dayIndex : date.getDay();
@@ -362,10 +390,10 @@ export async function getEventSummary(
         const minutes = date.getMinutes().toString().padStart(2, '0');
 
         summary[dayName].push({
-            id: entry.id,
-            name: entry.student_name,
-            time: `${hours}:${minutes}`,
-            rule: entry.recurrence_rule,
+            i: entry.id,
+            n: entry.student_name,
+            t: `${hours}:${minutes}`,
+            r: entry.recurrence_rule,
         });
     });
 

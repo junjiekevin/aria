@@ -4,7 +4,7 @@ Aria is an intelligent scheduling assistant that helps organizers build, manage,
 
 ## Features
 
-- **AI Scheduling Assistant** -- Conversational interface powered by Google Gemma 3 27B IT (via OpenRouter). Supports natural-language event creation, conflict detection, capacity analysis, and multi-step agentic operations.
+- **AI Scheduling Assistant** -- Conversational interface powered by Google Gemini 2.5 Flash Lite (via OpenRouter). Supports natural-language event creation, conflict detection, capacity analysis, and multi-step agentic operations.
 - **Visual Timetable** -- Weekly grid with configurable working hours and drag-and-drop support for assigning, moving, and swapping events (built with dnd-kit).
 - **Availability Forms** -- Shareable public links that allow participants to submit preferred time slots without needing an account.
 - **Agentic Operations (Edge)** -- Deno-based Supabase Edge Functions handle complex asynchronous workflows like grouping participants and distributing ICS files.
@@ -25,7 +25,7 @@ Aria is an intelligent scheduling assistant that helps organizers build, manage,
 | Edge Functions | Deno (Supabase Edge)                               |
 | Authentication | Google OAuth (Supabase Auth)                       |
 | Communications | Resend API                                         |
-| AI             | OpenRouter API, Google Gemma 3 27B IT              |
+| AI             | OpenRouter API, Google Gemini 2.5 Flash Lite       |
 | Drag and Drop  | dnd-kit                                            |
 | Deployment     | Vercel                                             |
 
@@ -63,6 +63,7 @@ npm run dev       # Start dev server with HMR
 npm run build     # TypeScript compile + production build
 npm run lint      # Run ESLint
 npm run preview   # Preview production build locally
+npm run test:integration # Run automated integration tests
 ```
 
 ## Project Structure
