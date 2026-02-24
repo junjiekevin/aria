@@ -1,6 +1,6 @@
 // src/lib/functions.ts
 // AI function execution layer.
-// Calls services only — never imports from api/* directly.
+// Primarily calls services; a few direct api/* imports remain for plan/form primitives.
 // Wraps all executions with deduplication to prevent AI double-fire.
 
 import { withDedup } from './retry';

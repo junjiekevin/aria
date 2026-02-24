@@ -199,7 +199,7 @@ FUNCTION_CALL: {"name":"autoScheduleParticipants","arguments":{"schedule_id":"..
         requiresIds: ['schedule_id'],
         providesIds: [],
         prerequisites: ['listSchedules'],
-        prompt: 'Provides the public iCal/ICS link for a schedule. Needs schedule_id.',
+        prompt: 'Provides the public schedule link for a schedule. Needs schedule_id.',
     },
 
     {

@@ -250,7 +250,7 @@ export async function updateEvent(args: {
         if (!hasExplicitRule) {
             updates.recurrence_rule = updateRecurrenceRule(
                 original.recurrence_rule,
-                new Date(updates.start_time + 'Z')
+                new Date(updates.start_time)
             );
         }
     }

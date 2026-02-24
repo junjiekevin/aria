@@ -58,6 +58,7 @@ const App = () => {
             <Routes>
                 <Route path="/" element={<AuthPage />} />
                 <Route path="/form/:scheduleId" element={<AvailabilityFormPage />} />
+                <Route path="/schedule/:scheduleId/public" element={<AvailabilityFormPage />} />
                 <Route path="/cancel/:entryId" element={<CancelPage />} />
                 <Route path="/dashboard" element={<ProtectedRoute><DashboardPage /></ProtectedRoute>} />
                 <Route path="/schedule/:scheduleId" element={<ProtectedRoute><SchedulePage /></ProtectedRoute>} />

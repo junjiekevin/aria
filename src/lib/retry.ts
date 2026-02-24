@@ -93,8 +93,24 @@ interface DedupEntry {
 const dedupCache = new Map<string, DedupEntry>();
 
 // Generates a stable cache key from function name + args
+function stableStringify(value: unknown): string {
+    if (value === undefined) return 'undefined';
+
+    if (value === null || typeof value !== 'object') {
+        return JSON.stringify(value) ?? String(value);
+    }
+
+    if (Array.isArray(value)) {
+        return `[${value.map(stableStringify).join(',')}]`;
+    }
+
+    const obj = value as Record<string, unknown>;
+    const keys = Object.keys(obj).sort();
+    return `{${keys.map(key => `${JSON.stringify(key)}:${stableStringify(obj[key])}`).join(',')}}`;
+}
+
 function buildDedupKey(functionName: string, args: Record<string, unknown>): string {
-    return `${functionName}::${JSON.stringify(args, Object.keys(args).sort())}`;
+    return `${functionName}::${stableStringify(args)}`;
 }
 
 // Evicts expired entries to prevent unbounded memory growth

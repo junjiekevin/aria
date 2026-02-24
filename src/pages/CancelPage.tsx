@@ -90,6 +90,7 @@ export default function CancelPage() {
     const { entryId } = useParams<{ entryId: string }>();
     const [searchParams] = useSearchParams();
     const date = searchParams.get('date'); // YYYY-MM-DD
+    const token = searchParams.get('token');
 
     const [reason, setReason] = useState('');
     const [loading, setLoading] = useState(false);
@@ -98,6 +99,10 @@ export default function CancelPage() {
 
     const handleCancel = async (e: React.FormEvent) => {
         e.preventDefault();
+        if (!token) {
+            setErrorMsg('This cancellation link is invalid or expired. Please contact your instructor for a new link.');
+            return;
+        }
         if (!reason.trim()) {
             setErrorMsg('Please provide a reason for cancellation.');
             return;
@@ -108,7 +113,7 @@ export default function CancelPage() {
 
         try {
             const { data, error } = await supabase.functions.invoke('cancel-event', {
-                body: { entry_id: entryId, occurrence_date: date, reason },
+                body: { entry_id: entryId, occurrence_date: date, reason, token },
             });
 
             if (error) throw error;

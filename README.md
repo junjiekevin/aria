@@ -52,8 +52,14 @@ Create a `.env` file in the project root:
 ```
 VITE_SUPABASE_URL=<your-supabase-project-url>
 VITE_SUPABASE_ANON_KEY=<your-supabase-anon-key>
-VITE_OPENROUTER_API_KEY=<your-openrouter-key>
+```
+
+Set server-side secrets in Supabase Edge Functions environment:
+
+```
+OPENROUTER_API_KEY=<your-openrouter-key>
 RESEND_API_KEY=<your-resend-api-key>
+EDGE_LINK_SIGNING_SECRET=<long-random-secret>
 ```
 
 ### Development

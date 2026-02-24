@@ -197,7 +197,7 @@ export async function checkScheduleOverlaps(
 
 export async function publishSchedule(scheduleId: string): Promise<{ success: boolean }> {
     const { error } = await supabase.functions.invoke('publish-schedule', {
-        body: { scheduleId }
+        body: { schedule_id: scheduleId }
     });
 
     if (error) throw error;
@@ -205,10 +205,6 @@ export async function publishSchedule(scheduleId: string): Promise<{ success: bo
 }
 
 export function generateExportLink(scheduleId: string): string {
-    // The get-ics function works per entry, but for now we'll provide the schedule's public link
-    // with a hint that iCal is coming soon or use the existing dashboard URL.
-    // Actually, according to the plan, we should provide the iCal link.
-    // If we don't have a schedule-wide iCal edge function yet, we'll provide the public link.
     const baseUrl = window.location.origin;
     return `${baseUrl}/schedule/${scheduleId}/public`;
 }
