@@ -29,7 +29,8 @@ USING (true)
 WITH CHECK (true);
 
 -- Allow public SELECT (to check for duplicates during submission)
-CREATE POLICY "Allow public select" ON form_responses
+DROP POLICY IF EXISTS "Allow public select" ON public.form_responses;
+CREATE POLICY "Allow public select" ON public.form_responses
 FOR SELECT TO public
 USING (true);
 
@@ -52,4 +53,9 @@ ALTER TABLE form_responses ENABLE ROW LEVEL SECURITY;
 
 -- Ensure schedule_entries has proper foreign key relationship and delete behavior
 -- The issue might be in how we're querying - let's add a unique constraint
-ALTER TABLE schedule_entries ADD CONSTRAINT schedule_entries_id_key UNIQUE (id);
+DO $$ 
+BEGIN 
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'schedule_entries_id_key') THEN
+        ALTER TABLE public.schedule_entries ADD CONSTRAINT schedule_entries_id_key UNIQUE (id);
+    END IF;
+END $$;

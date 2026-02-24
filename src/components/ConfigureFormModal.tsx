@@ -135,6 +135,7 @@ export default function ConfigureFormModal({
     const [maxChoices, setMaxChoices] = useState(3);
     const [instructions, setInstructions] = useState('');
     const [deadline, setDeadline] = useState('');
+    const [cancellationPolicy, setCancellationPolicy] = useState(24);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
@@ -143,6 +144,7 @@ export default function ConfigureFormModal({
             setMaxChoices(schedule.max_choices || 3);
             setInstructions(schedule.form_instructions || '');
             setDeadline(schedule.form_deadline || '');
+            setCancellationPolicy(schedule.cancellation_policy_hours || 24);
         }
     }, [isOpen, schedule]);
 
@@ -156,6 +158,7 @@ export default function ConfigureFormModal({
                 max_choices: maxChoices,
                 form_instructions: instructions || null,
                 form_deadline: deadline || null,
+                cancellation_policy_hours: cancellationPolicy,
             });
             onConfigured();
             onClose();
@@ -257,6 +260,38 @@ export default function ConfigureFormModal({
                         }}
                     />
                     <div style={styles.hint}>Form will close for submissions after this date</div>
+                </div>
+
+                <div style={styles.formGroup}>
+                    <label style={styles.label}>Cancellation Policy</label>
+                    <div style={{
+                        ...styles.radioGroup,
+                        flexWrap: 'wrap',
+                        gap: '0.5rem',
+                    }}>
+                        {[0, 12, 24, 48].map((hours) => (
+                            <label
+                                key={hours}
+                                style={{
+                                    ...styles.radioLabel,
+                                    ...(cancellationPolicy === hours ? styles.radioLabelSelected : {}),
+                                    fontSize: '0.8rem',
+                                    padding: '0.4rem 0.6rem',
+                                }}
+                            >
+                                <input
+                                    type="radio"
+                                    name="cancellationPolicy"
+                                    value={hours}
+                                    checked={cancellationPolicy === hours}
+                                    onChange={() => setCancellationPolicy(hours)}
+                                    style={{ accentColor: '#f97316' }}
+                                />
+                                {hours === 0 ? 'No notice' : `${hours}h notice`}
+                            </label>
+                        ))}
+                    </div>
+                    <div style={styles.hint}>Participants must cancel at least this many hours before their event</div>
                 </div>
 
 

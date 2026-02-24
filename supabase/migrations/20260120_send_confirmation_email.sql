@@ -10,6 +10,7 @@ SET send_confirmation_email = true
 WHERE status = 'collecting' AND send_confirmation_email IS NULL;
 
 -- Create a policy to allow users to update their own schedule's email setting
+DROP POLICY IF EXISTS "Allow users to update send_confirmation_email" ON schedules;
 CREATE POLICY "Allow users to update send_confirmation_email"
 ON schedules
 FOR UPDATE

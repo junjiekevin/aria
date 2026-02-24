@@ -118,7 +118,8 @@ export default function AddEventModal({
   const [day, setDay] = useState(initialDay || 'Sunday');
   const [startHour, setStartHour] = useState('09');
   const [startMinute, setStartMinute] = useState('00');
-  const [duration, setDuration] = useState('60');
+  const [endHour, setEndHour] = useState('10');
+  const [endMinute, setEndMinute] = useState('00');
   const [frequency, setFrequency] = useState('weekly');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -138,8 +139,12 @@ export default function AddEventModal({
       setStartHour(hours);
       setStartMinute(minutes);
 
-      const durationMinutes = (endDate.getTime() - startDate.getTime()) / (1000 * 60);
-      setDuration(durationMinutes.toString());
+      const endHours = endDate.getHours().toString().padStart(2, '0');
+      const endMinutes = endDate.getMinutes().toString().padStart(2, '0');
+      setEndHour(endHours);
+      setEndMinute(endMinutes);
+
+      // We no longer strictly enforce the previous duration state since it's now computed on the fly based on start/end.
 
       const rule = existingEntry.recurrence_rule || '';
       if (!rule) {
@@ -159,8 +164,11 @@ export default function AddEventModal({
       const hour = initialHour.toString().padStart(2, '0');
       setStartHour(hour);
       setStartMinute('00');
+      const nextHour = Math.min(initialHour + 1, workingHoursEnd ?? 21);
+      setEndHour(nextHour.toString().padStart(2, '0'));
+      setEndMinute('00');
     }
-  }, [initialHour, isOpen, existingEntry]);
+  }, [initialHour, isOpen, existingEntry, workingHoursEnd]);
 
   useEffect(() => {
     if (initialDay && isOpen && !existingEntry) {
@@ -172,7 +180,8 @@ export default function AddEventModal({
     if (!isOpen) {
       if (!existingEntry) {
         setStudentName('');
-        setDuration('60');
+        setEndHour('10');
+        setEndMinute('00');
         setFrequency('weekly');
       }
       setError(null);
@@ -188,8 +197,8 @@ export default function AddEventModal({
       return;
     }
 
-    if (!startHour || !startMinute) {
-      setError('Please select a start time');
+    if (!startHour || !startMinute || !endHour || !endMinute) {
+      setError('Please select start and end times');
       return;
     }
 
@@ -210,8 +219,17 @@ export default function AddEventModal({
       const minutes = parseInt(startMinute);
       firstOccurrence.setHours(hours, minutes, 0, 0);
 
+      const eHours = parseInt(endHour);
+      const eMinutes = parseInt(endMinute);
+
       const endTime = new Date(firstOccurrence);
-      endTime.setMinutes(endTime.getMinutes() + parseInt(duration));
+      endTime.setHours(eHours, eMinutes, 0, 0);
+
+      if (endTime <= firstOccurrence) {
+        setError('End time must be after start time');
+        setLoading(false);
+        return;
+      }
 
       const allEntries = await getScheduleEntries(scheduleId);
 
@@ -306,6 +324,44 @@ export default function AddEventModal({
     }
   };
 
+  const handleStartTimeChange = (type: 'hour' | 'minute', value: string) => {
+    // Calculate current duration before the change
+    const currentStartMins = parseInt(startHour) * 60 + parseInt(startMinute);
+    const currentEndMins = parseInt(endHour) * 60 + parseInt(endMinute);
+    let durationMins = currentEndMins - currentStartMins;
+
+    // Fallback to 60 mins if current duration is invalid (e.g. end < start)
+    if (durationMins <= 0) durationMins = 60;
+
+    // Apply the new start value
+    let newStartHour = startHour;
+    let newStartMinute = startMinute;
+    if (type === 'hour') {
+      newStartHour = value;
+      setStartHour(value);
+    } else {
+      newStartMinute = value;
+      setStartMinute(value);
+    }
+
+    // Calculate the new end time by adding the preserved duration
+    const newStartMinsTotal = parseInt(newStartHour) * 60 + parseInt(newStartMinute);
+    const newEndMinsTotal = newStartMinsTotal + durationMins;
+
+    const computedEndHour = Math.floor(newEndMinsTotal / 60);
+    const computedEndMinute = newEndMinsTotal % 60;
+
+    // Cap the end time at the working hours end
+    const maxEndHour = workingHoursEnd ?? 21;
+    if (computedEndHour > maxEndHour || (computedEndHour === maxEndHour && computedEndMinute > 0)) {
+      setEndHour(maxEndHour.toString().padStart(2, '0'));
+      setEndMinute('00');
+    } else {
+      setEndHour(computedEndHour.toString().padStart(2, '0'));
+      setEndMinute(computedEndMinute.toString().padStart(2, '0'));
+    }
+  };
+
   return (
     <Modal isOpen={isOpen} onClose={onClose} title={isEditMode ? "Edit Event" : "Add Event"} maxWidth="40rem">
       <form onSubmit={handleSubmit} style={styles.form}>
@@ -344,57 +400,6 @@ export default function AddEventModal({
 
           <div style={styles.formGroup}>
             <label style={styles.label}>
-              Start Time <span style={styles.required}>*</span>
-            </label>
-            <div style={{ display: 'flex', gap: '0.5rem' }}>
-              <select
-                value={startHour}
-                onChange={(e) => setStartHour(e.target.value)}
-                style={{ ...styles.select, flex: 1 }}
-                disabled={loading}
-              >
-                {Array.from({ length: (workingHoursEnd ?? 21) - (workingHoursStart ?? 8) }, (_, i) => i + (workingHoursStart ?? 8)).map((hour) => (
-                  <option key={hour} value={hour.toString().padStart(2, '0')}>
-                    {hour === 0 ? '12 AM' : hour === 12 ? '12 PM' : hour > 12 ? `${hour - 12} PM` : `${hour} AM`}
-                  </option>
-                ))}
-              </select>
-              <select
-                value={startMinute}
-                onChange={(e) => setStartMinute(e.target.value)}
-                style={{ ...styles.select, flex: 1, minWidth: '70px' }}
-                disabled={loading}
-              >
-                <option value="00">00</option>
-                <option value="15">15</option>
-                <option value="30">30</option>
-                <option value="45">45</option>
-              </select>
-            </div>
-          </div>
-        </div>
-
-        <div style={styles.row}>
-          <div style={styles.formGroup}>
-            <label style={styles.label}>
-              Duration <span style={styles.required}>*</span>
-            </label>
-            <select
-              value={duration}
-              onChange={(e) => setDuration(e.target.value)}
-              style={styles.select}
-              disabled={loading}
-            >
-              <option value="30">30 minutes</option>
-              <option value="45">45 minutes</option>
-              <option value="60">60 minutes (1 hour)</option>
-              <option value="90">90 minutes (1.5 hours)</option>
-              <option value="120">120 minutes (2 hours)</option>
-            </select>
-          </div>
-
-          <div style={styles.formGroup}>
-            <label style={styles.label}>
               Frequency <span style={styles.required}>*</span>
             </label>
             <select
@@ -411,10 +416,74 @@ export default function AddEventModal({
           </div>
         </div>
 
+        <div style={styles.row}>
+          <div style={styles.formGroup}>
+            <label style={styles.label}>
+              Start Time <span style={styles.required}>*</span>
+            </label>
+            <div style={{ display: 'flex', gap: '0.5rem' }}>
+              <select
+                value={startHour}
+                onChange={(e) => handleStartTimeChange('hour', e.target.value)}
+                style={{ ...styles.select, flex: 1 }}
+                disabled={loading}
+              >
+                {Array.from({ length: (workingHoursEnd ?? 21) - (workingHoursStart ?? 8) }, (_, i) => i + (workingHoursStart ?? 8)).map((hour) => (
+                  <option key={hour} value={hour.toString().padStart(2, '0')}>
+                    {hour === 0 ? '12 AM' : hour === 12 ? '12 PM' : hour > 12 ? `${hour - 12} PM` : `${hour} AM`}
+                  </option>
+                ))}
+              </select>
+              <select
+                value={startMinute}
+                onChange={(e) => handleStartTimeChange('minute', e.target.value)}
+                style={{ ...styles.select, flex: 1, minWidth: '70px' }}
+                disabled={loading}
+              >
+                <option value="00">00</option>
+                <option value="15">15</option>
+                <option value="30">30</option>
+                <option value="45">45</option>
+              </select>
+            </div>
+          </div>
+
+          <div style={styles.formGroup}>
+            <label style={styles.label}>
+              End Time <span style={styles.required}>*</span>
+            </label>
+            <div style={{ display: 'flex', gap: '0.5rem' }}>
+              <select
+                value={endHour}
+                onChange={(e) => setEndHour(e.target.value)}
+                style={{ ...styles.select, flex: 1 }}
+                disabled={loading}
+              >
+                {Array.from({ length: (workingHoursEnd ?? 21) - (workingHoursStart ?? 8) + 1 }, (_, i) => i + (workingHoursStart ?? 8)).map((hour) => (
+                  <option key={hour} value={hour.toString().padStart(2, '0')}>
+                    {hour === 0 ? '12 AM' : hour === 12 ? '12 PM' : hour > 12 ? `${hour - 12} PM` : `${hour} AM`}
+                  </option>
+                ))}
+              </select>
+              <select
+                value={endMinute}
+                onChange={(e) => setEndMinute(e.target.value)}
+                style={{ ...styles.select, flex: 1, minWidth: '70px' }}
+                disabled={loading}
+              >
+                <option value="00">00</option>
+                <option value="15">15</option>
+                <option value="30">30</option>
+                <option value="45">45</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
         <div style={styles.hint}>
           {frequency === 'once'
-            ? `This is a single event on ${day} at ${startHour}:${startMinute}`
-            : `This event will repeat on ${day}s at ${startHour}:${startMinute}`}
+            ? `This is a single event on ${day} from ${startHour}:${startMinute} to ${endHour}:${endMinute}`
+            : `This event will repeat on ${day}s from ${startHour}:${startMinute} to ${endHour}:${endMinute}`}
         </div>
 
         {error && <div style={styles.errorText}>{error}</div>}

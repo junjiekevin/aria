@@ -27,10 +27,12 @@ DECLARE
     v_new_start TIMESTAMPTZ;
     v_new_end TIMESTAMPTZ;
     v_created_count INTEGER := 0;
+    v_total_abs_weeks INTEGER;
+    v_occurrence DATE;
 BEGIN
     -- Get the entry details
     SELECT * INTO v_entry FROM schedule_entries WHERE id = p_entry_id;
-    IF NOT FOUND THEN
+    IF NOT FOUND OR v_entry.start_time IS NULL THEN
         RETURN 0;
     END IF;
 
@@ -39,7 +41,9 @@ BEGIN
     v_entry_day := EXTRACT(DOW FROM v_start_time)::INTEGER;
     v_rule := v_entry.recurrence_rule;
 
-    -- Parse the frequency from the rule
+    RAISE NOTICE 'Expanding entry % (%) starting at %', p_entry_id, v_entry.student_name, v_start_time;
+
+    -- Parse the frequency and interval from the rule
     v_freq := COALESCE(
         (SELECT UPPER(m[1]) FROM regexp_matches(v_rule, 'FREQ=(\w+)') AS m),
         'WEEKLY'
@@ -49,12 +53,6 @@ BEGIN
         1
     );
 
-    -- Get time components
-    v_start_hour := EXTRACT(HOUR FROM v_start_time)::INTEGER;
-    v_start_minute := EXTRACT(MINUTE FROM v_start_time)::INTEGER;
-    v_end_hour := EXTRACT(HOUR FROM v_end_time)::INTEGER;
-    v_end_minute := EXTRACT(MINUTE FROM v_end_time)::INTEGER;
-
     -- Find the first occurrence of this day after schedule start
     v_days_to_first := v_entry_day - EXTRACT(DOW FROM p_schedule_start)::INTEGER;
     IF v_days_to_first < 0 THEN v_days_to_first := v_days_to_first + 7; END IF;
@@ -62,21 +60,27 @@ BEGIN
 
     -- Generate entries for each week
     FOR v_week IN 0..p_schedule_weeks LOOP
-        -- Check frequency rules
-        IF v_freq = 'WEEKLY' THEN
-            IF (v_week % v_interval) != 0 THEN CONTINUE; END IF;
-        ELSIF v_freq = '2WEEKLY' THEN
-            IF (v_week % 2) != 0 THEN CONTINUE; END IF;
-        ELSIF v_freq = 'MONTHLY' THEN
-            IF (v_week % 4) != 0 THEN CONTINUE; END IF;
+        -- Calculate current occurrence date
+        v_occurrence := v_first_occurrence + (v_week * 7);
+        
+        -- Calculate ABSOLUTE week offset from the original entry to preserve parity
+        -- This ensures that biweekly/monthly logic is anchored to the original series
+        v_total_abs_weeks := (v_occurrence - v_start_time::DATE) / 7;
+
+        -- Check frequency rules against the absolute week offset
+        -- Normalize interval for non-standard freq strings
+        IF v_freq = '2WEEKLY' AND v_interval = 1 THEN v_interval := 2; v_freq := 'WEEKLY'; END IF;
+        IF v_freq = 'MONTHLY' AND v_interval = 1 THEN v_interval := 4; v_freq := 'WEEKLY'; END IF;
+        
+        IF (v_total_abs_weeks % v_interval) != 0 THEN 
+            CONTINUE; 
         END IF;
 
-        -- Calculate occurrence date
-        v_occurrence := v_first_occurrence + (v_week * 7);
+        -- Calculate start/end times preserving duration and timezone
+        v_new_start := v_start_time + ((v_occurrence - v_start_time::DATE)) * INTERVAL '1 day';
+        v_new_end := v_new_start + (v_end_time - v_start_time);
 
-        -- Create the new entry (only the 5 actual columns)
-        v_new_start := v_occurrence + (v_start_hour || ' hours')::INTERVAL + (v_start_minute || ' minutes')::INTERVAL;
-        v_new_end := v_occurrence + (v_end_hour || ' hours')::INTERVAL + (v_end_minute || ' minutes')::INTERVAL;
+        RAISE NOTICE '  - Week % (Abs %): Creating entry for %', v_week, v_total_abs_weeks, v_new_start;
 
         INSERT INTO schedule_entries (
             id,
@@ -125,8 +129,19 @@ BEGIN
         FROM schedules
         WHERE id = v_entry.schedule_id;
 
-        -- Calculate total weeks (use 13 weeks / ~3 months as default if schedule is very long)
-        v_total_weeks := LEAST(13, (v_schedule_end - v_schedule_start)::INTEGER / 7);
+        -- Fallback: If schedule has no dates, use the entry's own start_time
+        v_schedule_start := COALESCE(v_schedule_start, v_entry.start_time::DATE);
+        v_schedule_end := COALESCE(v_schedule_end, v_schedule_start + INTERVAL '3 months');
+
+        -- Calculate total weeks: default to 13 weeks (~3 months) if end date is missing
+        v_total_weeks := COALESCE(
+            CASE 
+                WHEN v_schedule_end > v_schedule_start THEN (v_schedule_end - v_schedule_start)::INTEGER / 7
+                ELSE 12 
+            END, 
+            12
+        );
+        v_total_weeks := LEAST(13, GREATEST(1, v_total_weeks)); -- Clamp between 1 and 13 weeks
 
         -- Expand the entry
         SELECT expand_recurring_entry(v_entry.id, v_schedule_start, v_total_weeks)
