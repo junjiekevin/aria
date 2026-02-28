@@ -19,6 +19,78 @@ const ALLOWED_MODELS = new Set([
   "qwen/qwen3-4b:free",
 ]);
 
+// ─── Auth token cache ────────────────────────────────────────────────────────
+// Agentic loops fire 2–5 requests within a few seconds using the same JWT.
+// Caching the getUser() result eliminates redundant Supabase round-trips for
+// every iteration after the first. 30s TTL ensures stale tokens expire safely.
+const AUTH_CACHE_TTL_MS = 30_000;
+interface AuthCacheEntry { userId: string; expiresAt: number; }
+const authCache = new Map<string, AuthCacheEntry>();
+
+function getJwtExpMs(authHeader: string): number | null {
+  try {
+    const token = authHeader.replace(/^Bearer\s+/i, "").trim();
+    const parts = token.split(".");
+    if (parts.length < 2) return null;
+
+    const base64 = parts[1].replace(/-/g, "+").replace(/_/g, "/");
+    const padded = base64 + "=".repeat((4 - (base64.length % 4)) % 4);
+    const payload = JSON.parse(atob(padded)) as { exp?: unknown };
+
+    return typeof payload.exp === "number" ? payload.exp * 1000 : null;
+  } catch {
+    return null;
+  }
+}
+
+async function getVerifiedUserId(
+  authHeader: string,
+): Promise<string | null> {
+  const now = Date.now();
+  const tokenExpMs = getJwtExpMs(authHeader);
+
+  if (tokenExpMs !== null && tokenExpMs <= now) {
+    authCache.delete(authHeader);
+    return null;
+  }
+
+  // Check cache first
+  const cached = authCache.get(authHeader);
+  if (cached && cached.expiresAt > now) {
+    return cached.userId;
+  }
+
+  // Cache miss — do the full Supabase lookup
+  if (!SUPABASE_URL || !SUPABASE_ANON_KEY) return null;
+  const client = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+    global: { headers: { Authorization: authHeader } },
+  });
+  const { data, error } = await client.auth.getUser();
+  if (error || !data?.user?.id) return null;
+
+  // Store in cache
+  const cacheNow = Date.now();
+  const ttlExpiryMs = cacheNow + AUTH_CACHE_TTL_MS;
+  const boundedExpiryMs = tokenExpMs !== null
+    ? Math.min(ttlExpiryMs, tokenExpMs - 1000)
+    : ttlExpiryMs;
+
+  if (boundedExpiryMs > cacheNow) {
+    authCache.set(authHeader, {
+      userId: data.user.id,
+      expiresAt: boundedExpiryMs,
+    });
+  }
+
+  // Evict entries that have expired to avoid unbounded memory growth
+  for (const [key, entry] of authCache) {
+    if (entry.expiresAt <= Date.now()) authCache.delete(key);
+  }
+
+  return data.user.id;
+}
+// ─────────────────────────────────────────────────────────────────────────────
+
 function json(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
     status,
@@ -60,14 +132,8 @@ serve(async (req) => {
       );
     }
 
-    const authClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-      global: {
-        headers: { Authorization: authHeader },
-      },
-    });
-
-    const { data: authData, error: authError } = await authClient.auth.getUser();
-    if (authError || !authData?.user) {
+    const userId = await getVerifiedUserId(authHeader);
+    if (!userId) {
       return json(
         {
           ok: false,
@@ -78,6 +144,7 @@ serve(async (req) => {
         200
       );
     }
+
 
     const body = await req.json();
     const model = body?.model;

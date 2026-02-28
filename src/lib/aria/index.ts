@@ -11,6 +11,7 @@ export {
   type RequiredId,
 } from './functionRegistry';
 export {
+  buildActionPrompt,
   buildSystemPrompt,
   buildToolBlock,
   getSystemPrompt,

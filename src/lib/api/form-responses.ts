@@ -70,6 +70,22 @@ export async function getFormResponses(scheduleId: string): Promise<FormResponse
     return data || [];
 }
 
+// Get a single form response by participant ID.
+export async function getFormResponseById(responseId: string): Promise<FormResponse | null> {
+    const { data, error } = await supabase
+        .from('form_responses')
+        .select('*')
+        .eq('id', responseId)
+        .single();
+
+    if (error) {
+        if (error.code === 'PGRST116') return null; // Not found
+        throw new Error(`Failed to fetch form response: ${error.message}`);
+    }
+
+    return data as FormResponse;
+}
+
 // Create a new form response (student submission)
 export async function createFormResponse(response: CreateFormResponseInput): Promise<FormResponse> {
     const { data, error } = await supabase

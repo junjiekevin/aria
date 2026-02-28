@@ -6,10 +6,18 @@
 import { supabase } from './supabase';
 
 const OPENROUTER_PROXY_FUNCTION = 'openrouter-chat';
-const MODELS = [
-  'google/gemini-2.5-flash-lite',
-  'z-ai/glm-4.7-flash',
-  'google/gemma-3-27b-it',
+
+// Per-model config: cap tokens tightly on fast models so they finish quickly.
+// Aria's longest real output is a function call JSON (~200 tokens) + short sentence (~50 tokens).
+// 800 tokens = 4× headroom for the primary model. Fallbacks get 1200 since they're slower anyway.
+interface ModelConfig {
+  id: string;
+  maxTokens: number;
+}
+const MODELS: ModelConfig[] = [
+  { id: 'google/gemini-2.5-flash-lite', maxTokens: 3000 },
+  { id: 'z-ai/glm-4.7-flash', maxTokens: 3000 },
+  { id: 'google/gemma-3-27b-it', maxTokens: 3000 },
 ];
 const DEBUG = import.meta.env.DEV;
 
@@ -27,6 +35,10 @@ export interface ChatResponse {
   message: string;
   rawContent?: string; // Original unstripped message for history
   functionCall?: FunctionCall;
+}
+
+export interface ChatOptions {
+  maxTokensOverride?: number;
 }
 
 interface ParsedFunctionCall {
@@ -95,7 +107,8 @@ async function callOpenRouterProxy(
  */
 export async function sendChatMessage(
   messages: Message[],
-  systemPrompt?: string
+  systemPrompt?: string,
+  options: ChatOptions = {}
 ): Promise<ChatResponse> {
   // Build messages array with optional system prompt
   const openRouterMessages: OpenRouterMessage[] = systemPrompt
@@ -104,18 +117,22 @@ export async function sendChatMessage(
 
   let lastError: Error | null = null;
 
-  for (const model of MODELS) {
+  for (const { id: model, maxTokens } of MODELS) {
+    const maxTokensForRequest = options.maxTokensOverride
+      ? Math.min(maxTokens, options.maxTokensOverride)
+      : maxTokens;
+
     const requestBody: OpenRouterRequest = {
-      model: model,
+      model,
       messages: openRouterMessages,
-      temperature: 0.7,
-      max_tokens: 4000, // Significantly increased to handle verbose thought blocks without truncation
+      temperature: 0.3, // Lower = faster, more deterministic. Aria is a tool agent, not a creative writer.
+      max_tokens: maxTokensForRequest,
       // Stop sequences - prevent model from roleplaying future turns or hallucinating results
       stop: ['[Turn', 'User:', '<start_of_turn>', '\nUser:', '\nAria:'],
     };
 
     try {
-      debugLog(`[Aria Debug] Attempting request using model: ${model}`);
+      debugLog(`[Aria Debug] Attempting request using model: ${model} (max_tokens: ${maxTokensForRequest})`);
       debugLog('[Aria Debug] Messages:', JSON.stringify(openRouterMessages.slice(-3), null, 2));
 
       const proxyResponse = await callOpenRouterProxy(requestBody);
@@ -147,8 +164,33 @@ export async function sendChatMessage(
       const assistantMessage = data.choices[0].message.content;
       debugLog('[Aria Debug] Raw assistant message:', assistantMessage);
 
-      // Strip <think>...</think> and <thought>...</thought> reasoning tags
-      let cleanedMessage = assistantMessage.replace(/<(thought|think)>[\s\S]*?<\/(thought|think)>/gi, '').trim();
+      if (!assistantMessage || !assistantMessage.trim()) {
+        debugWarn(`[Aria Debug] ${model} returned empty assistant content. Trying fallback model.`);
+        lastError = new Error(`Model ${model} returned empty content`);
+        continue;
+      }
+
+      // Apply stop-sequence truncation to raw output first so parsing and display
+      // both operate on the same bounded content.
+      const stopTriggers = ['\nUser:', '\nAria:', '[Turn', '<start_of_turn>'];
+      const applyStopTriggers = (msg: string): string => {
+        let truncated = msg;
+        for (const trigger of stopTriggers) {
+          const index = truncated.indexOf(trigger);
+          if (index !== -1) {
+            debugLog(`[Aria Debug] Detected stop trigger "${trigger}" at index ${index}. Truncating.`);
+            truncated = truncated.substring(0, index);
+          }
+        }
+        return truncated.trim();
+      };
+      const parseSource = applyStopTriggers(assistantMessage);
+
+      // Strip reasoning tags for display, including unclosed tags.
+      let cleanedMessage = parseSource
+        .replace(/<thought>[\s\S]*?(?:<\/thought>|$)/gi, '')
+        .replace(/<think>[\s\S]*?(?:<\/think>|$)/gi, '')
+        .trim();
 
       // 1. Force-remove "Aria:" prefix if the model stubbornly ignores the prompt
       if (cleanedMessage.startsWith('Aria:')) {
@@ -156,17 +198,6 @@ export async function sendChatMessage(
       } else if (cleanedMessage.startsWith('"') && cleanedMessage.includes('Aria: "')) {
         // Catch scenarios like: "Aria: "Message""
         cleanedMessage = cleanedMessage.replace(/^"?Aria:\s*"/, '').replace(/"$/, '');
-      }
-
-      // 2. Client-Side Stop Sequence Enforcement (Hallucination Slayer)
-      // If the model generates a script (User: ... Aria: ...), we cut it off at the first sign of a new turn.
-      const stopTriggers = ['\nUser:', '\nAria:', '[Turn', '<start_of_turn>'];
-      for (const trigger of stopTriggers) {
-        const index = cleanedMessage.indexOf(trigger);
-        if (index !== -1) {
-          debugLog(`[Aria Debug] Detected stop trigger "${trigger}" at index ${index}. Truncating.`);
-          cleanedMessage = cleanedMessage.substring(0, index).trim();
-        }
       }
 
       debugLog('[Aria Debug] Final sanitized message:', cleanedMessage);
@@ -189,17 +220,17 @@ export async function sendChatMessage(
 
       const textResponse = stripFunctionCalls(cleanedMessage);
 
-      // 1. Look for FUNCTION_CALL: pattern (in cleaned message, not raw)
+      // 1. Look for FUNCTION_CALL: pattern in parseSource (raw bounded text)
       const functionCallMarker = 'FUNCTION_CALL:';
-      const firstCallIndex = cleanedMessage.indexOf(functionCallMarker);
+      const firstCallIndex = parseSource.indexOf(functionCallMarker);
 
-      // 2. Look for <tool_call> pattern (in cleaned message)
-      const toolCallMatch = cleanedMessage.match(/<tool_call>\s*(\{[\s\S]*?\})\s*<\/tool_call>/);
+      // 2. Look for <tool_call> pattern in parseSource
+      const toolCallMatch = parseSource.match(/<tool_call>\s*(\{[\s\S]*?\})\s*<\/tool_call>/);
 
       if (firstCallIndex !== -1) {
         try {
           const start = firstCallIndex + functionCallMarker.length;
-          const potentialJson = cleanedMessage.substring(start).trim();
+          const potentialJson = parseSource.substring(start).trim();
 
           let jsonString = '';
           let braceCount = 0;
