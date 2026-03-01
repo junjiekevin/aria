@@ -191,6 +191,71 @@ function normalizePlanChanges(raw: unknown): PlanChange[] | null {
 }
 
 // ============================================
+// Input Validation
+// ============================================
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+function requireString(args: Record<string, unknown>, key: string, label?: string): string | null {
+    const v = args[key];
+    if (typeof v === 'string' && v.trim()) return null;
+    return `Missing required field: ${label ?? key}`;
+}
+
+function requireUuid(args: Record<string, unknown>, key: string, label?: string): string | null {
+    const v = args[key];
+    if (typeof v === 'string' && UUID_RE.test(v.trim())) return null;
+    if (typeof v === 'string' && v.trim()) return `${label ?? key} must be a valid UUID, got "${v}". Use a lookup tool first.`;
+    return `Missing required field: ${label ?? key}`;
+}
+
+/**
+ * Validate tool inputs before execution.
+ * Returns an error string if validation fails, null if inputs are valid.
+ */
+function validateToolInput(name: string, args: Record<string, unknown>): string | null {
+    switch (name) {
+        case 'createSchedule':
+            return requireString(args, 'label') ?? requireString(args, 'start_date') ?? requireString(args, 'end_date');
+        case 'updateSchedule':
+        case 'trashSchedule':
+        case 'recoverSchedule':
+        case 'publishSchedule':
+        case 'getExportLink':
+        case 'updateFormConfig':
+        case 'analyzeScheduleHealth':
+        case 'autoScheduleParticipants':
+            return requireString(args, 'schedule_id');
+        case 'addEventToSchedule':
+            return requireString(args, 'schedule_id') ?? requireString(args, 'student_name') ?? requireString(args, 'day');
+        case 'updateEventInSchedule':
+            return requireString(args, 'event_id');
+        case 'deleteEventFromSchedule':
+            return requireString(args, 'event_id');
+        case 'getEventSummaryInSchedule':
+        case 'searchEventsInSchedule':
+        case 'listUnassignedParticipants':
+            return requireString(args, 'schedule_id');
+        case 'swapEvents': {
+            const e1 = args.event1_id || args.event_id1 || args.id1;
+            const e2 = args.event2_id || args.event_id2 || args.id2;
+            if (!e1 || !e2) return 'Missing event IDs. Provide both event1_id and event2_id. Use getEventSummaryInSchedule first.';
+            return null;
+        }
+        case 'markParticipantAssigned':
+            return requireString(args, 'participant_id');
+        case 'getParticipantPreferences':
+            return requireString(args, 'participant_id');
+        case 'proposeScheduleChanges':
+            return requireString(args, 'schedule_id');
+        case 'commitSchedulePlan':
+            return requireUuid(args, 'plan_id');
+        default:
+            return null;
+    }
+}
+
+// ============================================
 // Execution
 // ============================================
 
@@ -202,6 +267,12 @@ export async function executeFunction(
     const resolvedFunctionName = normalizeFunctionName(functionName);
 
     const run = async () => {
+        // Pre-flight validation
+        const validationError = validateToolInput(resolvedFunctionName, args);
+        if (validationError) {
+            return { success: false, error: validationError };
+        }
+
         try {
             switch (resolvedFunctionName) {
 

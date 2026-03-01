@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { Send, Loader2, User, MessageCircle, X, Minimize2, Lightbulb } from 'lucide-react';
 import { sendChatMessage, type Message } from '../lib/openrouter';
-import { buildActionPrompt, buildSystemPrompt, buildToolBlock, isSimpleQuery, getMinimalPrompt, type PromptContext } from '../lib/aria';
+import { buildActionPrompt, buildAdvisoryPrompt, buildAdvisoryToolBlock, buildSystemPrompt, buildToolBlock, classifyMode, getMinimalPrompt, ADVISORY_TOOL_NAMES, suggestSlots, type PromptContext, type AriaMode, type ScheduledEvent, type UnassignedParticipant } from '../lib/aria';
 import { executeFunction } from '../lib/functions';
 import PlanPreviewCard from './PlanPreviewCard';
 import ariaProfile from '../assets/images/aria-profile.png';
@@ -13,6 +13,10 @@ const MULTI_STEP_GOAL_HINT = /\b(and then|then|also|after that|afterwards|plus)\
 const COMPLEX_GOAL_HINT = /\b(suggest|recommend|remaining|coverage|gap|analy[sz]e|resolve|fix|plan|propose|optimi[sz]e)\b/i;
 const SIMPLE_ACTION_MAX_TOKENS = 700;
 const COMPLEX_INTENT_MAX_TOKENS = 180;
+const ADVISORY_MAX_ITERATIONS = 4;
+const ADVISORY_MAX_TOKENS = 1200;
+const ADVISORY_REPEAT_TOOL_SOFT_CAP = 2;
+const ADVISORY_SEEDED_HISTORY = 4;
 const MAX_SEEDED_HISTORY_MESSAGES = 10;
 const ID_DELEGATION_HINT = /(need|provide|missing).*(id|ids)|event ids?|participant id/i;
 const COMPLEX_INTENT_TRIGGER = /\b(swap|move|resched|change|update|delete|remove|commit|apply|approve)\b/i;
@@ -329,6 +333,107 @@ function isUnscheduledCountQuery(input: string): boolean {
   return asksCount && asksUnscheduled;
 }
 
+function isSuggestSpotsForUnscheduledQuery(input: string): boolean {
+  const lower = input.toLowerCase();
+  const asksSuggest = /\b(suggest|recommend|propose|find)\b/.test(lower);
+  const asksSlots = /\b(spot|spots|slot|slots|time|times)\b/.test(lower);
+  const asksUnscheduled = /\b(unassigned|unscheduled|remaining|left)\b/.test(lower);
+  return asksSuggest && asksSlots && asksUnscheduled;
+}
+
+function parseHourFromTimeLike(value: unknown): number | null {
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    const hour = Math.trunc(value);
+    return hour >= 0 && hour <= 23 ? hour : null;
+  }
+  if (typeof value !== 'string') return null;
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+
+  const match = trimmed.match(/^(\d{1,2})/);
+  if (!match) return null;
+  const hour = Number(match[1]);
+  if (!Number.isFinite(hour) || hour < 0 || hour > 23) return null;
+  return hour;
+}
+
+function formatHourForDisplay(hour24: number): string {
+  const normalized = Math.max(0, Math.min(23, Math.trunc(hour24)));
+  const suffix = normalized >= 12 ? 'PM' : 'AM';
+  const hour12 = normalized % 12 === 0 ? 12 : normalized % 12;
+  return `${hour12}:00 ${suffix}`;
+}
+
+function mapSummaryToScheduledEvents(summaryData: unknown): ScheduledEvent[] {
+  if (!summaryData || typeof summaryData !== 'object') return [];
+  const byDay = summaryData as Record<string, unknown>;
+  const mapped: ScheduledEvent[] = [];
+
+  for (const [day, rawEvents] of Object.entries(byDay)) {
+    if (!Array.isArray(rawEvents)) continue;
+    for (const raw of rawEvents) {
+      if (!raw || typeof raw !== 'object') continue;
+      const row = raw as Record<string, unknown>;
+      const timeKey = extractHourKey(row);
+      const hour = parseHourFromTimeLike(timeKey);
+      if (hour === null) continue;
+
+      const name =
+        (typeof row.n === 'string' && row.n.trim()) ||
+        (typeof row.student_name === 'string' && row.student_name.trim()) ||
+        (typeof row.name === 'string' && row.name.trim()) ||
+        'Event';
+
+      mapped.push({ name, day, hour });
+    }
+  }
+
+  return mapped;
+}
+
+function mapUnassignedToParticipants(unassignedData: unknown): UnassignedParticipant[] {
+  if (!Array.isArray(unassignedData)) return [];
+
+  return unassignedData
+    .map((raw) => {
+      if (!raw || typeof raw !== 'object') return null;
+      const row = raw as Record<string, unknown>;
+      const id = String(row.id ?? '').trim();
+      if (!id) return null;
+
+      const name =
+        (typeof row.student_name === 'string' && row.student_name.trim()) ||
+        (typeof row.n === 'string' && row.n.trim()) ||
+        `Participant ${id.slice(0, 8)}`;
+
+      const preferences: UnassignedParticipant['preferences'] = [];
+      for (let i = 1; i <= 3; i++) {
+        const dayRaw = row[`preferred_${i}_day`] ?? row[`p${i}d`];
+        const startRaw = row[`preferred_${i}_start`] ?? row[`p${i}s`];
+        const endRaw = row[`preferred_${i}_end`] ?? row[`p${i}e`];
+        const frequencyRaw = row[`preferred_${i}_frequency`] ?? row[`p${i}f`];
+
+        if (typeof dayRaw !== 'string' || !dayRaw.trim()) continue;
+        const startHour = parseHourFromTimeLike(startRaw);
+        if (startHour === null) continue;
+        const endHour = parseHourFromTimeLike(endRaw) ?? Math.min(startHour + 1, 23);
+        const frequency = typeof frequencyRaw === 'string' && frequencyRaw.trim()
+          ? frequencyRaw.trim()
+          : 'weekly';
+
+        preferences.push({
+          day: dayRaw.trim(),
+          startHour,
+          endHour,
+          frequency,
+        });
+      }
+
+      return { id, name, preferences };
+    })
+    .filter((participant): participant is UnassignedParticipant => participant !== null);
+}
+
 function normalizeComparableText(input: string): string {
   return input.trim().toLowerCase().replace(/\s+/g, ' ');
 }
@@ -351,6 +456,13 @@ interface ChatMessage extends Message {
 interface FloatingChatProps {
   onScheduleChange?: () => void;
   onShowAutoSchedule?: () => void;
+}
+
+interface ResolvedScheduleContext {
+  scheduleId: string | null;
+  noSchedules: boolean;
+  needsUserChoice: boolean;
+  scheduleLabels: string[];
 }
 
 const styles: Record<string, React.CSSProperties> = {
@@ -899,6 +1011,70 @@ export default function FloatingChat({ onScheduleChange, onShowAutoSchedule }: F
     return picked;
   };
 
+  const resolveScheduleContextForLookup = async (
+    preferredScheduleId: string | null
+  ): Promise<ResolvedScheduleContext> => {
+    const listResult = await executeFunction('listSchedules', {}, { bypassDedup: true });
+    if (!listResult.success || !Array.isArray(listResult.data)) {
+      return {
+        scheduleId: preferredScheduleId,
+        noSchedules: false,
+        needsUserChoice: false,
+        scheduleLabels: [],
+      };
+    }
+
+    const schedules = listResult.data
+      .map((raw) => {
+        if (!raw || typeof raw !== 'object') return null;
+        const row = raw as Record<string, unknown>;
+        const id = typeof row.id === 'string' ? row.id : '';
+        const label =
+          typeof row.label === 'string'
+            ? row.label
+            : typeof row.name === 'string'
+              ? row.name
+              : '';
+        if (!id.trim()) return null;
+        return { id: id.trim(), label: label.trim() };
+      })
+      .filter((item): item is { id: string; label: string } => item !== null);
+
+    if (schedules.length === 0) {
+      return {
+        scheduleId: null,
+        noSchedules: true,
+        needsUserChoice: false,
+        scheduleLabels: [],
+      };
+    }
+
+    if (preferredScheduleId && schedules.some((s) => s.id === preferredScheduleId)) {
+      return {
+        scheduleId: preferredScheduleId,
+        noSchedules: false,
+        needsUserChoice: false,
+        scheduleLabels: schedules.map((s) => s.label || s.id.slice(0, 8)),
+      };
+    }
+
+    if (schedules.length === 1) {
+      return {
+        scheduleId: schedules[0].id,
+        noSchedules: false,
+        needsUserChoice: false,
+        scheduleLabels: schedules.map((s) => s.label || s.id.slice(0, 8)),
+      };
+    }
+
+    return {
+      scheduleId: null,
+      noSchedules: false,
+      needsUserChoice: true,
+      scheduleLabels: schedules.map((s) => s.label || s.id.slice(0, 8)).slice(0, 5),
+    };
+  };
+
   const classifyComplexIntent = async (messageText: string): Promise<ComplexIntent | null> => {
     if (!COMPLEX_INTENT_TRIGGER.test(messageText)) return null;
 
@@ -1112,13 +1288,311 @@ export default function FloatingChat({ onScheduleChange, onShowAutoSchedule }: F
       const promptContext: PromptContext = {
         scheduleId: currentScheduleId || undefined,
       };
-      const singleStepGoalLikely =
-        !MULTI_STEP_GOAL_HINT.test(userMessage.content) &&
-        !COMPLEX_GOAL_HINT.test(userMessage.content);
+
+      // ─── Mode classification ────────────────────────────────────────────────
+      // Deterministic first, LLM fallback for ambiguous inputs.
+      const modeResult = await classifyMode(userMessage.content);
+      const mode: AriaMode = modeResult.mode;
+      if (DEBUG) {
+        console.log('[Aria Debug] Mode classification:', {
+          mode: modeResult.mode,
+          confidence: modeResult.confidence,
+          source: modeResult.source,
+        });
+      }
 
       if (currentScheduleId) {
         if (DEBUG) console.log('[FloatingChat Debug] Current schedule context:', currentScheduleId);
       }
+
+      // ─── Simple mode ────────────────────────────────────────────────────────
+      if (mode === 'simple') {
+        const response = await sendChatMessage(
+          [{ role: 'user', content: userMessage.content }],
+          getMinimalPrompt(),
+        );
+        appendAssistantMessage(response.message);
+        return;
+      }
+
+      // ─── Advisory mode ──────────────────────────────────────────────────────
+      if (mode === 'advisory') {
+        const advisorySeeded = messages
+          .filter(shouldKeepForSeededHistory)
+          .slice(-ADVISORY_SEEDED_HISTORY)
+          .map((msg) => ({ role: msg.role, content: msg.content }));
+
+        const alreadyEndsWithSameUserText =
+          advisorySeeded.length > 0 &&
+          advisorySeeded[advisorySeeded.length - 1]?.role === 'user' &&
+          normalizeComparableText(advisorySeeded[advisorySeeded.length - 1].content) === normalizeComparableText(userMessage.content);
+        let advisoryHistory: Message[] = alreadyEndsWithSameUserText
+          ? [...advisorySeeded]
+          : [...advisorySeeded, { role: 'user', content: userMessage.content }];
+
+        const advisorySystemPrompt = buildAdvisoryPrompt(promptContext);
+        const originalGoal = userMessage.content;
+        const needsDeterministicUnscheduledLookup =
+          isUnscheduledCountQuery(originalGoal) || isSuggestSpotsForUnscheduledQuery(originalGoal);
+        if (needsDeterministicUnscheduledLookup) {
+          const resolvedSchedule = await resolveScheduleContextForLookup(currentScheduleId);
+
+          if (resolvedSchedule.noSchedules) {
+            appendAssistantMessage('You do not have any schedules yet. Create one first, then I can help with unscheduled students.');
+            return;
+          }
+
+          if (!resolvedSchedule.scheduleId) {
+            const labelsText = resolvedSchedule.scheduleLabels.join(', ');
+            appendAssistantMessage(
+              labelsText
+                ? `I found multiple schedules: ${labelsText}. Tell me which schedule name you want me to check.`
+                : 'I found multiple schedules. Tell me which schedule name you want me to check.'
+            );
+            return;
+          }
+
+          if (isUnscheduledCountQuery(originalGoal)) {
+            const unassignedResult = await executeFunction(
+              'listUnassignedParticipants',
+              { schedule_id: resolvedSchedule.scheduleId },
+              { bypassDedup: true }
+            );
+
+            if (!unassignedResult.success) {
+              appendAssistantMessage('I could not access that schedule right now. Try again or pick a different schedule name.');
+              return;
+            }
+
+            const count = Array.isArray(unassignedResult.data) ? unassignedResult.data.length : 0;
+            appendAssistantMessage(`You have ${count} unscheduled participant${count === 1 ? '' : 's'}.`);
+            return;
+          }
+
+          if (isSuggestSpotsForUnscheduledQuery(originalGoal)) {
+            const [summaryResult, unassignedResult] = await Promise.all([
+              executeFunction('getEventSummaryInSchedule', { schedule_id: resolvedSchedule.scheduleId }, { bypassDedup: true }),
+              executeFunction('listUnassignedParticipants', { schedule_id: resolvedSchedule.scheduleId }, { bypassDedup: true }),
+            ]);
+
+            if (summaryResult.success && unassignedResult.success) {
+              const events = mapSummaryToScheduledEvents(summaryResult.data);
+              const participants = mapUnassignedToParticipants(unassignedResult.data);
+              const suggestionResult = suggestSlots(events, participants);
+
+              if (suggestionResult.totalSuggested === 0) {
+                appendAssistantMessage('I could not find safe slot suggestions from current preferences. I can run auto-schedule preview next.');
+                return;
+              }
+
+              const preview = suggestionResult.suggestions
+                .slice(0, 4)
+                .map((s) => `${s.participantName} on ${s.day} at ${formatHourForDisplay(s.hour)}`)
+                .join('; ');
+              const unresolvedText = suggestionResult.unresolvable.length > 0
+                ? ` ${suggestionResult.unresolvable.length} still need manual review.`
+                : '';
+              appendAssistantMessage(
+                `I found suggested spots for ${suggestionResult.totalSuggested}/${suggestionResult.totalUnassigned}: ${preview}.${unresolvedText} Want me to apply these as a plan?`
+              );
+              if (DEBUG) console.log('[Aria Debug] Advisory deterministic slot suggestion path used');
+              return;
+            }
+          }
+        }
+
+        let lastFunctionCalled: string | undefined = undefined;
+        let advisoryIterations = 0;
+        const toolsCalled: string[] = [];
+        let terminationReason = 'completed';
+        let advisoryResponseShown = false;
+        let lastAdvisoryTool: string | undefined = undefined;
+        let consecutiveAdvisorySameToolCount = 0;
+
+        while (advisoryIterations < ADVISORY_MAX_ITERATIONS) {
+          advisoryIterations++;
+
+          const toolBlock = buildAdvisoryToolBlock(promptContext, lastFunctionCalled);
+
+          // On the last allowed iteration, inject a finish instruction
+          const isLastIteration = advisoryIterations === ADVISORY_MAX_ITERATIONS;
+          const finishNudge = isLastIteration
+            ? '\n\n[System: This is your last turn. Synthesize your findings into 1-3 concise, actionable sentences. Do NOT call another tool.]'
+            : '';
+
+          let messagesForThisCall: Message[] = advisoryHistory;
+          if (toolBlock) {
+            messagesForThisCall = [
+              { role: 'user', content: `[Context for this step]\n${toolBlock}${finishNudge}` },
+              ...advisoryHistory,
+            ];
+          } else if (finishNudge) {
+            messagesForThisCall = [
+              ...advisoryHistory,
+              { role: 'user', content: finishNudge },
+            ];
+          }
+
+          const response = await sendChatMessage(
+            messagesForThisCall,
+            advisorySystemPrompt,
+            { maxTokensOverride: ADVISORY_MAX_TOKENS },
+          );
+
+          advisoryHistory = [
+            ...advisoryHistory,
+            { role: 'assistant', content: response.rawContent || response.message },
+          ];
+
+          // No function call → advisory is done, show final message
+          if (!response.functionCall) {
+            let displayMessage = response.message
+              .replace(/<thought>[\s\S]*?(?:<\/thought>|$)/gi, '')
+              .replace(/<think>[\s\S]*?(?:<\/think>|$)/gi, '')
+              .trim();
+
+            if (displayMessage.length > 1 && /^["']|["']$/g.test(displayMessage)) {
+              displayMessage = displayMessage.replace(/^["']|["']$/g, '');
+            }
+
+            if (displayMessage) {
+              appendAssistantMessage(displayMessage);
+              advisoryResponseShown = true;
+            }
+
+            terminationReason = isLastIteration ? 'budget_limit' : 'completed';
+            break;
+          }
+
+          // Function call — execute (read-only only)
+          const { name, arguments: fnArgs } = response.functionCall;
+
+          // Safety guard: block mutating tools in advisory mode
+          if (!ADVISORY_TOOL_NAMES.has(name)) {
+            if (DEBUG) console.warn(`[Aria Debug] Advisory mode blocked mutating tool: ${name}`);
+            appendAssistantMessage(
+              `I can see you'd like me to ${originalGoal.toLowerCase()}. Would you like me to go ahead and make those changes?`
+            );
+            terminationReason = 'mutation_blocked';
+            break;
+          }
+
+          // Show working indicator on first iteration
+          if (advisoryIterations === 1) {
+            let displayMessage = response.message
+              .replace(/<thought>[\s\S]*?(?:<\/thought>|$)/gi, '')
+              .replace(/<think>[\s\S]*?(?:<\/think>|$)/gi, '')
+              .trim();
+            if (!displayMessage || displayMessage === response.rawContent) {
+              displayMessage = 'Let me look into that...';
+            }
+            const workingMessage: ChatMessage = {
+              id: (Date.now() + advisoryIterations * 10).toString(),
+              role: 'assistant',
+              content: displayMessage,
+              timestamp: new Date(),
+            };
+            setMessages((prev) => {
+              const updated = [...prev, workingMessage];
+              return updated.length > MAX_MESSAGES ? updated.slice(-MAX_MESSAGES) : updated;
+            });
+          }
+
+          if (DEBUG) console.log(`[Aria Debug] Advisory executing: ${name}`, fnArgs);
+
+          let executionArgs = fnArgs;
+          if (
+            name === 'getParticipantPreferences' &&
+            currentScheduleId &&
+            !String(fnArgs.schedule_id ?? '').trim()
+          ) {
+            executionArgs = { ...fnArgs, schedule_id: currentScheduleId };
+          }
+
+          const result = await executeFunction(name, executionArgs, { bypassDedup: true });
+          toolsCalled.push(name);
+          lastFunctionCalled = name;
+
+          if (name === lastAdvisoryTool) {
+            consecutiveAdvisorySameToolCount++;
+          } else {
+            lastAdvisoryTool = name;
+            consecutiveAdvisorySameToolCount = 1;
+          }
+
+          if (
+            result.success &&
+            name === 'listUnassignedParticipants' &&
+            isUnscheduledCountQuery(originalGoal)
+          ) {
+            const count = Array.isArray(result.data) ? result.data.length : 0;
+            appendAssistantMessage(`You have ${count} unscheduled participant${count === 1 ? '' : 's'}.`);
+            terminationReason = 'advisory_count_fast_path';
+            advisoryResponseShown = true;
+            break;
+          }
+
+          const { llmContent } = formatFunctionResult(name, result);
+
+          // Inject result + continuation into history
+          const repeatedToolNudge = result.success && consecutiveAdvisorySameToolCount >= ADVISORY_REPEAT_TOOL_SOFT_CAP
+            ? `\n\n[System: You have called ${name} ${consecutiveAdvisorySameToolCount} times in a row. Unless essential, use a different read tool or synthesize now.]`
+            : '';
+          const continuationPrompt = result.success
+            ? `${llmContent}\n\n[System: Data retrieved. Original question: "${originalGoal}". If you have enough information, synthesize your answer now in 1-3 concise sentences. If you need more data, call exactly one more tool.]${repeatedToolNudge}`
+            : `${llmContent}\n\n[System: That lookup failed. Try a different approach or synthesize your answer from what you have.]`;
+
+          advisoryHistory = [
+            ...advisoryHistory,
+            { role: 'user', content: continuationPrompt },
+          ];
+
+          if (!result.success) {
+            // Don't hard-stop advisory on failure — let it try another approach
+            // or synthesize from available data
+            if (DEBUG) console.log('[Aria Debug] Advisory tool failed, continuing');
+          }
+        }
+
+        if (advisoryIterations >= ADVISORY_MAX_ITERATIONS) {
+          terminationReason = 'budget_limit';
+        }
+
+        if (!advisoryResponseShown) {
+          const finalResponse = await sendChatMessage(
+            [
+              ...advisoryHistory,
+              { role: 'user', content: '[System: Final step. Synthesize your best answer now in 1-3 concise sentences. Do NOT call tools.]' },
+            ],
+            advisorySystemPrompt,
+            { maxTokensOverride: 320 },
+          );
+
+          const finalMessage = (finalResponse.message || '')
+            .replace(/<thought>[\s\S]*?(?:<\/thought>|$)/gi, '')
+            .replace(/<think>[\s\S]*?(?:<\/think>|$)/gi, '')
+            .trim();
+
+          appendAssistantMessage(finalMessage || 'I reviewed what I could. Please share one more detail and I can refine this recommendation.');
+          advisoryResponseShown = true;
+        }
+
+        if (DEBUG) {
+          console.log('[Aria Debug] Advisory complete:', {
+            stepsUsed: advisoryIterations,
+            toolsCalled,
+            terminationReason,
+          });
+        }
+
+        return; // Advisory never mutates, so no post-mutation tasks
+      }
+
+      // ─── Execution mode ─────────────────────────────────────────────────────
+      // Preserves all existing behavior: compact, full, preflight, recovery.
+      const singleStepGoalLikely =
+        !MULTI_STEP_GOAL_HINT.test(userMessage.content) &&
+        !COMPLEX_GOAL_HINT.test(userMessage.content);
 
       // Hybrid preflight for complex ID-heavy actions:
       // LLM extracts intent -> deterministic resolver executes safely.
@@ -1142,12 +1616,9 @@ export default function FloatingChat({ onScheduleChange, onShowAutoSchedule }: F
       // ─── Tier 1: Static system prompt ──────────────────────────────────────
       // Built ONCE per user turn. Personality + rules only — no tools.
       // Staying tool-free here keeps the system prompt short and cache-friendly.
-      const isSimple = isSimpleQuery(userMessage.content);
-      const systemPrompt = isSimple
-        ? getMinimalPrompt()
-        : singleStepGoalLikely
-          ? buildActionPrompt(promptContext)
-          : buildSystemPrompt(promptContext);
+      const systemPrompt = singleStepGoalLikely
+        ? buildActionPrompt(promptContext)
+        : buildSystemPrompt(promptContext);
 
       // Track original goal and last function called for the loop
       const originalGoal = userMessage.content;
@@ -1159,6 +1630,9 @@ export default function FloatingChat({ onScheduleChange, onShowAutoSchedule }: F
       let anyScheduleModified = false;
       let forcedFunctionCallRetry = false;
       let forcedFailureRecoveryRetry = false;
+      const executionToolsCalled: string[] = [];
+      let consecutiveSameToolCount = 0;
+      let lastToolInLoop: string | undefined = undefined;
 
       while (iterations < MAX_ITERATIONS) {
         iterations++;
@@ -1168,14 +1642,12 @@ export default function FloatingChat({ onScheduleChange, onShowAutoSchedule }: F
         // Rebuilt every iteration based on what Aria just called.
         // Injected as a user-role context message so it doesn't pollute
         // assistant history and can be replaced cheaply each iteration.
-        const toolBlock = isSimple
-          ? ''
-          : buildToolBlock(
-            originalGoal,
-            promptContext,
-            lastFunctionCalled,
-            { compact: singleStepGoalLikely && !lastFunctionCalled }
-          );
+        const toolBlock = buildToolBlock(
+          originalGoal,
+          promptContext,
+          lastFunctionCalled,
+          { compact: singleStepGoalLikely && !lastFunctionCalled }
+        );
 
         // Build the messages array for this iteration:
         // [system prompt] + [tool context (user role)] + [conversation history]
@@ -1243,15 +1715,13 @@ export default function FloatingChat({ onScheduleChange, onShowAutoSchedule }: F
           const raw = response.rawContent || response.message;
           const isEmptyAssistantTurn = !raw.trim();
           const looksLikeIncompleteToolTurn =
-            !isSimple &&
             !forcedFunctionCallRetry &&
             (/<thought>|<think>|FUNCTION_CALL:/i.test(raw));
           const looksLikeIdDelegation =
-            !isSimple &&
             !forcedFunctionCallRetry &&
             ID_DELEGATION_HINT.test(raw);
 
-          if ((!isSimple && !forcedFunctionCallRetry && isEmptyAssistantTurn) || looksLikeIncompleteToolTurn || looksLikeIdDelegation) {
+          if ((!forcedFunctionCallRetry && isEmptyAssistantTurn) || looksLikeIncompleteToolTurn || looksLikeIdDelegation) {
             forcedFunctionCallRetry = true;
             conversationHistory = [
               ...conversationHistory,
@@ -1260,8 +1730,8 @@ export default function FloatingChat({ onScheduleChange, onShowAutoSchedule }: F
                 content: isEmptyAssistantTurn
                   ? '[System: Your previous response was empty. Output exactly one FUNCTION_CALL now using a valid function name. No prose, no thoughts.]'
                   : looksLikeIdDelegation
-                  ? '[System: Do NOT ask the user for IDs. Find IDs yourself using available tools (searchEventsInSchedule/getEventSummaryInSchedule/listUnassignedParticipants) and output exactly one FUNCTION_CALL now.]'
-                  : '[System: Your previous response was incomplete. Output exactly one FUNCTION_CALL now using a valid function name. No prose, no thoughts.]',
+                    ? '[System: Do NOT ask the user for IDs. Find IDs yourself using available tools (searchEventsInSchedule/getEventSummaryInSchedule/listUnassignedParticipants) and output exactly one FUNCTION_CALL now.]'
+                    : '[System: Your previous response was incomplete. Output exactly one FUNCTION_CALL now using a valid function name. No prose, no thoughts.]',
               },
             ];
             if (DEBUG) console.warn('[FloatingChat Debug] Empty/incomplete non-tool reply detected; forcing one strict retry');
@@ -1275,6 +1745,26 @@ export default function FloatingChat({ onScheduleChange, onShowAutoSchedule }: F
         // ── Execute function ──────────────────────────────────────────────────
         const { name, arguments: args } = response.functionCall;
         if (DEBUG) console.log(`[FloatingChat Debug] Executing: ${name}`, args);
+        executionToolsCalled.push(name);
+
+        // Non-productive turn detection: same tool called 3+ times in a row
+        if (name === lastToolInLoop) {
+          consecutiveSameToolCount++;
+        } else {
+          consecutiveSameToolCount = 1;
+          lastToolInLoop = name;
+        }
+        if (consecutiveSameToolCount >= 3) {
+          const isReadOnlyTool = ADVISORY_TOOL_NAMES.has(name);
+          if (!isReadOnlyTool || consecutiveSameToolCount >= 6) {
+            if (DEBUG) console.warn(`[Aria Debug] Non-productive loop detected: ${name} called ${consecutiveSameToolCount}x consecutively`);
+            appendAssistantMessage(`I'm having trouble completing this action — I keep calling the same step. Could you rephrase your request or provide more details?`);
+            break;
+          }
+          if (DEBUG) {
+            console.warn(`[Aria Debug] Soft-cap warning: read-only tool ${name} repeated ${consecutiveSameToolCount}x`);
+          }
+        }
 
         let executionArgs = args;
         if (
@@ -1377,18 +1867,6 @@ export default function FloatingChat({ onScheduleChange, onShowAutoSchedule }: F
         }
 
         if (scheduleModified) anyScheduleModified = true;
-
-        if (
-          result.success &&
-          name === 'listUnassignedParticipants' &&
-          singleStepGoalLikely &&
-          isUnscheduledCountQuery(originalGoal)
-        ) {
-          const count = Array.isArray(result.data) ? result.data.length : 0;
-          appendAssistantMessage(`There ${count === 1 ? 'is' : 'are'} ${count} unscheduled participant${count === 1 ? '' : 's'}.`);
-          if (DEBUG) console.log('[FloatingChat Debug] Auto-completed unscheduled count query');
-          break;
-        }
 
         // Track which function just ran — used by buildToolBlock next iteration
         lastFunctionCalled = name;
@@ -1497,6 +1975,15 @@ export default function FloatingChat({ onScheduleChange, onShowAutoSchedule }: F
 
       if (iterations >= MAX_ITERATIONS) {
         if (DEBUG) console.warn('[FloatingChat Debug] Max iterations reached');
+      }
+
+      if (DEBUG) {
+        console.log('[Aria Debug] Execution complete:', {
+          mode: 'execution',
+          stepsUsed: iterations,
+          toolsCalled: executionToolsCalled,
+          terminationReason: iterations >= MAX_ITERATIONS ? 'budget_limit' : 'completed',
+        });
       }
 
       runPostMutationTasks(anyScheduleModified, currentScheduleId);

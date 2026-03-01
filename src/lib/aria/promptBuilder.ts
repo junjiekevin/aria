@@ -97,6 +97,43 @@ Rules:
 - If required IDs are missing, call the appropriate discovery tool first.
 - For addEventToSchedule: if user does NOT request recurrence, set recurrence_rule to "" (one-time).`;
 
+// ─────────────────────────────────────────────────────────────────────────────
+// ADVISORY PROMPT — reasoning-first mode for suggestions/analysis/planning
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const ADVISORY_PROMPT = `You are Aria, a warm, professional scheduling assistant.
+
+## MODE: ADVISORY
+You are in advisory mode. Your job is to GATHER DATA and then SYNTHESIZE a concise recommendation.
+
+## RULES
+1. GATHER FIRST — use read-only tools (getEventSummaryInSchedule, listUnassignedParticipants, analyzeScheduleHealth, searchEventsInSchedule, getParticipantPreferences) to retrieve the data you need.
+2. SYNTHESIZE AFTER — once you have enough data, produce your final answer. Do NOT make more tool calls after synthesizing.
+3. NO MUTATIONS — never call mutating tools (add/update/delete/swap/commit/publish/trash/recover/empty/autoSchedule/markAssigned) in advisory mode. If the user wants action, tell them what to do and offer to execute it.
+4. CONCISE RESPONSE — your final answer must be 1-3 sentences. Be specific and actionable.
+5. FORMAT — when you need data, use exactly:
+   FUNCTION_CALL: {"name": "...", "arguments": {...}}
+6. EXACT TOOL NAMES ONLY — use names exactly as listed in AVAILABLE TOOLS.
+7. ONE TOOL PER TURN — output exactly one FUNCTION_CALL per turn when gathering data.
+
+## PERSONALITY
+- Speak like a helpful collaborator, not a robot.
+- Give concrete suggestions ("I'd suggest putting Alex on Tuesday at 2pm") not vague advice.
+- If you spot conflicts or issues, mention them directly.`;
+
+/** Read-only tools available in advisory mode. */
+export const ADVISORY_TOOL_NAMES = new Set([
+    'listSchedules',
+    'listTrashedSchedules',
+    'getEventSummaryInSchedule',
+    'searchEventsInSchedule',
+    'listUnassignedParticipants',
+    'getParticipantPreferences',
+    'analyzeScheduleHealth',
+    'checkScheduleOverlaps',
+    'getExportLink',
+]);
+
 
 // ─────────────────────────────────────────────────────────────────────────────
 // TOOL TRANSITION GRAPH
@@ -434,6 +471,55 @@ export function buildActionPrompt(context: PromptContext = {}): string {
         prompt += `\n\nCURRENT_SCHEDULE_ID: "${context.scheduleId}"`;
     }
     return prompt;
+}
+
+export function buildAdvisoryPrompt(context: PromptContext = {}): string {
+    let prompt = ADVISORY_PROMPT;
+    if (context.scheduleId) {
+        prompt += `\n\n## CONTEXT\nCURRENT_SCHEDULE_ID: "${context.scheduleId}"\nPrefer this ID unless the user names a different schedule.`;
+    }
+    prompt += `\n\nCurrent Date & Time: ${new Date().toLocaleString()}`;
+    return prompt;
+}
+
+/**
+ * Builds a tool block containing only read-only tools for advisory mode.
+ * Uses the same format as buildToolBlock but filters to ADVISORY_TOOL_NAMES.
+ */
+export function buildAdvisoryToolBlock(
+    context: PromptContext,
+    lastFunctionCalled?: string,
+): string {
+    let toolNames: string[];
+
+    if (!lastFunctionCalled) {
+        // First iteration: provide the most useful advisory starting tools
+        toolNames = context.scheduleId
+            ? ['getEventSummaryInSchedule', 'listUnassignedParticipants', 'analyzeScheduleHealth', 'searchEventsInSchedule']
+            : ['listSchedules', 'getEventSummaryInSchedule', 'listUnassignedParticipants', 'analyzeScheduleHealth'];
+    } else {
+        // Follow-up: use transition graph but filter to read-only
+        const nextTools = TOOL_TRANSITIONS[lastFunctionCalled] ?? [];
+        const readOnly = nextTools.filter(t => ADVISORY_TOOL_NAMES.has(t));
+        toolNames = Array.from(new Set([...readOnly, ...DISCOVERY_TOOLS]));
+
+        // If the transition map says terminal, return empty — advisory should synthesize
+        if (TOOL_TRANSITIONS[lastFunctionCalled]?.length === 0 || readOnly.length === 0) {
+            return '';
+        }
+    }
+
+    const tools = toolNames
+        .map(name => FUNCTION_REGISTRY.find(fn => fn.name === name))
+        .filter((fn): fn is FunctionMeta => fn !== undefined);
+
+    if (tools.length === 0) return '';
+
+    const validNames = tools.map(fn => fn.name).join(', ');
+    let block = `\n## AVAILABLE TOOLS (${tools.length}) — READ-ONLY\n`;
+    block += tools.map(fn => `- **${fn.name}**: ${fn.prompt}`).join('\n');
+    block += `\n\nVALID FUNCTION NAMES THIS TURN: ${validNames}\nUse one name exactly as written. After gathering data, synthesize your answer — do NOT call more tools.`;
+    return block;
 }
 
 /**
