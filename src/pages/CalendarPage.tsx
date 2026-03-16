@@ -200,11 +200,20 @@ export default function CalendarPage() {
             <h3>{draft.id ? 'Edit event' : 'Create event'}</h3>
             <div style={{ display: 'grid', gap: '0.65rem' }}>
               <input value={draft.title} onChange={(e) => setDraft((prev) => prev ? { ...prev, title: e.target.value } : prev)} placeholder="Event title" />
-              <select value={draft.providerCalendarId} onChange={(e) => setDraft((prev) => prev ? { ...prev, providerCalendarId: e.target.value } : prev)}>
+              <select
+                value={draft.providerCalendarId}
+                onChange={(e) => setDraft((prev) => prev ? { ...prev, providerCalendarId: e.target.value } : prev)}
+                disabled={Boolean(draft.id)}
+              >
                 {calendars.map((calendar) => (
                   <option key={calendar.providerCalendarId} value={calendar.providerCalendarId}>{calendar.name}</option>
                 ))}
               </select>
+              {draft.id ? (
+                <small style={{ color: '#64748b' }}>
+                  Calendar changes for existing events are not supported yet.
+                </small>
+              ) : null}
               <input type="datetime-local" value={draft.startAt} onChange={(e) => setDraft((prev) => prev ? { ...prev, startAt: e.target.value } : prev)} />
               <input type="datetime-local" value={draft.endAt} onChange={(e) => setDraft((prev) => prev ? { ...prev, endAt: e.target.value } : prev)} />
             </div>

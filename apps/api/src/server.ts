@@ -1,7 +1,8 @@
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
 import { randomUUID } from 'node:crypto';
 import { URL } from 'node:url';
-import { createUserScopedSupabaseClient, getSupabaseAuthBaseUrl } from './supabase.js';
+import type { SupabaseClient } from '@supabase/supabase-js';
+import { createServiceRoleSupabaseClient, createUserScopedSupabaseClient, getSupabaseAuthBaseUrl } from './supabase.js';
 import { GoogleCalendarAdapter } from '../../../src/infrastructure/providers/google/google-calendar-adapter.js';
 import {
   registerGoogleWatchForSelectedCalendars,
@@ -147,12 +148,6 @@ async function ensureCalendarAccount(
 ): Promise<void> {
   const client = createUserScopedSupabaseClient(token);
   const providerAccountId = email ?? userId;
-  const { data: existingAccount } = await client
-    .from('calendar_accounts')
-    .select('encrypted_token_metadata, connection_status')
-    .eq('provider', 'google')
-    .eq('provider_account_id', providerAccountId)
-    .maybeSingle();
   const { data: userData, error: userError } = await client.auth.getUser();
   if (userError || !userData.user) {
     throw new Error('AUTH_USER_FETCH_FAILED');
@@ -162,40 +157,41 @@ async function ensureCalendarAccount(
     throw new Error('GOOGLE_TOKEN_METADATA_MISSING');
   }
 
-  const { error } = await client.from('calendar_accounts').upsert(
-    {
-      user_id: userId,
-      provider: 'google',
-      provider_account_id: providerAccountId,
-      encrypted_token_metadata: tokenMetadata
-        ? JSON.stringify({
-          access_token: tokenMetadata.accessToken,
-          refresh_token: tokenMetadata.refreshToken,
-          captured_at: new Date().toISOString(),
-        })
-        : (existingAccount?.encrypted_token_metadata ?? null),
-      scope_metadata: tokenMetadata?.scope
-        ? tokenMetadata.scope.split(' ').map((value) => value.trim()).filter(Boolean)
-        : toScopeMetadata(),
-      connection_status: tokenMetadata
-        ? 'connected'
-        : ((existingAccount?.connection_status as 'connected' | 'revoked' | 'error' | null) ?? 'error'),
-      updated_at: new Date().toISOString(),
-    },
-    { onConflict: 'provider,provider_account_id' },
-  );
+  const upsertPayload: Record<string, unknown> = {
+    user_id: userId,
+    provider: 'google',
+    provider_account_id: providerAccountId,
+    updated_at: new Date().toISOString(),
+  };
+
+  if (tokenMetadata) {
+    upsertPayload.encrypted_token_metadata = JSON.stringify({
+      access_token: tokenMetadata.accessToken,
+      refresh_token: tokenMetadata.refreshToken,
+      captured_at: new Date().toISOString(),
+    });
+    upsertPayload.scope_metadata = tokenMetadata.scope
+      ? tokenMetadata.scope.split(' ').map((value) => value.trim()).filter(Boolean)
+      : toScopeMetadata();
+    upsertPayload.connection_status = 'connected';
+  }
+
+  const { error } = await client
+    .from('calendar_accounts')
+    .upsert(upsertPayload, { onConflict: 'provider,provider_account_id' });
 
   if (error) throw new Error(`Failed to upsert calendar account: ${error.message}`);
 }
 
-function createGoogleAdapterForUser(token: string) {
+function createGoogleAdapterForUser(userId: string) {
   return new GoogleCalendarAdapter(async (accountId: string) => {
-    const client = createUserScopedSupabaseClient(token);
+    const client = createServiceRoleSupabaseClient();
     const { data, error } = await client
       .from('calendar_accounts')
       .select('encrypted_token_metadata')
       .eq('provider', 'google')
       .eq('provider_account_id', accountId)
+      .eq('user_id', userId)
       .maybeSingle();
 
     if (error || !data?.encrypted_token_metadata) {
@@ -214,15 +210,13 @@ function createGoogleAdapterForUser(token: string) {
   } : undefined);
 }
 
-function createSyncDeps(token: string) {
-  const db = createUserScopedSupabaseClient(token);
-
+function createSyncDeps(db: SupabaseClient) {
   return {
     accounts: {
       async getByUserAndProvider(userId: string, provider: 'google') {
         const { data, error } = await db
           .from('calendar_accounts')
-          .select('*')
+          .select('id,user_id,provider,provider_account_id,scope_metadata,connection_status,created_at,updated_at')
           .eq('user_id', userId)
           .eq('provider', provider)
           .maybeSingle();
@@ -232,7 +226,7 @@ function createSyncDeps(token: string) {
           userId: data.user_id,
           provider: data.provider,
           providerAccountId: data.provider_account_id,
-          encryptedTokenMetadata: data.encrypted_token_metadata,
+          encryptedTokenMetadata: null,
           scopeMetadata: data.scope_metadata,
           connectionStatus: data.connection_status,
           createdAt: data.created_at,
@@ -395,7 +389,7 @@ async function handleSetupStatus(req: IncomingMessage, res: ServerResponse): Pro
   }));
 
   if (availableCalendars.length === 0) {
-    const adapter = createGoogleAdapterForUser(ctx.token);
+    const adapter = createGoogleAdapterForUser(ctx.userId);
     const discovered = await adapter.listCalendars(account.provider_account_id);
     availableCalendars = discovered.map((cal) => ({
       providerCalendarId: cal.providerCalendarId,
@@ -463,7 +457,7 @@ async function handleSetupSelection(req: IncomingMessage, res: ServerResponse): 
     updated_at: new Date().toISOString(),
   }));
 
-  const { error } = await client.from('provider_calendars').upsert(rows, { onConflict: 'provider,provider_calendar_id' });
+  const { error } = await client.from('provider_calendars').upsert(rows, { onConflict: 'calendar_account_id,provider,provider_calendar_id' });
   if (error) return json(res, 500, { error: `SETUP_SAVE_FAILED: ${error.message}` });
 
   json(res, 200, { success: true, setupComplete: true });
@@ -473,8 +467,8 @@ async function handleRunSync(req: IncomingMessage, res: ServerResponse): Promise
   const ctx = await getUserContext(req);
   if (!ctx) return json(res, 401, { error: 'UNAUTHORIZED' });
 
-  const deps = createSyncDeps(ctx.token);
-  const adapter = createGoogleAdapterForUser(ctx.token);
+  const deps = createSyncDeps(createUserScopedSupabaseClient(ctx.token));
+  const adapter = createGoogleAdapterForUser(ctx.userId);
   const result = await syncSelectedCalendarsForUser({
     ...deps,
     adapter,
@@ -490,8 +484,8 @@ async function handleRegisterWatch(req: IncomingMessage, res: ServerResponse): P
   const ctx = await getUserContext(req);
   if (!ctx) return json(res, 401, { error: 'UNAUTHORIZED' });
 
-  const deps = createSyncDeps(ctx.token);
-  const adapter = createGoogleAdapterForUser(ctx.token);
+  const deps = createSyncDeps(createUserScopedSupabaseClient(ctx.token));
+  const adapter = createGoogleAdapterForUser(ctx.userId);
   const result = await registerGoogleWatchForSelectedCalendars({
     ...deps,
     adapter,
@@ -517,13 +511,7 @@ async function handleGoogleWebhook(req: IncomingMessage, res: ServerResponse): P
 
   // Webhook ingress acknowledges notification; background sync trigger is represented
   // by immediate sync call in this runtime for MVP.
-  const serviceToken = process.env.SYSTEM_SYNC_USER_ACCESS_TOKEN;
-  if (!serviceToken) {
-    return json(res, 503, { error: 'SYSTEM_SYNC_USER_ACCESS_TOKEN_REQUIRED' });
-  }
-
-  const deps = createSyncDeps(serviceToken);
-  const db = createUserScopedSupabaseClient(serviceToken);
+  const db = createServiceRoleSupabaseClient();
   const { data: cursor, error } = await db
     .from('calendar_sync_cursors')
     .select('provider_calendar_id, provider_calendars!inner(calendar_account_id, calendar_accounts!inner(user_id))')
@@ -535,7 +523,8 @@ async function handleGoogleWebhook(req: IncomingMessage, res: ServerResponse): P
   }
 
   const userId = (cursor.provider_calendars as unknown as { calendar_accounts: { user_id: string } }).calendar_accounts.user_id;
-  const adapter = createGoogleAdapterForUser(serviceToken);
+  const deps = createSyncDeps(db);
+  const adapter = createGoogleAdapterForUser(userId);
   await syncSelectedCalendarsForUser({ ...deps, adapter }, { userId, sourceSurface: 'system_sync' });
 
   json(res, 202, { accepted: true, synced: true });
@@ -627,7 +616,7 @@ async function handleCreateCalendarEvent(req: IncomingMessage, res: ServerRespon
     .maybeSingle();
   if (!calendar) return json(res, 400, { error: 'INVALID_PROVIDER_CALENDAR_ID' });
 
-  const adapter = createGoogleAdapterForUser(ctx.token);
+  const adapter = createGoogleAdapterForUser(ctx.userId);
   const created = await adapter.createEvent(account.providerAccountId, {
     calendarId: payload.providerCalendarId,
     title: payload.title,
@@ -695,8 +684,11 @@ async function handleUpdateCalendarEvent(req: IncomingMessage, res: ServerRespon
     .eq('provider_calendar_id', payload.providerCalendarId || existing.provider_calendar_id)
     .maybeSingle();
   if (!calendar) return json(res, 400, { error: 'INVALID_PROVIDER_CALENDAR_ID' });
+  if (payload.providerCalendarId && payload.providerCalendarId !== existing.provider_calendar_id) {
+    return json(res, 400, { error: 'CROSS_CALENDAR_MOVE_NOT_SUPPORTED' });
+  }
 
-  const adapter = createGoogleAdapterForUser(ctx.token);
+  const adapter = createGoogleAdapterForUser(ctx.userId);
   const updated = await adapter.updateEvent(account.providerAccountId, existing.provider_event_id, {
     calendarId: calendar.provider_calendar_id,
     title: payload.title ?? existing.title,
@@ -756,7 +748,7 @@ async function handleDeleteCalendarEvent(req: IncomingMessage, res: ServerRespon
     .maybeSingle();
   if (!existing) return json(res, 404, { error: 'EVENT_NOT_FOUND' });
 
-  const adapter = createGoogleAdapterForUser(ctx.token);
+  const adapter = createGoogleAdapterForUser(ctx.userId);
   await adapter.deleteEvent(account.providerAccountId, existing.provider_calendar_id, existing.provider_event_id);
 
   const { error } = await db

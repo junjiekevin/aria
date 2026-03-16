@@ -13,7 +13,6 @@ type CalendarAccountRow = {
   user_id: string;
   provider: 'google';
   provider_account_id: string;
-  encrypted_token_metadata: string | null;
   scope_metadata: string[] | null;
   connection_status: 'connected' | 'revoked' | 'error';
   created_at: string;
@@ -48,7 +47,7 @@ function toCalendarAccount(row: CalendarAccountRow): CalendarAccount {
     userId: row.user_id,
     provider: row.provider,
     providerAccountId: row.provider_account_id,
-    encryptedTokenMetadata: row.encrypted_token_metadata,
+    encryptedTokenMetadata: null,
     scopeMetadata: row.scope_metadata,
     connectionStatus: row.connection_status,
     createdAt: row.created_at,
@@ -62,7 +61,6 @@ function toCalendarAccountRow(account: CalendarAccount): CalendarAccountRow {
     user_id: account.userId,
     provider: account.provider,
     provider_account_id: account.providerAccountId,
-    encrypted_token_metadata: account.encryptedTokenMetadata,
     scope_metadata: account.scopeMetadata,
     connection_status: account.connectionStatus,
     created_at: account.createdAt,
@@ -126,7 +124,7 @@ export class SupabaseCalendarAccountRepository implements CalendarAccountReposit
   async getByUserAndProvider(userId: string, provider: 'google'): Promise<CalendarAccount | null> {
     const { data, error } = await supabase
       .from('calendar_accounts')
-      .select('*')
+      .select('id,user_id,provider,provider_account_id,scope_metadata,connection_status,created_at,updated_at')
       .eq('user_id', userId)
       .eq('provider', provider)
       .maybeSingle();
@@ -136,10 +134,14 @@ export class SupabaseCalendarAccountRepository implements CalendarAccountReposit
   }
 
   async upsert(account: CalendarAccount): Promise<CalendarAccount> {
+    const payload = {
+      ...toCalendarAccountRow(account),
+      encrypted_token_metadata: account.encryptedTokenMetadata,
+    };
     const { data, error } = await supabase
       .from('calendar_accounts')
-      .upsert(toCalendarAccountRow(account), { onConflict: 'provider,provider_account_id' })
-      .select('*')
+      .upsert(payload, { onConflict: 'provider,provider_account_id' })
+      .select('id,user_id,provider,provider_account_id,scope_metadata,connection_status,created_at,updated_at')
       .single();
 
     if (error) throw new Error(`Failed to upsert calendar account: ${error.message}`);
@@ -166,7 +168,7 @@ export class SupabaseProviderCalendarRepository implements ProviderCalendarRepos
 
     const { error: upsertError } = await supabase
       .from('provider_calendars')
-      .upsert(payload, { onConflict: 'provider,provider_calendar_id' });
+      .upsert(payload, { onConflict: 'calendar_account_id,provider,provider_calendar_id' });
 
     if (upsertError) {
       throw new Error(`Failed to replace provider calendar selection: ${upsertError.message}`);

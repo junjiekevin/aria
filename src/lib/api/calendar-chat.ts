@@ -125,6 +125,59 @@ export async function deleteCalendarEventById(eventId: string): Promise<void> {
   await deleteWorkspaceEvent(eventId, 'floating_chat');
 }
 
+export async function swapCalendarEventsById(event1Id: string, event2Id: string): Promise<[WorkspaceEvent, WorkspaceEvent]> {
+  const workspace = await fetchWorkspaceEvents();
+  const first = workspace.events.find((event) => event.id === event1Id);
+  const second = workspace.events.find((event) => event.id === event2Id);
+
+  if (!first || !second) {
+    throw new Error('One or both events were not found');
+  }
+  if (first.providerCalendarId !== second.providerCalendarId) {
+    throw new Error('Cross-calendar swap is not supported');
+  }
+
+  await updateWorkspaceEvent(first.id, {
+    providerCalendarId: first.providerCalendarId,
+    startAt: second.startAt,
+    endAt: second.endAt,
+    timezone: second.timezone || first.timezone || 'UTC',
+  }, 'floating_chat');
+  try {
+    await updateWorkspaceEvent(second.id, {
+      providerCalendarId: second.providerCalendarId,
+      startAt: first.startAt,
+      endAt: first.endAt,
+      timezone: first.timezone || second.timezone || 'UTC',
+    }, 'floating_chat');
+  } catch (swapError) {
+    try {
+      await updateWorkspaceEvent(first.id, {
+        providerCalendarId: first.providerCalendarId,
+        startAt: first.startAt,
+        endAt: first.endAt,
+        timezone: first.timezone || second.timezone || 'UTC',
+      }, 'floating_chat');
+    } catch (rollbackError) {
+      const swapMessage = swapError instanceof Error ? swapError.message : String(swapError);
+      const rollbackMessage = rollbackError instanceof Error ? rollbackError.message : String(rollbackError);
+      throw new Error(`Swap failed and rollback failed: ${swapMessage}; rollback error: ${rollbackMessage}`);
+    }
+
+    const swapMessage = swapError instanceof Error ? swapError.message : String(swapError);
+    throw new Error(`Swap failed; first event was rolled back: ${swapMessage}`);
+  }
+
+  const refreshed = await fetchWorkspaceEvents();
+  const updatedFirst = refreshed.events.find((event) => event.id === first.id);
+  const updatedSecond = refreshed.events.find((event) => event.id === second.id);
+  if (!updatedFirst || !updatedSecond) {
+    throw new Error('Swap completed but could not refresh updated events');
+  }
+
+  return [updatedFirst, updatedSecond];
+}
+
 export async function getCalendarEventSummary(): Promise<Record<string, Array<{ i: string; n: string; t: string; r: string }>>> {
   const workspace = await fetchWorkspaceEvents();
   const summary: Record<string, Array<{ i: string; n: string; t: string; r: string }>> = {

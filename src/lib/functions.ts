@@ -22,14 +22,6 @@ import {
     type UpdateScheduleInput,
 } from './services/scheduleService';
 
-import {
-    addEvent,
-    updateEvent,
-    swapEvents,
-    deleteEvent,
-    getEventSummary,
-} from './services/entryService';
-
 import { autoScheduleParticipants } from './services/autoScheduler';
 
 import {
@@ -48,15 +40,14 @@ import {
 } from './api/schedule-plans';
 
 import {
-    getScheduleEntries,
-} from './api/schedule-entries';
-import {
     createCalendarEventFromLegacyArgs,
     deleteCalendarEventById,
     getCalendarEventSummary,
     searchCalendarEvents,
+    swapCalendarEventsById,
     updateCalendarEventFromLegacyArgs,
 } from './api/calendar-chat';
+import { fetchWorkspaceEvents } from './api/calendar-workspace';
 
 const FUNCTION_NAME_ALIASES: Record<string, string> = {
     // Event aliases
@@ -336,7 +327,7 @@ export async function executeFunction(
                 }
 
                 case 'analyzeScheduleHealth': {
-                    const summary = await getEventSummary(args.schedule_id as string);
+                    const summary = await getCalendarEventSummary();
                     return { success: true, data: { summary, message: 'Analyzing your schedule health...' } };
                 }
 
@@ -368,21 +359,10 @@ export async function executeFunction(
                 }
 
                 case 'swapEvents': {
-                    // Normalize hallucinations: event1_id vs event_id1 vs id1
                     const e1 = (args.event1_id || args.event_id1 || args.id1) as string;
                     const e2 = (args.event2_id || args.event_id2 || args.id2) as string;
-
-                    if (!e1 || !e2) {
-                        throw new Error(
-                            'Missing event IDs. Provide both event1_id and event2_id. ' +
-                            'Call getEventSummaryInSchedule first to find them.'
-                        );
-                    }
-                    const events = await swapEvents(e1, e2);
-                    return {
-                        success: true,
-                        data: { message: 'Events swapped successfully', events },
-                    };
+                    const events = await swapCalendarEventsById(e1, e2);
+                    return { success: true, data: { message: 'Events swapped successfully', events } };
                 }
 
                 case 'deleteEventFromSchedule': {
@@ -482,26 +462,26 @@ export async function executeFunction(
                         };
                     }
 
-                    // Validate: Detect conflicts by checking existing entries
-                    const existingEntries = await getScheduleEntries(scheduleId);
+                    // Validate: Detect conflicts by checking current workspace events
+                    const workspace = await fetchWorkspaceEvents();
                     const conflicts: PlanConflict[] = [];
 
                     for (const change of changes) {
                         if (change.action === 'add' && change.after?.start_time) {
-                            // Check for time overlap with existing entries
+                            // Check for time overlap with existing events
                             const targetDay = change.after.day;
                             const targetStart = change.after.start_time;
-                            for (const entry of existingEntries) {
-                                const entryDate = new Date(entry.start_time);
+                            for (const event of workspace.events) {
+                                const entryDate = new Date(event.startAt);
                                 const entryDay = entryDate.toLocaleDateString('en-US', { weekday: 'long' });
                                 const entryHour = entryDate.getHours();
                                 const targetHour = parseInt(targetStart?.split(':')[0] || '0');
                                 if (entryDay === targetDay && entryHour === targetHour) {
                                     conflicts.push({
                                         type: 'overlap',
-                                        description: `"${change.target}" conflicts with existing "${entry.student_name}" at ${entryDay} ${entryHour}:00`,
+                                        description: `"${change.target}" conflicts with existing "${event.title || 'Untitled'}" at ${entryDay} ${entryHour}:00`,
                                         severity: 'error',
-                                        affected_entries: [entry.id, change.target],
+                                        affected_entries: [event.id, change.target],
                                     });
                                 }
                             }
@@ -551,27 +531,26 @@ export async function executeFunction(
                             switch (change.action) {
                                 case 'add': {
                                     if (change.after) {
-                                        await addEvent({
-                                            schedule_id: plan.schedule_id,
+                                        await createCalendarEventFromLegacyArgs({
                                             student_name: change.after.student_name || change.target,
                                             day: change.after.day || '',
-                                            start_time: change.after.start_time,
-                                            end_time: change.after.end_time,
-                                            recurrence_rule: change.after.recurrence_rule,
+                                            start_time: change.after.start_time ?? undefined,
+                                            end_time: change.after.end_time ?? undefined,
                                         });
                                         results.push(`✅ Added: ${change.description}`);
                                     }
                                     break;
                                 }
                                 case 'delete': {
-                                    await deleteEvent(change.target);
+                                    await deleteCalendarEventById(change.target);
                                     results.push(`✅ Deleted: ${change.description}`);
                                     break;
                                 }
                                 case 'move': {
                                     if (change.after) {
-                                        await updateEvent({
+                                        await updateCalendarEventFromLegacyArgs({
                                             event_id: change.target,
+                                            student_name: change.after.student_name ?? undefined,
                                             day: change.after.day,
                                             start_time: change.after.start_time,
                                             end_time: change.after.end_time,
@@ -581,11 +560,24 @@ export async function executeFunction(
                                     break;
                                 }
                                 case 'swap': {
-                                    // Swap requires two entry IDs
                                     const targets = change.target.split(',');
-                                    if (targets.length === 2) {
-                                        await swapEvents(targets[0].trim(), targets[1].trim());
-                                        results.push(`✅ Swapped: ${change.description}`);
+                                    if (targets.length !== 2) {
+                                        throw new Error('swap action requires target in "eventIdA,eventIdB" format');
+                                    }
+                                    await swapCalendarEventsById(targets[0].trim(), targets[1].trim());
+                                    results.push(`✅ Swapped: ${change.description}`);
+                                    break;
+                                }
+                                case 'update': {
+                                    if (change.after) {
+                                        await updateCalendarEventFromLegacyArgs({
+                                            event_id: change.target,
+                                            student_name: change.after.student_name ?? undefined,
+                                            day: change.after.day,
+                                            start_time: change.after.start_time,
+                                            end_time: change.after.end_time,
+                                        });
+                                        results.push(`✅ Updated: ${change.description}`);
                                     }
                                     break;
                                 }
