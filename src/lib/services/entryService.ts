@@ -1,7 +1,6 @@
 // src/lib/services/entryService.ts
-// Business logic for schedule entry (event) operations.
-// Handles add, update, move, swap with validation and optimistic locking.
-// Never imports from other services. Only imports from api/* and lib/*.
+// LEGACY BRIDGE (BLD-001): schedule_entries service retained only as migration seam.
+// New v2.1 calendar workspace writes should move to shared application handlers.
 
 import {
     getScheduleEntries as apiGetScheduleEntries,

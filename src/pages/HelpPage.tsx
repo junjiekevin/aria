@@ -5,97 +5,92 @@ import {
   ArrowLeft,
   Search,
   Sparkles,
-  MousePointer2,
+  Calendar,
   Users,
   Settings,
   ChevronRight,
   Mail,
   MessageSquare,
-  Lock
+  Lock,
 } from 'lucide-react';
 import s from './HelpPage.module.css';
 
 const HELP_CATEGORIES = [
   {
     id: 'ai',
-    title: 'AI Assistant',
-    desc: 'Master natural language commands and automation.',
+    title: 'Calendar Assistant',
+    desc: 'Use chat to orchestrate connected calendar actions.',
     icon: Sparkles,
     color: '#8b5cf6',
-    bg: '#f5f3ff'
+    bg: '#f5f3ff',
   },
   {
-    id: 'timetable',
-    title: 'Timetable Tools',
-    desc: 'Unlocking drag-and-drop, swaps, and recurrence.',
-    icon: MousePointer2,
+    id: 'calendar',
+    title: 'Calendar Operations',
+    desc: 'Manage events and updates from the calendar workspace.',
+    icon: Calendar,
     color: '#f97316',
-    bg: '#fff7ed'
+    bg: '#fff7ed',
   },
   {
-    id: 'forms',
-    title: 'Availability Forms',
-    desc: 'Managing participant info and automated submissions.',
+    id: 'intake',
+    title: 'Availability Intake',
+    desc: 'Collect participant availability for organizer review.',
     icon: Users,
     color: '#06b6d4',
-    bg: '#ecfeff'
+    bg: '#ecfeff',
   },
   {
     id: 'account',
     title: 'Settings & Privacy',
-    desc: 'Managing profile, hours, and data security.',
+    desc: 'Control profile, permissions, and data safety.',
     icon: Settings,
     color: '#ec4899',
-    bg: '#fdf2f8'
-  }
+    bg: '#fdf2f8',
+  },
 ];
 
 const FAQ_DATA = [
   {
     category: 'ai',
     question: 'How do I talk to Aria?',
-    answer: "Click the floating chat icon in the bottom right corner of any schedule page. You can give natural language commands like 'Add John on Monday at 3pm' or 'Move Sarah to tomorrow morning'. Aria uses an 'Agentic Loop' to confirm details and execute multiple steps automatically."
+    answer: "Use the floating chat on authenticated routes. Ask for calendar actions like 'Create a 30-minute event tomorrow at 2 PM'.",
   },
   {
     category: 'ai',
-    question: 'What can Aria actually do?',
-    answer: "Aria can: \n• Add single or multiple events \n• Move events between days or times \n• Perform 'Collision-Safe Swaps' between two participants \n• Delete events and clean up unassigned entries \n• Answer questions about your current schedule data."
+    question: 'Do chat actions use the same backend path as the calendar UI?',
+    answer: 'Yes. Chat and direct UI event actions share the same server command handlers and operation logging path.',
   },
   {
-    category: 'timetable',
-    question: 'How does the Collision-Safe Swap work?',
-    answer: "You can drag one participant block directly onto another participant's block. Aria will perform an 'Atomic Swap'—meaning both events change places while preserving their original durations and recurrence settings. This prevents data loss and accidental overlaps."
+    category: 'calendar',
+    question: 'How does sync with connected calendars work?',
+    answer: 'Aria reads and reconciles selected Google calendars, then renders canonical event state in the calendar workspace.',
   },
   {
-    category: 'timetable',
-    question: 'How do I handle recurring events?',
-    answer: "When adding an event, you can choose between 'Once', 'Weekly', 'Every 2 Weeks', or 'Monthly'. The system uses RRULE logic to ensure these appear correctly every week. If you move a recurring event, it will update the pattern for future occurrences as well."
+    category: 'calendar',
+    question: 'How is the primary write calendar used?',
+    answer: 'New event writes use the selected primary write calendar by default unless you explicitly choose another connected calendar.',
   },
   {
-    category: 'timetable',
-    question: 'Where is the Trash Zone?',
-    answer: "When you start dragging an event, a pill-shaped 'Trash Zone' will slide down from the top-center of the screen. Drop any event there to remove it from the timetable. Don't worry—you'll see a confirmation before anything is permanently deleted."
+    category: 'intake',
+    question: 'What does an availability submission mean?',
+    answer: 'A submission is intake data for organizer review. It is not a final booking confirmation.',
+  },
+  {
+    category: 'intake',
+    question: 'How do I handle late submissions?',
+    answer: 'If a public intake deadline has passed, participants should contact the organizer directly for next steps.',
   },
   {
     category: 'account',
-    question: 'How do I change my working hours?',
-    answer: "Each schedule can have its own operational window. In the 'Settings' menu of a schedule, look for 'Operating Hours'. You can define a 'Day Start' and 'Day End'. The timetable grid and public submission form will automatically shrink or expand to match these hours."
+    question: 'Where are provider tokens stored?',
+    answer: 'Provider tokens stay server-side only. Browsers do not receive provider refresh tokens.',
   },
   {
     category: 'account',
-    question: 'What do the different statuses mean?',
-    answer: "• Draft: Private workspace for planning.\n• Active (Collecting): Public form is open for submissions.\n• Archived: Closed schedule kept for records.\n• Trashed: Queued for permanent deletion in 30 days."
+    question: 'Can I limit which calendars are visible?',
+    answer: 'Yes. Use calendar visibility toggles in the calendar workspace while keeping primary write context visible.',
   },
-  {
-    category: 'forms',
-    question: 'How do participants submit their availability?',
-    answer: "Generate a 'Public Form Link' from the Action Toolbar. Participants can visit this link (no login required) to submit up to 3 preferred slots. Once they submit, they appear in your 'Unassigned' list on the schedule page."
-  },
-  {
-    category: 'forms',
-    question: 'How do I place unassigned participants?',
-    answer: "Open the 'Events' menu in the Action Toolbar to see participants who have submitted forms but aren't on the grid. You can drag them directly onto an empty slot, or ask Aria to 'Schedule all unassigned participants' for you."
-  }
 ];
 
 export default function HelpPage() {
@@ -105,9 +100,9 @@ export default function HelpPage() {
   const [openFaq, setOpenFaq] = useState<string | null>(null);
 
   const filteredFaqs = useMemo(() => {
-    return FAQ_DATA.filter(faq => {
-      const matchesSearch = faq.question.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        faq.answer.toLowerCase().includes(searchQuery.toLowerCase());
+    return FAQ_DATA.filter((faq) => {
+      const matchesSearch = faq.question.toLowerCase().includes(searchQuery.toLowerCase())
+        || faq.answer.toLowerCase().includes(searchQuery.toLowerCase());
       const matchesCategory = activeCategory ? faq.category === activeCategory : true;
       return matchesSearch && matchesCategory;
     });
@@ -117,10 +112,7 @@ export default function HelpPage() {
     <div className={s.container}>
       <header className={s.header}>
         <div className={s.headerContent}>
-          <button
-            onClick={() => navigate('/dashboard')}
-            className={s.backButton}
-          >
+          <button onClick={() => navigate('/calendar')} className={s.backButton}>
             <ArrowLeft size={20} />
           </button>
           <span style={{ fontWeight: '600', color: 'var(--text-400)' }}>Help Center</span>
@@ -129,18 +121,12 @@ export default function HelpPage() {
 
       <section className={s.hero}>
         <h1 className={s.heroTitle}>How can we help?</h1>
-        <p className={s.heroSubtitle}>
-          Everything you need to know about Aria, the intelligent scheduling assistant.
-        </p>
+        <p className={s.heroSubtitle}>Aria is a calendar orchestration assistant over connected calendars.</p>
         <div className={s.searchContainer}>
-          <Search
-            size={20}
-            color="#9ca3af"
-            style={{ position: 'absolute', left: '1.25rem', top: '50%', transform: 'translateY(-50%)' }}
-          />
+          <Search size={20} color="#9ca3af" style={{ position: 'absolute', left: '1.25rem', top: '50%', transform: 'translateY(-50%)' }} />
           <input
             type="text"
-            placeholder="Search for guides, features, and tips..."
+            placeholder="Search guides and FAQ..."
             className={s.searchInput}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
@@ -158,7 +144,7 @@ export default function HelpPage() {
                 style={{
                   borderColor: activeCategory === cat.id ? cat.color : 'var(--border-gray-200)',
                   boxShadow: activeCategory === cat.id ? `0 10px 20px -5px ${cat.color}20` : 'none',
-                  transform: activeCategory === cat.id ? 'translateY(-4px)' : 'none'
+                  transform: activeCategory === cat.id ? 'translateY(-4px)' : 'none',
                 }}
                 onClick={() => setActiveCategory(activeCategory === cat.id ? null : cat.id)}
               >
@@ -175,7 +161,7 @@ export default function HelpPage() {
         )}
 
         <h2 className={s.sectionTitle}>
-          {searchQuery ? `Search Results for "${searchQuery}"` : activeCategory ? `${HELP_CATEGORIES.find(c => c.id === activeCategory)?.title} FAQ` : 'Common Questions'}
+          {searchQuery ? `Search Results for "${searchQuery}"` : activeCategory ? `${HELP_CATEGORIES.find((c) => c.id === activeCategory)?.title} FAQ` : 'Common Questions'}
         </h2>
 
         <div className={s.faqList}>
@@ -183,19 +169,14 @@ export default function HelpPage() {
             <div
               key={i}
               className={s.faqItem}
-              style={{
-                borderColor: openFaq === faq.question ? 'var(--brand-primary)' : 'var(--border-gray-200)'
-              }}
+              style={{ borderColor: openFaq === faq.question ? 'var(--brand-primary)' : 'var(--border-gray-200)' }}
             >
-              <div
-                className={s.faqHeader}
-                onClick={() => setOpenFaq(openFaq === faq.question ? null : faq.question)}
-              >
+              <div className={s.faqHeader} onClick={() => setOpenFaq(openFaq === faq.question ? null : faq.question)}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
                   <div style={{ padding: '0.5rem', background: 'var(--bg-gray-50)', borderRadius: '8px' }}>
                     {faq.category === 'ai' && <Sparkles size={16} color="#8b5cf6" />}
-                    {faq.category === 'timetable' && <MousePointer2 size={16} color="var(--brand-primary)" />}
-                    {faq.category === 'forms' && <Users size={16} color="#06b6d4" />}
+                    {faq.category === 'calendar' && <Calendar size={16} color="var(--brand-primary)" />}
+                    {faq.category === 'intake' && <Users size={16} color="#06b6d4" />}
                     {faq.category === 'account' && <Lock size={16} color="#ec4899" />}
                   </div>
                   {faq.question}
@@ -203,55 +184,35 @@ export default function HelpPage() {
                 <ChevronRight
                   size={20}
                   color="#9ca3af"
-                  style={{
-                    transition: 'transform 0.2s',
-                    transform: openFaq === faq.question ? 'rotate(90deg)' : 'none'
-                  }}
+                  style={{ transition: 'transform 0.2s', transform: openFaq === faq.question ? 'rotate(90deg)' : 'none' }}
                 />
               </div>
               {openFaq === faq.question && (
-                <div className={s.faqContent}>
-                  {faq.answer.split('\n').map((line, idx) => (
-                    <p key={idx} style={{ margin: '0 0 0.5rem 0' }}>{line}</p>
-                  ))}
-                </div>
+                <div className={s.faqContent}><p style={{ margin: 0 }}>{faq.answer}</p></div>
               )}
             </div>
           )) : (
             <div style={{ textAlign: 'center', padding: '4rem 0' }}>
-              <div style={{ background: '#f3f4f6', width: '64px', height: '64px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1.5rem' }}>
-                <Search size={32} color="#9ca3af" />
-              </div>
               <h3 style={{ fontWeight: '600' }}>No matches found</h3>
-              <p style={{ color: 'var(--text-400)' }}>Try using broader keywords or check another category.</p>
+              <p style={{ color: 'var(--text-400)' }}>Try broader keywords.</p>
             </div>
           )}
         </div>
 
         <div className={s.contactGrid}>
           <div className={s.contactCard}>
-            <div className={s.iconBox} style={{ background: 'rgba(255,255,255,0.1)', color: 'white' }}>
-              <Mail size={24} />
-            </div>
+            <div className={s.iconBox} style={{ background: 'rgba(255,255,255,0.1)', color: 'white' }}><Mail size={24} /></div>
             <h3 style={{ fontWeight: '700' }}>Technical Support</h3>
-            <p style={{ opacity: 0.7, fontSize: '0.875rem' }}>Have a bug or feature request? Our engineering team is here to help.</p>
-            <button
-              className={s.contactButton}
-              onClick={() => window.location.href = 'mailto:support@aria.app'}
-            >
+            <p style={{ opacity: 0.7, fontSize: '0.875rem' }}>Need help with sync, setup, or event behavior?</p>
+            <button className={s.contactButton} onClick={() => { window.location.href = 'mailto:support@aria.app'; }}>
               Email Support
             </button>
           </div>
           <div className={s.contactCard} style={{ background: 'var(--brand-primary)' }}>
-            <div className={s.iconBox} style={{ background: 'rgba(255,255,255,0.2)', color: 'white' }}>
-              <MessageSquare size={24} />
-            </div>
+            <div className={s.iconBox} style={{ background: 'rgba(255,255,255,0.2)', color: 'white' }}><MessageSquare size={24} /></div>
             <h3 style={{ fontWeight: '700' }}>Feature Guides</h3>
-            <p style={{ opacity: 0.9, fontSize: '0.875rem' }}>Want to see Aria in action? Check out our visual tutorials and community forum.</p>
-            <button
-              className={s.contactButton}
-              style={{ background: 'white', color: 'var(--brand-primary)' }}
-            >
+            <p style={{ opacity: 0.9, fontSize: '0.875rem' }}>Review practical examples for calendar and intake workflows.</p>
+            <button className={s.contactButton} style={{ background: 'white', color: 'var(--brand-primary)' }}>
               View Tutorials
             </button>
           </div>

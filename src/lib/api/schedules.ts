@@ -1,7 +1,6 @@
 // src/lib/api/schedules.ts
-// Data access layer for the schedules table.
-// Pure Supabase CRUD only. No business logic, no validation, no orchestration.
-// All business logic lives in src/lib/services/scheduleService.ts.
+// LEGACY BRIDGE (BLD-001): direct schedules table gateway kept for compatibility.
+// New v2.1 canonical models should be implemented in src/infrastructure/supabase/*.
 
 import { supabase } from '../supabase';
 

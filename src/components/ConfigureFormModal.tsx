@@ -181,7 +181,7 @@ export default function ConfigureFormModal({
     };
 
     return (
-        <Modal isOpen={isOpen} onClose={onClose} title="Configure Form" maxWidth="40rem">
+        <Modal isOpen={isOpen} onClose={onClose} title="Configure Availability Intake" maxWidth="40rem">
             <form onSubmit={handleSubmit} style={styles.form}>
                 {error && <div style={styles.error}>{error}</div>}
 
@@ -197,7 +197,7 @@ export default function ConfigureFormModal({
                 </div>
 
                 <div style={styles.formGroup}>
-                    <label style={styles.label}>Number of Preferred Timings</label>
+                    <label style={styles.label}>Number of Availability Options</label>
                     <div style={{
                         ...styles.radioGroup,
                         flexDirection: typeof window !== 'undefined' && window.innerWidth < 480 ? 'column' : 'row',
@@ -224,7 +224,7 @@ export default function ConfigureFormModal({
                             </label>
                         ))}
                     </div>
-                    <div style={styles.hint}>Participants will provide their top {maxChoices} preferred time slot{maxChoices !== 1 ? 's' : ''}</div>
+                    <div style={styles.hint}>Participants will provide their top {maxChoices} availability option{maxChoices !== 1 ? 's' : ''}</div>
                 </div>
 
                 <div style={styles.formGroup}>
@@ -296,14 +296,14 @@ export default function ConfigureFormModal({
 
 
                 <div style={styles.preview}>
-                    <div style={styles.previewTitle}>Form Preview</div>
+                    <div style={styles.previewTitle}>Intake Preview</div>
                     <div style={styles.previewItem}>
                         <span>•</span>
                         <strong>{schedule.label}</strong>
                     </div>
                     <div style={styles.previewItem}>
                         <span>•</span>
-                        {maxChoices} preferred timing{maxChoices !== 1 ? 's' : ''} per participant
+                        {maxChoices} availability option{maxChoices !== 1 ? 's' : ''} per participant
                     </div>
                     {instructions && (
                         <div style={styles.previewItem}>
@@ -344,7 +344,7 @@ export default function ConfigureFormModal({
                         onMouseEnter={(e) => { if (!loading) e.currentTarget.style.backgroundColor = '#ea580c'; }}
                         onMouseLeave={(e) => { if (!loading) e.currentTarget.style.backgroundColor = '#f97316'; }}
                     >
-                        {loading ? 'Activating...' : 'Save & Activate Form'}
+                        {loading ? 'Saving...' : 'Save Intake Settings'}
                     </button>
                 </div>
             </form>

@@ -1,7 +1,7 @@
 // src/lib/services/scheduleService.ts
-// Business logic for schedule lifecycle management.
-// All validation, status transitions, and orchestration live here.
-// Never imports from other services. Only imports from api/* and errors.ts.
+// LEGACY BRIDGE (BLD-001): schedule-owned service kept for migration compatibility.
+// Do not add new v2.1 product behavior here; route new calendar logic to
+// domain/application/infrastructure modules under src/{domain,application,infrastructure}.
 
 import {
     getSchedule as apiGetSchedule,

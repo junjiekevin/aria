@@ -1,0 +1,7 @@
+{
+  "extends": "../../tsconfig.app.json",
+  "compilerOptions": {
+    "tsBuildInfoFile": "../../node_modules/.tmp/packages-application.tsbuildinfo"
+  },
+  "include": ["src", "../../src/application", "../../src/domain"]
+}

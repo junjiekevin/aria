@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, Navigate } from 'react-router-dom';
-import { Auth as SupabaseAuth, ThemeSupa } from '@supabase/auth-ui-react';
 import { supabase } from '../lib/supabase';
 import logo from '../assets/images/logo-with-text.png';
 import Modal from '../components/Modal';
+import { fetchCalendarSetupStatus, getGoogleAuthStartUrl } from '../lib/api/calendar-setup';
 
 // Inline Icons to avoid build issues
 const CalendarIcon = ({ size = 24, className = '' }) => (
@@ -41,6 +41,9 @@ export default function AuthPage() {
     const navigate = useNavigate();
     const [checking, setChecking] = useState(true);
     const [isAuthed, setIsAuthed] = useState(false);
+    const [authedRedirectPath, setAuthedRedirectPath] = useState('/calendar/setup');
+    const [startingGoogle, setStartingGoogle] = useState(false);
+    const [authError, setAuthError] = useState<string | null>(null);
     const [showPrivacy, setShowPrivacy] = useState(false);
     const [showTerms, setShowTerms] = useState(false);
 
@@ -53,6 +56,12 @@ export default function AuthPage() {
             if (!isMounted) return;
 
             if (session) {
+                try {
+                    const status = await fetchCalendarSetupStatus();
+                    setAuthedRedirectPath(status.setupComplete ? '/calendar' : '/calendar/setup');
+                } catch {
+                    setAuthedRedirectPath('/calendar/setup');
+                }
                 setIsAuthed(true);
                 setChecking(false);
                 return;
@@ -61,7 +70,14 @@ export default function AuthPage() {
             const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, newSession) => {
                 if (newSession) {
                     setIsAuthed(true);
-                    setTimeout(() => navigate('/dashboard'), 50);
+                    setTimeout(async () => {
+                        try {
+                            const status = await fetchCalendarSetupStatus();
+                            navigate(status.setupComplete ? '/calendar' : '/calendar/setup');
+                        } catch {
+                            navigate('/calendar/setup');
+                        }
+                    }, 50);
                 }
             });
 
@@ -100,8 +116,20 @@ export default function AuthPage() {
     }
 
     if (isAuthed) {
-        return <Navigate to="/dashboard" replace />;
+        return <Navigate to={authedRedirectPath} replace />;
     }
+
+    const startGoogleSignIn = async () => {
+        setStartingGoogle(true);
+        setAuthError(null);
+        try {
+            const url = await getGoogleAuthStartUrl();
+            window.location.assign(url);
+        } catch (err) {
+            setAuthError(err instanceof Error ? err.message : 'Failed to start Google sign-in');
+            setStartingGoogle(false);
+        }
+    };
 
     return (
         <div style={{
@@ -185,55 +213,25 @@ export default function AuthPage() {
                     borderRadius: '12px',
                     boxShadow: '0 2px 8px rgba(0,0,0,0.05)'
                 }}>
-                    <SupabaseAuth
-                        supabaseClient={supabase}
-                        appearance={{
-                            theme: ThemeSupa,
-                            variables: {
-                                default: {
-                                    colors: {
-                                        brand: '#f97316',
-                                        brandAccent: '#ea580c',
-                                        inputText: '#374151',
-                                        inputBorder: '#e5e7eb',
-                                    },
-                                    radii: {
-                                        borderRadiusButton: '10px',
-                                        inputBorderRadius: '10px',
-                                    },
-                                    space: {
-                                        buttonPadding: '12px 16px',
-                                        inputPadding: '12px 16px',
-                                    },
-                                    fonts: {
-                                        bodyFontFamily: 'ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
-                                        buttonFontFamily: 'ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
-                                    }
-                                },
-                            },
-                            style: {
-                                button: {
-                                    fontSize: '0.95rem',
-                                    fontWeight: '500',
-                                    boxShadow: '0 2px 4px rgba(249, 115, 22, 0.1)',
-                                },
-                                container: {
-                                    gap: '1rem',
-                                }
-                            }
+                    <button
+                        type="button"
+                        onClick={startGoogleSignIn}
+                        disabled={startingGoogle}
+                        style={{
+                            width: '100%',
+                            border: '1px solid #e5e7eb',
+                            borderRadius: '10px',
+                            background: '#ffffff',
+                            padding: '12px 16px',
+                            fontSize: '0.95rem',
+                            fontWeight: 500,
+                            color: '#374151',
+                            cursor: startingGoogle ? 'default' : 'pointer',
                         }}
-                        providers={['google']}
-                        onlyThirdPartyProviders
-                        socialLayout="vertical"
-                        redirectTo={window.location.origin + '/dashboard'}
-                        localization={{
-                            variables: {
-                                sign_in: {
-                                    button_label: 'Continue with Google',
-                                },
-                            },
-                        }}
-                    />
+                    >
+                        {startingGoogle ? 'Redirecting...' : 'Continue with Google'}
+                    </button>
+                    {authError ? <p style={{ color: '#dc2626', margin: '0.75rem 0 0', fontSize: '0.875rem' }}>{authError}</p> : null}
                 </div>
 
                 <div style={{ height: '1px', background: 'linear-gradient(to right, transparent, #e5e7eb, transparent)', marginBottom: '2rem' }} />

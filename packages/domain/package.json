@@ -1,0 +1,13 @@
+{
+  "name": "@aria/domain",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "lint": "eslint src --ext .ts",
+    "build": "tsc -p tsconfig.json"
+  }
+}

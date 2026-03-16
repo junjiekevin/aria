@@ -3,6 +3,8 @@ import { useParams } from 'react-router-dom';
 import { Copy, Check, AlertCircle } from 'lucide-react';
 import { getPublicSchedule, type Schedule } from '../lib/api/schedules';
 import { createFormResponse, getFormResponses } from '../lib/api/form-responses';
+import { submitAvailability } from '../application/availability-intake';
+import { SupabaseAvailabilitySubmissionRepository } from '../infrastructure/supabase';
 
 const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 const FREQUENCIES = [
@@ -235,7 +237,7 @@ function TimingSelector({
     return (
         <div style={styles.timingCard}>
             <div style={styles.timingHeader}>
-                <span style={styles.badge}>Choice {index + 1}</span>
+                <span style={styles.badge}>Option {index + 1}</span>
             </div>
 
             <div style={styles.row}>
@@ -462,8 +464,8 @@ export default function AvailabilityFormPage() {
             errors.push('Please enter a valid email address');
         }
 
-        const maxChoices = schedule?.max_choices || 3;
-        const timings = [timing1, timing2, timing3].slice(0, maxChoices);
+        const maxOptions = schedule?.max_choices || 3;
+        const timings = [timing1, timing2, timing3].slice(0, maxOptions);
 
         for (let i = 0; i < timings.length; i++) {
             const t = timings[i];
@@ -471,12 +473,12 @@ export default function AvailabilityFormPage() {
             const end = parseInt(t.endHour) * 60 + parseInt(t.endMinute);
 
             if (start >= end) {
-                errors.push(`Choice ${i + 1}: End time must be after start time`);
+                errors.push(`Option ${i + 1}: End time must be after start time`);
             }
 
             for (let j = i + 1; j < timings.length; j++) {
                 if (timesOverlap(t, timings[j])) {
-                    errors.push(`Choice ${i + 1} overlaps with Choice ${j + 1}`);
+                    errors.push(`Option ${i + 1} overlaps with Option ${j + 1}`);
                 }
             }
         }
@@ -553,6 +555,31 @@ export default function AvailabilityFormPage() {
 
             await createFormResponse(formData);
 
+            const intakeRepository = new SupabaseAvailabilitySubmissionRepository();
+            await submitAvailability(intakeRepository, {
+                publicLinkId: scheduleId,
+                participantName: `${firstName} ${lastName}`,
+                participantEmail: email.trim(),
+                choices: timings.slice(0, maxChoices).map((t) => {
+                    const base = new Date();
+                    const targetDay = DAYS.findIndex((d) => d === t.day);
+                    const delta = (targetDay - base.getDay() + 7) % 7;
+                    const date = new Date(base);
+                    date.setDate(base.getDate() + delta);
+
+                    const start = new Date(date);
+                    start.setHours(Number(t.startHour), Number(t.startMinute), 0, 0);
+                    const end = new Date(date);
+                    end.setHours(Number(t.endHour), Number(t.endMinute), 0, 0);
+                    if (end <= start) end.setHours(start.getHours() + 1);
+
+                    return {
+                        startAt: start.toISOString(),
+                        endAt: end.toISOString(),
+                    };
+                }),
+            });
+
             setSubmitted(true);
         } catch (err) {
             console.error('Failed to submit form:', err);
@@ -601,14 +628,14 @@ export default function AvailabilityFormPage() {
                             </div>
                             <div style={styles.thankYouTitle}>Response Received!</div>
                             <div style={styles.thankYouText}>
-                                Thank you, {firstName}! Your preferred time slots have been submitted.
+                                Thanks, {firstName}. Your availability has been received.
                                 <br /><br />
-                                If you need to make any changes, please contact the person who sent you this form link.
+                                The organizer will confirm final event details after reviewing responses.
                             </div>
                         </div>
 
                         <div style={styles.copySection}>
-                            <div style={styles.copyLabel}>Share this form with others who need to submit their availability:</div>
+                            <div style={styles.copyLabel}>Share this intake link with additional participants:</div>
                             <div style={styles.copyRow}>
                                 <input
                                     readOnly
@@ -644,7 +671,7 @@ export default function AvailabilityFormPage() {
                         <div style={{ ...styles.error, backgroundColor: '#fef3c7', border: '1px solid #f59e0b', color: '#92400e' }}>
                             <AlertCircle size={20} style={{ flexShrink: 0, marginTop: 2 }} />
                             <div>
-                                This form is closed. The deadline has passed.
+                                This intake form is closed because the deadline has passed. Contact the organizer if you still need to submit availability.
                             </div>
                         </div>
                     )}
@@ -718,9 +745,9 @@ export default function AvailabilityFormPage() {
                     </div>
 
                     <div style={{ marginTop: '1.5rem', marginBottom: '1rem' }}>
-                        <div style={styles.sectionTitle}>Preferred Time Slots *</div>
+                        <div style={styles.sectionTitle}>Your Availability *</div>
                         <div style={{ fontSize: '0.8rem', color: '#6b7280', marginBottom: '1rem' }}>
-                            Please provide {schedule?.max_choices || 3} preferred time slot{(schedule?.max_choices || 3) !== 1 ? 's' : ''}. All {(schedule?.max_choices || 3)} are required.
+                            Please provide {schedule?.max_choices || 3} availability option{(schedule?.max_choices || 3) !== 1 ? 's' : ''}. All {(schedule?.max_choices || 3)} are required.
                         </div>
 
                         {(!formClosedDueToDeadline) && (
@@ -729,7 +756,7 @@ export default function AvailabilityFormPage() {
                                     timing={timing1}
                                     onChange={(newVal) => handleTimingChange(0, newVal)}
                                     index={0}
-                                    errors={formErrors.filter(e => e.includes('Choice 1') || e.includes('1'))}
+                                    errors={formErrors.filter(e => e.includes('Option 1') || e.includes('1'))}
                                     startHours={startHours}
                                     endHours={endHours}
                                 />
@@ -738,7 +765,7 @@ export default function AvailabilityFormPage() {
                                         timing={timing2}
                                         onChange={(newVal) => handleTimingChange(1, newVal)}
                                         index={1}
-                                        errors={formErrors.filter(e => e.includes('Choice 2') || e.includes('2'))}
+                                        errors={formErrors.filter(e => e.includes('Option 2') || e.includes('2'))}
                                         startHours={startHours}
                                         endHours={endHours}
                                     />
@@ -748,7 +775,7 @@ export default function AvailabilityFormPage() {
                                         timing={timing3}
                                         onChange={(newVal) => handleTimingChange(2, newVal)}
                                         index={2}
-                                        errors={formErrors.filter(e => e.includes('Choice 3') || e.includes('3'))}
+                                        errors={formErrors.filter(e => e.includes('Option 3') || e.includes('3'))}
                                         startHours={startHours}
                                         endHours={endHours}
                                     />
@@ -767,6 +794,11 @@ export default function AvailabilityFormPage() {
                     >
                         {submitting ? 'Submitting...' : formClosedDueToDeadline ? 'Form Closed' : 'Submit Availability'}
                     </button>
+                    {!formClosedDueToDeadline && (
+                        <div style={{ marginTop: '0.625rem', fontSize: '0.75rem', color: '#6b7280' }}>
+                            This submission collects availability for organizer review and is not a final booking confirmation.
+                        </div>
+                    )}
                 </form>
             </div>
         </div>

@@ -1,19 +1,28 @@
 # Aria
 
-Aria is an intelligent scheduling assistant that helps organizers build, manage, and optimize timetables. It combines a visual weekly grid with an AI-powered chat interface that can create, move, swap, and delete events through natural language.
+Aria v2.1 is being repositioned as an AI scheduling orchestration layer on top of external calendars, starting with Google Calendar. The target experience is calendar-first, with a full synced calendar UI as the authenticated home page and a floating assistant as the main command surface.
 
-## Features
+The current codebase still contains the legacy standalone scheduling product in implementation terms. For the revamp direction, use `docs/agents/context` as the source of truth.
 
-- **AI Scheduling Assistant** -- Conversational interface powered by Google Gemini 2.5 Flash Lite (via OpenRouter). Supports natural-language event creation, conflict detection, capacity analysis, and multi-step agentic operations.
-- **Visual Timetable** -- Weekly grid with configurable working hours and drag-and-drop support for assigning, moving, and swapping events (built with dnd-kit).
-- **Availability Forms** -- Shareable public links that allow participants to submit preferred time slots without needing an account.
-- **Agentic Operations (Edge)** -- Deno-based Supabase Edge Functions handle complex asynchronous workflows like grouping participants and distributing ICS files.
-- **Smart Notifications** -- Automated email dispatch via the Resend API keeps participants informed of schedule finalizations and provides encrypted cancellation links.
-- **Auto-Scheduling** -- Algorithm-driven participant placement with a preview-and-confirm workflow.
-- **Recurring Events** -- Support for one-time, weekly, bi-weekly, and monthly recurrence using RRULE format.
-- **Export** -- iCal (.ics) export for calendar applications and branded PDF generation for print, with zero external dependencies.
-- **Authentication** -- Google OAuth sign-in via Supabase Auth.
-- **Zero-Trust Data Security** -- Row Level Security (RLS) policies enforce strict tenant isolation at the database level. The AI assistant and edge functions operate under tight policy constraints, ensuring participants can only access explicitly permitted data.
+## Current Repo Snapshot
+
+The repository currently contains:
+- a legacy Vite SPA
+- a schedule-centric data model
+- floating chat tied to legacy scheduling tools
+- public availability forms
+- Supabase-backed CRUD and edge functions
+
+These are implementation starting points, not the final v2.1 architecture.
+
+## v2.1 Direction
+
+- **Calendar-First Product** -- Full calendar UI is the main authenticated surface.
+- **Floating Aria** -- The assistant remains a floating chat layer, not a separate page.
+- **Google-First Sync** -- Google Calendar is the first active provider and system of record for event truth.
+- **Provider-Neutral Core** -- Internal contracts should support future Apple, Outlook, and CalDAV integrations.
+- **Availability Intake** -- Public forms remain in scope as workflow intake, not as primary calendar truth.
+- **Server-First Execution** -- Privileged auth, sync, tool execution, and provider calls must move behind a server layer.
 
 ## Tech Stack
 

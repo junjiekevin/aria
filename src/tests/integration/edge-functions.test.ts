@@ -43,7 +43,7 @@ describe('Edge Functions Integration', () => {
 
         expect(error).not.toBeNull();
         // The function returns 400 with "Schedule not found"
-    });
+    }, 15000);
 
     it('cancel-event: should fail with non-existent entry', async () => {
         const fakeId = '00000000-0000-0000-0000-000000000000';

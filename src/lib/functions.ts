@@ -1,7 +1,7 @@
 // src/lib/functions.ts
-// AI function execution layer.
-// Primarily calls services; a few direct api/* imports remain for plan/form primitives.
-// Wraps all executions with deduplication to prevent AI double-fire.
+// LEGACY BRIDGE (BLD-001): temporary function gateway for schedule-centric tools.
+// New v2.1 calendar commands should land in src/application/* and be wired here only
+// as a compatibility adapter until legacy schedule tools are fully retired.
 
 import { withDedup } from './retry';
 import { toAriaError } from './errors';
@@ -28,8 +28,6 @@ import {
     swapEvents,
     deleteEvent,
     getEventSummary,
-    searchEventsInSchedule,
-    type FrequencyType,
 } from './services/entryService';
 
 import { autoScheduleParticipants } from './services/autoScheduler';
@@ -52,6 +50,13 @@ import {
 import {
     getScheduleEntries,
 } from './api/schedule-entries';
+import {
+    createCalendarEventFromLegacyArgs,
+    deleteCalendarEventById,
+    getCalendarEventSummary,
+    searchCalendarEvents,
+    updateCalendarEventFromLegacyArgs,
+} from './api/calendar-chat';
 
 const FUNCTION_NAME_ALIASES: Record<string, string> = {
     // Event aliases
@@ -78,32 +83,6 @@ const FUNCTION_NAME_ALIASES: Record<string, string> = {
 function normalizeFunctionName(functionName: string): string {
     const canonical = functionName.toLowerCase().replace(/[^a-z0-9]/g, '');
     return FUNCTION_NAME_ALIASES[canonical] ?? functionName;
-}
-
-function normalizeRecurrenceForAddEvent(
-    rawRule: unknown
-): { recurrence_rule?: string; frequency?: FrequencyType } {
-    if (rawRule === undefined || rawRule === null) return {};
-    if (typeof rawRule !== 'string') return { recurrence_rule: '' };
-
-    const rule = rawRule.trim();
-    if (!rule) return { recurrence_rule: '' };
-
-    const normalized = rule.toLowerCase();
-    if (normalized === 'none' || normalized === 'once' || normalized === 'one-time' || normalized === 'onetime') {
-        return { recurrence_rule: '' };
-    }
-    if (normalized === 'daily') return { recurrence_rule: '', frequency: 'daily' };
-    if (normalized === 'weekly') return { recurrence_rule: '', frequency: 'weekly' };
-    if (normalized === 'biweekly' || normalized === 'bi-weekly') return { recurrence_rule: '', frequency: '2weekly' };
-    if (normalized === 'monthly') return { recurrence_rule: '', frequency: 'monthly' };
-
-    if (rule.toUpperCase().startsWith('FREQ=')) {
-        return { recurrence_rule: rule };
-    }
-
-    // Unknown recurrence hint from model — fall back to one-time instead of storing invalid rules.
-    return { recurrence_rule: '' };
 }
 
 function normalizeHourForAddEvent(rawHour: unknown): number | undefined {
@@ -227,13 +206,14 @@ function validateToolInput(name: string, args: Record<string, unknown>): string 
         case 'autoScheduleParticipants':
             return requireString(args, 'schedule_id');
         case 'addEventToSchedule':
-            return requireString(args, 'schedule_id') ?? requireString(args, 'student_name') ?? requireString(args, 'day');
+            return requireString(args, 'student_name');
         case 'updateEventInSchedule':
             return requireString(args, 'event_id');
         case 'deleteEventFromSchedule':
             return requireString(args, 'event_id');
         case 'getEventSummaryInSchedule':
         case 'searchEventsInSchedule':
+            return null;
         case 'listUnassignedParticipants':
             return requireString(args, 'schedule_id');
         case 'swapEvents': {
@@ -365,29 +345,24 @@ export async function executeFunction(
                 // ============================================
 
                 case 'addEventToSchedule': {
-                    const normalizedRecurrence = normalizeRecurrenceForAddEvent(args.recurrence_rule);
-                    const event = await addEvent({
-                        schedule_id: args.schedule_id as string,
+                    const event = await createCalendarEventFromLegacyArgs({
                         student_name: args.student_name as string,
-                        day: args.day as string,
+                        day: args.day as string | undefined,
                         hour: normalizeHourForAddEvent(args.hour),
                         start_time: args.start_time as string | undefined,
                         end_time: args.end_time as string | undefined,
-                        recurrence_rule: normalizedRecurrence.recurrence_rule,
-                        frequency: normalizedRecurrence.frequency,
                     });
                     return { success: true, data: event };
                 }
 
                 case 'updateEventInSchedule': {
-                    const event = await updateEvent({
+                    const event = await updateCalendarEventFromLegacyArgs({
                         event_id: args.event_id as string,
                         student_name: args.student_name as string | undefined,
                         day: args.day as string | undefined,
                         hour: normalizeHourForAddEvent(args.hour),
                         start_time: args.start_time as string | undefined,
                         end_time: args.end_time as string | undefined,
-                        recurrence_rule: args.recurrence_rule as string | undefined,
                     });
                     return { success: true, data: event };
                 }
@@ -411,20 +386,17 @@ export async function executeFunction(
                 }
 
                 case 'deleteEventFromSchedule': {
-                    await deleteEvent(args.event_id as string);
+                    await deleteCalendarEventById(args.event_id as string);
                     return { success: true, data: { message: 'Event deleted' } };
                 }
 
                 case 'getEventSummaryInSchedule': {
-                    const summary = await getEventSummary(args.schedule_id as string);
+                    const summary = await getCalendarEventSummary();
                     return { success: true, data: summary };
                 }
 
                 case 'searchEventsInSchedule': {
-                    const results = await searchEventsInSchedule(
-                        args.schedule_id as string,
-                        args.query as string
-                    );
+                    const results = await searchCalendarEvents(args.query as string);
                     return { success: true, data: results };
                 }
 

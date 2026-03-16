@@ -53,7 +53,7 @@ export default function AboutPage() {
     <div className={s.container}>
       <header className={s.header}>
         <button
-          onClick={() => navigate('/dashboard')}
+          onClick={() => navigate('/calendar')}
           className={s.backButton}
         >
           <ArrowLeft size={18} />
@@ -114,6 +114,9 @@ export default function AboutPage() {
 
       <div className={`${s.section} ${s.reveal}`}>
         <h2 className={s.sectionHeading}>A Purpose-Driven Tool</h2>
+        <div className={s.textBlock}>
+          Aria v2.1 is a calendar orchestration layer on top of connected calendars. Provider calendars remain event truth in MVP, while Aria owns workflow and orchestration state.
+        </div>
         <div className={s.textBlock}>
           Aria began as a project built specifically to help practitioners. The goal was straightforward: reduce the time spent scheduling so they could focus on their expertise, which was the reason they chose their profession in the first place.
         </div>

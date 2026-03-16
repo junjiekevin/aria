@@ -1,0 +1,12 @@
+{
+  "name": "@aria/web",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -p tsconfig.json && vite build",
+    "lint": "eslint src --ext .ts,.tsx",
+    "preview": "vite preview"
+  }
+}

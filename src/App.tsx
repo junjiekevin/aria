@@ -8,12 +8,16 @@ import { supabase } from './lib/supabase'
 const CHAT_STORAGE_KEY = 'aria_chat_messages';
 
 const AvailabilityFormPage = React.lazy(() => import('./pages/AvailabilityFormPage.tsx'))
-const DashboardPage = React.lazy(() => import('./pages/DashboardPage.tsx'))
-const SchedulePage = React.lazy(() => import('./pages/SchedulePage.tsx'))
+const CalendarPage = React.lazy(() => import('./pages/CalendarPage.tsx'))
+const CalendarSetupPage = React.lazy(() => import('./pages/CalendarSetupPage.tsx'))
+const AuthCallbackPage = React.lazy(() => import('./pages/AuthCallbackPage.tsx'))
 const AccountPage = React.lazy(() => import('./pages/AccountPage.tsx'))
 const HelpPage = React.lazy(() => import('./pages/HelpPage.tsx'))
 const AboutPage = React.lazy(() => import('./pages/AboutPage.tsx'))
 const CancelPage = React.lazy(() => import('./pages/CancelPage.tsx'))
+
+// Legacy authenticated routes retained as compatibility redirects during v2.1 migration.
+const LEGACY_AUTH_ROUTES = ['/dashboard', '/schedule/:scheduleId'] as const;
 
 const App = () => {
     const location = useLocation();
@@ -57,15 +61,22 @@ const App = () => {
         <React.Suspense fallback={<div>Loading...</div>}>
             <Routes>
                 <Route path="/" element={<AuthPage />} />
+                <Route path="/auth/callback" element={<AuthCallbackPage />} />
                 <Route path="/form/:scheduleId" element={<AvailabilityFormPage />} />
                 <Route path="/schedule/:scheduleId/public" element={<AvailabilityFormPage />} />
                 <Route path="/cancel/:entryId" element={<CancelPage />} />
-                <Route path="/dashboard" element={<ProtectedRoute><DashboardPage /></ProtectedRoute>} />
-                <Route path="/schedule/:scheduleId" element={<ProtectedRoute><SchedulePage /></ProtectedRoute>} />
+                <Route path="/calendar" element={<ProtectedRoute><CalendarPage /></ProtectedRoute>} />
+                <Route path="/calendar/setup" element={<ProtectedRoute><CalendarSetupPage /></ProtectedRoute>} />
+                {LEGACY_AUTH_ROUTES.length > 0 && (
+                    <>
+                        <Route path="/dashboard" element={<ProtectedRoute><Navigate to="/calendar" replace /></ProtectedRoute>} />
+                        <Route path="/schedule/:scheduleId" element={<ProtectedRoute><Navigate to="/calendar" replace /></ProtectedRoute>} />
+                    </>
+                )}
                 <Route path="/account" element={<ProtectedRoute><AccountPage /></ProtectedRoute>} />
                 <Route path="/help" element={<ProtectedRoute><HelpPage /></ProtectedRoute>} />
                 <Route path="/about" element={<ProtectedRoute><AboutPage /></ProtectedRoute>} />
-                <Route path="*" element={<Navigate to="/" />} />
+                <Route path="*" element={<Navigate to={isAuthenticated ? '/calendar' : '/'} replace />} />
             </Routes>
             {showChat && <FloatingChat onScheduleChange={handleScheduleChange} onShowAutoSchedule={handleShowAutoSchedule} />}
         </React.Suspense>

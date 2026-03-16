@@ -1,0 +1,11 @@
+{
+  "name": "@aria/api",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "npm run build && node dist/server.js",
+    "build": "tsc -p tsconfig.json",
+    "lint": "eslint src --ext .ts"
+  }
+}

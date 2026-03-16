@@ -55,7 +55,7 @@ export default function ProtectedRoute({ children }: ProtectedRouteProps) {
 
     // If not logged in
     if (!session) {
-        return <Navigate to="/auth" replace />;
+        return <Navigate to="/" replace />;
     }
 
     // Else render protected content

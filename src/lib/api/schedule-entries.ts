@@ -1,6 +1,6 @@
 // src/lib/api/schedule-entries.ts
-// Data access layer for the schedule_entries table.
-// Pure Supabase CRUD only. No business logic.
+// LEGACY BRIDGE (BLD-001): direct schedule_entries CRUD kept only for migration.
+// New v2.1 event persistence should move to canonical calendar repositories.
 
 import { supabase } from '../supabase';
 
