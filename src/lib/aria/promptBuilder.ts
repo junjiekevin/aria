@@ -18,28 +18,17 @@ export interface ToolBlockOptions {
 }
 
 const TOOL_SIGNATURES: Record<string, string> = {
-    createSchedule: 'label, start_date, end_date',
     listSchedules: '',
-    listTrashedSchedules: '',
-    updateSchedule: 'schedule_id, updates',
-    trashSchedule: 'schedule_id',
-    recoverSchedule: 'schedule_id',
-    emptyTrash: '',
-    updateFormConfig: 'schedule_id, form_config',
-    checkScheduleOverlaps: 'start_date, end_date, exclude_id?',
-    autoScheduleParticipants: 'schedule_id',
-    publishSchedule: 'schedule_id',
-    getExportLink: 'schedule_id',
-    analyzeScheduleHealth: 'schedule_id',
-    proposeScheduleChanges: 'schedule_id, changes[]',
+    analyzeScheduleHealth: '',
+    proposeScheduleChanges: 'changes[], calendar_id?',
     commitSchedulePlan: 'plan_id',
-    addEventToSchedule: 'schedule_id, student_name, day, hour, recurrence_rule',
+    addEventToSchedule: 'calendar_id, student_name, day, hour, recurrence_rule',
     updateEventInSchedule: 'event_id, student_name?, day?, hour?, recurrence_rule?',
     deleteEventFromSchedule: 'event_id',
-    getEventSummaryInSchedule: 'schedule_id',
-    searchEventsInSchedule: 'schedule_id, query',
+    getEventSummaryInSchedule: 'calendar_id',
+    searchEventsInSchedule: 'calendar_id, query',
     swapEvents: 'event1_id, event2_id',
-    listUnassignedParticipants: 'schedule_id',
+    listUnassignedParticipants: 'legacy_schedule_id',
     getParticipantPreferences: 'participant_id',
     markParticipantAssigned: 'participant_id, assigned',
 };
@@ -70,7 +59,7 @@ Every action request MUST result in a FUNCTION_CALL.
    or listUnassignedParticipants before giving up. If a search returns a close match 
    to what the user typed, proceed with it directly — do not ask for confirmation. 
    Mention the correction in your final message only (e.g. "I assumed you meant Piano").
-7. **SCHEDULES vs EVENTS**: Schedules are containers ("Test Schedule"). Events are slots inside them ("Piano", "Singing"). If the user targets an event by name, call listSchedules then immediately searchEventsInSchedule on the result — never ask if they meant the schedule.
+7. **CALENDARS vs EVENTS**: Calendars are containers ("Primary"). Events are slots inside them ("Piano", "Singing"). If the user targets an event by name and no calendar_id is in context, call listSchedules then searchEventsInSchedule.
 8. EXACT TOOL NAMES ONLY — you MUST call tools using names exactly as listed in AVAILABLE TOOLS. Never shorten/rename (e.g., never use "updateEvent"; use "updateEventInSchedule").
 ## RECURRENCE FORMAT (iCal)
 - Once:      "" (empty string)
@@ -124,14 +113,11 @@ You are in advisory mode. Your job is to GATHER DATA and then SYNTHESIZE a conci
 /** Read-only tools available in advisory mode. */
 export const ADVISORY_TOOL_NAMES = new Set([
     'listSchedules',
-    'listTrashedSchedules',
     'getEventSummaryInSchedule',
     'searchEventsInSchedule',
     'listUnassignedParticipants',
     'getParticipantPreferences',
     'analyzeScheduleHealth',
-    'checkScheduleOverlaps',
-    'getExportLink',
 ]);
 
 
@@ -150,13 +136,7 @@ const TOOL_TRANSITIONS: Record<string, string[]> = {
         'getEventSummaryInSchedule',
         'searchEventsInSchedule',
         'listUnassignedParticipants',
-        'updateSchedule',
-        'trashSchedule',
-        'publishSchedule',
-        'getExportLink',
-        'autoScheduleParticipants',
         'analyzeScheduleHealth',
-        'updateFormConfig',
         'proposeScheduleChanges',
     ],
 
@@ -184,7 +164,6 @@ const TOOL_TRANSITIONS: Record<string, string[]> = {
         'getParticipantPreferences',
         'markParticipantAssigned',
         'addEventToSchedule',
-        'autoScheduleParticipants',
     ],
 
     // After getting participant preferences → schedule them
@@ -198,30 +177,14 @@ const TOOL_TRANSITIONS: Record<string, string[]> = {
         'commitSchedulePlan',
     ],
 
-    // After listing trashed schedules → recover or empty
-    listTrashedSchedules: [
-        'recoverSchedule',
-        'emptyTrash',
-    ],
-
     // Terminal actions — after these, Aria should confirm and stop
     addEventToSchedule: [],
     updateEventInSchedule: [],
     deleteEventFromSchedule: [],
     swapEvents: [],
-    createSchedule: [],
-    updateSchedule: [],
-    trashSchedule: [],
-    recoverSchedule: [],
-    emptyTrash: [],
-    publishSchedule: [],
-    getExportLink: [],
     analyzeScheduleHealth: [],
-    autoScheduleParticipants: [],
     commitSchedulePlan: [],
     markParticipantAssigned: [],
-    updateFormConfig: [],
-    checkScheduleOverlaps: [],
 };
 
 // Always-available discovery tools — cheap to include, high value for recovery
@@ -268,7 +231,7 @@ function compactToolSelection(message: string, context: PromptContext): string[]
     if (asksSuggestRemaining) {
         return context.scheduleId
             ? ['getEventSummaryInSchedule', 'listUnassignedParticipants', 'analyzeScheduleHealth']
-            : ['listSchedules', 'getEventSummaryInSchedule', 'listUnassignedParticipants', 'analyzeScheduleHealth'];
+            : ['listSchedules', 'getEventSummaryInSchedule', 'analyzeScheduleHealth'];
     }
 
     const asksBulkSchedule =
@@ -276,8 +239,8 @@ function compactToolSelection(message: string, context: PromptContext): string[]
         /\b(all|everyone|everybody|them all)\b/i.test(lower);
     if (asksBulkSchedule) {
         return context.scheduleId
-            ? ['autoScheduleParticipants']
-            : ['listSchedules', 'autoScheduleParticipants'];
+            ? ['listUnassignedParticipants', 'proposeScheduleChanges']
+            : ['proposeScheduleChanges'];
     }
 
     const asksUnscheduled = /\b(unassigned|unscheduled|not scheduled|without events|pending)\b/i.test(lower);
@@ -285,12 +248,12 @@ function compactToolSelection(message: string, context: PromptContext): string[]
     if (asksUnscheduled) {
         return context.scheduleId
             ? ['listUnassignedParticipants']
-            : ['listSchedules', 'listUnassignedParticipants'];
+            : ['analyzeScheduleHealth'];
     }
     if (asksCount && /\b(events?|schedule)\b/i.test(lower)) {
         return context.scheduleId
             ? ['getEventSummaryInSchedule', 'listUnassignedParticipants']
-            : ['listSchedules', 'getEventSummaryInSchedule', 'listUnassignedParticipants'];
+            : ['listSchedules', 'getEventSummaryInSchedule'];
     }
 
     const primary = detectPrimaryToolForCompact(message);
@@ -307,7 +270,7 @@ function compactToolSelection(message: string, context: PromptContext): string[]
         selected.add(prereq);
     }
 
-    if (primary.requiresIds.includes('schedule_id') && !context.scheduleId) {
+    if (primary.requiresIds.includes('calendar_id') && !context.scheduleId) {
         selected.add('listSchedules');
     }
 
@@ -319,7 +282,6 @@ function compactToolSelection(message: string, context: PromptContext): string[]
 
     if (primary.requiresIds.includes('participant_id')) {
         selected.add('listUnassignedParticipants');
-        if (!context.scheduleId) selected.add('listSchedules');
     }
 
     return Array.from(selected);
@@ -405,8 +367,8 @@ export function detectToolsFromIntent(
         /\b(unassigned|unscheduled|remaining|left)\b/i.test(lower);
     if (suggestsSpotsForUnscheduled) {
         return context.scheduleId
-            ? ['listUnassignedParticipants', 'getEventSummaryInSchedule', 'autoScheduleParticipants']
-            : ['listSchedules', 'listUnassignedParticipants', 'getEventSummaryInSchedule', 'autoScheduleParticipants'];
+            ? ['listUnassignedParticipants', 'getEventSummaryInSchedule', 'proposeScheduleChanges']
+            : ['listSchedules', 'getEventSummaryInSchedule', 'proposeScheduleChanges'];
     }
 
     const matched = new Set<string>();
@@ -458,7 +420,7 @@ export function buildSystemPrompt(context: PromptContext = {}): string {
     let prompt = CORE_PROMPT;
 
     if (context.scheduleId) {
-        prompt += `\n\n## CONTEXT\nCURRENT_SCHEDULE_ID: "${context.scheduleId}"\nPrefer this ID unless the user names a different schedule.`;
+        prompt += `\n\n## CONTEXT\nCURRENT_CALENDAR_ID: "${context.scheduleId}"\nPrefer this ID unless the user names a different calendar.`;
     }
 
     prompt += `\n\nCurrent Date & Time: ${new Date().toLocaleString()}`;
@@ -468,7 +430,7 @@ export function buildSystemPrompt(context: PromptContext = {}): string {
 export function buildActionPrompt(context: PromptContext = {}): string {
     let prompt = ACTION_PROMPT;
     if (context.scheduleId) {
-        prompt += `\n\nCURRENT_SCHEDULE_ID: "${context.scheduleId}"`;
+        prompt += `\n\nCURRENT_CALENDAR_ID: "${context.scheduleId}"`;
     }
     return prompt;
 }
@@ -476,7 +438,7 @@ export function buildActionPrompt(context: PromptContext = {}): string {
 export function buildAdvisoryPrompt(context: PromptContext = {}): string {
     let prompt = ADVISORY_PROMPT;
     if (context.scheduleId) {
-        prompt += `\n\n## CONTEXT\nCURRENT_SCHEDULE_ID: "${context.scheduleId}"\nPrefer this ID unless the user names a different schedule.`;
+        prompt += `\n\n## CONTEXT\nCURRENT_CALENDAR_ID: "${context.scheduleId}"\nPrefer this ID unless the user names a different calendar.`;
     }
     prompt += `\n\nCurrent Date & Time: ${new Date().toLocaleString()}`;
     return prompt;
@@ -496,7 +458,7 @@ export function buildAdvisoryToolBlock(
         // First iteration: provide the most useful advisory starting tools
         toolNames = context.scheduleId
             ? ['getEventSummaryInSchedule', 'listUnassignedParticipants', 'analyzeScheduleHealth', 'searchEventsInSchedule']
-            : ['listSchedules', 'getEventSummaryInSchedule', 'listUnassignedParticipants', 'analyzeScheduleHealth'];
+            : ['listSchedules', 'getEventSummaryInSchedule', 'analyzeScheduleHealth'];
     } else {
         // Follow-up: use transition graph but filter to read-only
         const nextTools = TOOL_TRANSITIONS[lastFunctionCalled] ?? [];

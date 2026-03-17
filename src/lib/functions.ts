@@ -1,28 +1,13 @@
 // src/lib/functions.ts
-// LEGACY BRIDGE (BLD-001): temporary function gateway for schedule-centric tools.
-// New v2.1 calendar commands should land in src/application/* and be wired here only
-// as a compatibility adapter until legacy schedule tools are fully retired.
+// BLD-012: Active-path bridge for assistant-triggered calendar event and availability-intake operations.
+// Schedule CRUD tools (createSchedule, updateSchedule, trashSchedule, etc.) were retired
+// from this dispatch table in BLD-012. Those modules remain as compatibility-only seams in
+// src/lib/services/scheduleService.ts and src/lib/api/schedules.ts with no active callers from here.
+// Calendar event actions flow through calendar-chat.ts → calendar-workspace.ts → apps/api (canonical path).
+// Note: listSchedules remains as canonical calendar discovery (provider calendars), not legacy schedule CRUD.
 
 import { withDedup } from './retry';
 import { toAriaError } from './errors';
-
-import {
-    createSchedule,
-    getSchedulesSummary,
-    getTrashedSchedules,
-    updateSchedule,
-    trashSchedule,
-    restoreSchedule,
-    permanentDeleteAllTrashed,
-    updateFormConfig,
-    checkScheduleOverlaps,
-    publishSchedule,
-    generateExportLink,
-    type CreateScheduleInput,
-    type UpdateScheduleInput,
-} from './services/scheduleService';
-
-import { autoScheduleParticipants } from './services/autoScheduler';
 
 import {
     getFormResponses,
@@ -179,23 +164,28 @@ function requireUuid(args: Record<string, unknown>, key: string, label?: string)
     return `Missing required field: ${label ?? key}`;
 }
 
+function getLegacyScheduleIdArg(args: Record<string, unknown>): string | null {
+    const legacy = args.legacy_schedule_id;
+    if (typeof legacy === 'string' && legacy.trim()) return legacy.trim();
+    const legacyCompat = args.schedule_id;
+    if (typeof legacyCompat === 'string' && legacyCompat.trim()) return legacyCompat.trim();
+    return null;
+}
+
+function getCalendarIdArg(args: Record<string, unknown>): string | null {
+    const canonical = args.calendar_id;
+    if (typeof canonical === 'string' && canonical.trim()) return canonical.trim();
+    const compat = args.schedule_id;
+    if (typeof compat === 'string' && compat.trim()) return compat.trim();
+    return null;
+}
+
 /**
  * Validate tool inputs before execution.
  * Returns an error string if validation fails, null if inputs are valid.
  */
 function validateToolInput(name: string, args: Record<string, unknown>): string | null {
     switch (name) {
-        case 'createSchedule':
-            return requireString(args, 'label') ?? requireString(args, 'start_date') ?? requireString(args, 'end_date');
-        case 'updateSchedule':
-        case 'trashSchedule':
-        case 'recoverSchedule':
-        case 'publishSchedule':
-        case 'getExportLink':
-        case 'updateFormConfig':
-        case 'analyzeScheduleHealth':
-        case 'autoScheduleParticipants':
-            return requireString(args, 'schedule_id');
         case 'addEventToSchedule':
             return requireString(args, 'student_name');
         case 'updateEventInSchedule':
@@ -206,7 +196,8 @@ function validateToolInput(name: string, args: Record<string, unknown>): string 
         case 'searchEventsInSchedule':
             return null;
         case 'listUnassignedParticipants':
-            return requireString(args, 'schedule_id');
+            if (getLegacyScheduleIdArg(args)) return null;
+            return 'Missing required field: legacy_schedule_id';
         case 'swapEvents': {
             const e1 = args.event1_id || args.event_id1 || args.id1;
             const e2 = args.event2_id || args.event_id2 || args.id2;
@@ -218,7 +209,7 @@ function validateToolInput(name: string, args: Record<string, unknown>): string 
         case 'getParticipantPreferences':
             return requireString(args, 'participant_id');
         case 'proposeScheduleChanges':
-            return requireString(args, 'schedule_id');
+            return null;
         case 'commitSchedulePlan':
             return requireUuid(args, 'plan_id');
         default:
@@ -248,87 +239,26 @@ export async function executeFunction(
             switch (resolvedFunctionName) {
 
                 // ============================================
-                // Schedule Functions
+                // Calendar Event Functions (canonical path: calendar-chat → calendar-workspace → apps/api)
+                // Legacy schedule CRUD tools retired in BLD-012.
                 // ============================================
-
-                case 'createSchedule': {
-                    const input: CreateScheduleInput = {
-                        label: args.label as string,
-                        start_date: args.start_date as string,
-                        end_date: args.end_date as string,
-                    };
-                    const schedule = await createSchedule(input);
-                    return { success: true, data: schedule };
-                }
-
-                case 'listSchedules': {
-                    const schedules = await getSchedulesSummary();
-                    return { success: true, data: schedules };
-                }
-
-                case 'listTrashedSchedules': {
-                    const schedules = await getTrashedSchedules();
-                    return { success: true, data: schedules };
-                }
-
-                case 'updateSchedule': {
-                    const { schedule_id, ...updates } = args;
-                    const updated = await updateSchedule(
-                        schedule_id as string,
-                        updates as UpdateScheduleInput
-                    );
-                    return { success: true, data: updated };
-                }
-
-                case 'trashSchedule': {
-                    await trashSchedule(args.schedule_id as string);
-                    return { success: true, data: { message: 'Schedule moved to trash' } };
-                }
-
-                case 'recoverSchedule': {
-                    await restoreSchedule(args.schedule_id as string);
-                    return { success: true, data: { message: 'Schedule restored from trash' } };
-                }
-
-                case 'emptyTrash': {
-                    const result = await permanentDeleteAllTrashed();
-                    return {
-                        success: true,
-                        data: { message: `Permanently deleted ${result.count} schedule(s) from trash` },
-                    };
-                }
-
-                case 'updateFormConfig': {
-                    const { schedule_id, ...config } = args;
-                    const result = await updateFormConfig(
-                        schedule_id as string,
-                        config as Parameters<typeof updateFormConfig>[1]
-                    );
-                    return { success: true, data: result };
-                }
-
-                case 'checkScheduleOverlaps': {
-                    const result = await checkScheduleOverlaps(
-                        args.start_date as string,
-                        args.end_date as string,
-                        args.exclude_id as string | undefined
-                    );
-                    return { success: true, data: result };
-                }
-
-                case 'publishSchedule': {
-                    await publishSchedule(args.schedule_id as string);
-                    return { success: true, data: { message: 'Schedule published successfully! Participants will be notified.' } };
-                }
-
-                case 'getExportLink': {
-                    const link = generateExportLink(args.schedule_id as string);
-                    return { success: true, data: { message: 'Here is the link for your schedule:', link } };
-                }
 
                 case 'analyzeScheduleHealth': {
                     const summary = await getCalendarEventSummary();
                     return { success: true, data: { summary, message: 'Analyzing your schedule health...' } };
+                }
+
+                case 'listSchedules': {
+                    const workspace = await fetchWorkspaceEvents();
+                    const schedules = (workspace.calendars ?? []).map((calendar) => ({
+                        id: calendar.providerCalendarId,
+                        calendar_id: calendar.providerCalendarId,
+                        label: calendar.name,
+                        provider: 'google',
+                        selected_for_sync: calendar.selectedForSync,
+                        is_primary_write: calendar.isPrimaryWrite,
+                    }));
+                    return { success: true, data: schedules };
                 }
 
                 // ============================================
@@ -385,7 +315,22 @@ export async function executeFunction(
                 // ============================================
 
                 case 'listUnassignedParticipants': {
-                    const responses = await getFormResponses(args.schedule_id as string);
+                    const legacyScheduleId = getLegacyScheduleIdArg(args);
+                    if (!legacyScheduleId) {
+                        return { success: false, error: 'Missing legacy_schedule_id' };
+                    }
+                    const workspace = await fetchWorkspaceEvents();
+                    const isProviderCalendarId = workspace.calendars.some(
+                        (calendar) => calendar.providerCalendarId === legacyScheduleId
+                    );
+                    if (isProviderCalendarId) {
+                        return {
+                            success: false,
+                            error: 'Participant lookup requires legacy_schedule_id (legacy schedule domain), not provider calendar id.',
+                        };
+                    }
+
+                    const responses = await getFormResponses(legacyScheduleId);
                     const unassigned = responses.filter(r => !r.assigned);
                     return { success: true, data: unassigned };
                 }
@@ -397,9 +342,19 @@ export async function executeFunction(
                     }
 
                     let participant = null as Awaited<ReturnType<typeof getFormResponseById>>;
-                    const scheduleId = args.schedule_id as string | undefined;
+                    const scheduleId = getLegacyScheduleIdArg(args);
 
                     if (scheduleId) {
+                        const workspace = await fetchWorkspaceEvents();
+                        const isProviderCalendarId = workspace.calendars.some(
+                            (calendar) => calendar.providerCalendarId === scheduleId
+                        );
+                        if (isProviderCalendarId) {
+                            return {
+                                success: false,
+                                error: 'Participant lookup requires legacy_schedule_id (legacy schedule domain), not provider calendar id.',
+                            };
+                        }
                         const responses = await getFormResponses(scheduleId);
                         participant = responses.find(r => r.id === participantId) ?? null;
                     } else {
@@ -436,25 +391,13 @@ export async function executeFunction(
                     };
                 }
 
-                case 'autoScheduleParticipants': {
-                    // Always preview mode from AI — UI handles commit via modal
-                    const result = await autoScheduleParticipants(
-                        args.schedule_id as string,
-                        false
-                    );
-                    return { success: true, data: result };
-                }
-
                 // ============================================
                 // Agentic Plan Tools
                 // ============================================
 
                 case 'proposeScheduleChanges': {
-                    const scheduleId = args.schedule_id as string;
+                    const scheduleId = getCalendarIdArg(args) ?? '';
                     const changes = normalizePlanChanges(args.changes);
-                    if (!scheduleId || typeof scheduleId !== 'string') {
-                        return { success: false, error: 'Missing schedule_id for proposeScheduleChanges.' };
-                    }
                     if (!changes) {
                         return {
                             success: false,

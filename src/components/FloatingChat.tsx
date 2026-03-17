@@ -999,7 +999,7 @@ export default function FloatingChat({ onScheduleChange, onShowAutoSchedule }: F
 
     const search = await executeFunction(
       'searchEventsInSchedule',
-      { schedule_id: scheduleId, query: rawName.trim() },
+      { calendar_id: scheduleId, query: rawName.trim() },
       { bypassDedup: true }
     );
     if (!search.success) return null;
@@ -1014,64 +1014,11 @@ export default function FloatingChat({ onScheduleChange, onShowAutoSchedule }: F
   const resolveScheduleContextForLookup = async (
     preferredScheduleId: string | null
   ): Promise<ResolvedScheduleContext> => {
-    const listResult = await executeFunction('listSchedules', {}, { bypassDedup: true });
-    if (!listResult.success || !Array.isArray(listResult.data)) {
-      return {
-        scheduleId: preferredScheduleId,
-        noSchedules: false,
-        needsUserChoice: false,
-        scheduleLabels: [],
-      };
-    }
-
-    const schedules = listResult.data
-      .map((raw) => {
-        if (!raw || typeof raw !== 'object') return null;
-        const row = raw as Record<string, unknown>;
-        const id = typeof row.id === 'string' ? row.id : '';
-        const label =
-          typeof row.label === 'string'
-            ? row.label
-            : typeof row.name === 'string'
-              ? row.name
-              : '';
-        if (!id.trim()) return null;
-        return { id: id.trim(), label: label.trim() };
-      })
-      .filter((item): item is { id: string; label: string } => item !== null);
-
-    if (schedules.length === 0) {
-      return {
-        scheduleId: null,
-        noSchedules: true,
-        needsUserChoice: false,
-        scheduleLabels: [],
-      };
-    }
-
-    if (preferredScheduleId && schedules.some((s) => s.id === preferredScheduleId)) {
-      return {
-        scheduleId: preferredScheduleId,
-        noSchedules: false,
-        needsUserChoice: false,
-        scheduleLabels: schedules.map((s) => s.label || s.id.slice(0, 8)),
-      };
-    }
-
-    if (schedules.length === 1) {
-      return {
-        scheduleId: schedules[0].id,
-        noSchedules: false,
-        needsUserChoice: false,
-        scheduleLabels: schedules.map((s) => s.label || s.id.slice(0, 8)),
-      };
-    }
-
     return {
-      scheduleId: null,
+      scheduleId: preferredScheduleId,
       noSchedules: false,
-      needsUserChoice: true,
-      scheduleLabels: schedules.map((s) => s.label || s.id.slice(0, 8)).slice(0, 5),
+      needsUserChoice: false,
+      scheduleLabels: [],
     };
   };
 
@@ -1221,8 +1168,8 @@ export default function FloatingChat({ onScheduleChange, onShowAutoSchedule }: F
     (async () => {
       try {
         const [summaryResult, unassignedResult] = await Promise.all([
-          executeFunction('getEventSummaryInSchedule', { schedule_id: currentScheduleId }, { bypassDedup: true }),
-          executeFunction('listUnassignedParticipants', { schedule_id: currentScheduleId }, { bypassDedup: true }),
+          executeFunction('getEventSummaryInSchedule', { calendar_id: currentScheduleId }, { bypassDedup: true }),
+          executeFunction('listUnassignedParticipants', { legacy_schedule_id: currentScheduleId }, { bypassDedup: true }),
         ]);
 
         if (!summaryResult.success || !unassignedResult.success) return;
@@ -1337,17 +1284,9 @@ export default function FloatingChat({ onScheduleChange, onShowAutoSchedule }: F
         if (needsDeterministicUnscheduledLookup) {
           const resolvedSchedule = await resolveScheduleContextForLookup(currentScheduleId);
 
-          if (resolvedSchedule.noSchedules) {
-            appendAssistantMessage('You do not have any schedules yet. Create one first, then I can help with unscheduled students.');
-            return;
-          }
-
           if (!resolvedSchedule.scheduleId) {
-            const labelsText = resolvedSchedule.scheduleLabels.join(', ');
             appendAssistantMessage(
-              labelsText
-                ? `I found multiple schedules: ${labelsText}. Tell me which schedule name you want me to check.`
-                : 'I found multiple schedules. Tell me which schedule name you want me to check.'
+              'I can check unscheduled participants only when a legacy schedule is in context. Open a specific legacy schedule route and try again.'
             );
             return;
           }
@@ -1355,7 +1294,7 @@ export default function FloatingChat({ onScheduleChange, onShowAutoSchedule }: F
           if (isUnscheduledCountQuery(originalGoal)) {
             const unassignedResult = await executeFunction(
               'listUnassignedParticipants',
-              { schedule_id: resolvedSchedule.scheduleId },
+              { legacy_schedule_id: resolvedSchedule.scheduleId },
               { bypassDedup: true }
             );
 
@@ -1371,8 +1310,8 @@ export default function FloatingChat({ onScheduleChange, onShowAutoSchedule }: F
 
           if (isSuggestSpotsForUnscheduledQuery(originalGoal)) {
             const [summaryResult, unassignedResult] = await Promise.all([
-              executeFunction('getEventSummaryInSchedule', { schedule_id: resolvedSchedule.scheduleId }, { bypassDedup: true }),
-              executeFunction('listUnassignedParticipants', { schedule_id: resolvedSchedule.scheduleId }, { bypassDedup: true }),
+              executeFunction('getEventSummaryInSchedule', { calendar_id: resolvedSchedule.scheduleId }, { bypassDedup: true }),
+              executeFunction('listUnassignedParticipants', { legacy_schedule_id: resolvedSchedule.scheduleId }, { bypassDedup: true }),
             ]);
 
             if (summaryResult.success && unassignedResult.success) {
@@ -1504,9 +1443,9 @@ export default function FloatingChat({ onScheduleChange, onShowAutoSchedule }: F
           if (
             name === 'getParticipantPreferences' &&
             currentScheduleId &&
-            !String(fnArgs.schedule_id ?? '').trim()
+            !String(fnArgs.legacy_schedule_id ?? fnArgs.schedule_id ?? '').trim()
           ) {
-            executionArgs = { ...fnArgs, schedule_id: currentScheduleId };
+            executionArgs = { ...fnArgs, legacy_schedule_id: currentScheduleId };
           }
 
           const result = await executeFunction(name, executionArgs, { bypassDedup: true });
@@ -1770,9 +1709,9 @@ export default function FloatingChat({ onScheduleChange, onShowAutoSchedule }: F
         if (
           name === 'getParticipantPreferences' &&
           currentScheduleId &&
-          !String(args.schedule_id ?? '').trim()
+          !String(args.legacy_schedule_id ?? args.schedule_id ?? '').trim()
         ) {
-          executionArgs = { ...args, schedule_id: currentScheduleId };
+          executionArgs = { ...args, legacy_schedule_id: currentScheduleId };
         }
         if (name === 'swapEvents' && currentScheduleId) {
           const raw1 = String(args.event1_id ?? args.event_id1 ?? args.id1 ?? '').trim();
@@ -1781,8 +1720,8 @@ export default function FloatingChat({ onScheduleChange, onShowAutoSchedule }: F
 
           if (needsPreResolution) {
             const [event1Search, event2Search] = await Promise.all([
-              executeFunction('searchEventsInSchedule', { schedule_id: currentScheduleId, query: raw1 }, { bypassDedup: true }),
-              executeFunction('searchEventsInSchedule', { schedule_id: currentScheduleId, query: raw2 }, { bypassDedup: true }),
+              executeFunction('searchEventsInSchedule', { calendar_id: currentScheduleId, query: raw1 }, { bypassDedup: true }),
+              executeFunction('searchEventsInSchedule', { calendar_id: currentScheduleId, query: raw2 }, { bypassDedup: true }),
             ]);
             rememberEventSearchResults(currentScheduleId, event1Search.data);
             rememberEventSearchResults(currentScheduleId, event2Search.data);
@@ -1810,8 +1749,8 @@ export default function FloatingChat({ onScheduleChange, onShowAutoSchedule }: F
 
           if (needsResolution) {
             const [event1Search, event2Search] = await Promise.all([
-              executeFunction('searchEventsInSchedule', { schedule_id: currentScheduleId, query: raw1 }, { bypassDedup: true }),
-              executeFunction('searchEventsInSchedule', { schedule_id: currentScheduleId, query: raw2 }, { bypassDedup: true }),
+              executeFunction('searchEventsInSchedule', { calendar_id: currentScheduleId, query: raw1 }, { bypassDedup: true }),
+              executeFunction('searchEventsInSchedule', { calendar_id: currentScheduleId, query: raw2 }, { bypassDedup: true }),
             ]);
             rememberEventSearchResults(currentScheduleId, event1Search.data);
             rememberEventSearchResults(currentScheduleId, event2Search.data);
@@ -1937,11 +1876,11 @@ export default function FloatingChat({ onScheduleChange, onShowAutoSchedule }: F
         // ── Continuation prompt ───────────────────────────────────────────────
         // Restates the original goal so Aria never "forgets" mid-chain.
         // On failure: tells Aria to diagnose and either retry or explain.
-        const continuationPrompt = result.success
-          ? `${llmContent}\n\n[System: Step ${iterations} complete. Original goal: "${originalGoal}". If the goal is NOT fully achieved yet, output the next FUNCTION_CALL immediately. Do NOT summarize or confirm until the entire goal is done.]`
-          : isRecoverableLookupFailure
-            ? `${llmContent}\n\n[System: Recovery required. Do NOT ask the user for IDs. Use searchEventsInSchedule or getEventSummaryInSchedule with CURRENT_SCHEDULE_ID to find the correct IDs, then output the next FUNCTION_CALL immediately.]`
-            : `${llmContent}\n\n[System: The last action failed. Diagnose the error. Either retry with corrected arguments or explain the issue to the user clearly. Do NOT claim success.]`;
+          const continuationPrompt = result.success
+            ? `${llmContent}\n\n[System: Step ${iterations} complete. Original goal: "${originalGoal}". If the goal is NOT fully achieved yet, output the next FUNCTION_CALL immediately. Do NOT summarize or confirm until the entire goal is done.]`
+            : isRecoverableLookupFailure
+              ? `${llmContent}\n\n[System: Recovery required. Do NOT ask the user for IDs. Use searchEventsInSchedule or getEventSummaryInSchedule with CURRENT_CALENDAR_ID to find the correct IDs, then output the next FUNCTION_CALL immediately.]`
+              : `${llmContent}\n\n[System: The last action failed. Diagnose the error. Either retry with corrected arguments or explain the issue to the user clearly. Do NOT claim success.]`;
 
         // ── Context slimming ──────────────────────────────────────────────────
         // Replace older results from the same summary/list function with a

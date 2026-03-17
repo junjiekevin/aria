@@ -7,8 +7,8 @@
 //   Daily:    FREQ=DAILY
 //   Once:     "" (empty string)
 
-export type FunctionCategory = 'schedule' | 'event' | 'participant';
-export type RequiredId = 'schedule_id' | 'event_id' | 'participant_id' | 'plan_id';
+export type FunctionCategory = 'event' | 'participant';
+export type RequiredId = 'calendar_id' | 'legacy_schedule_id' | 'event_id' | 'participant_id' | 'plan_id';
 
 export interface FunctionMeta {
     name: string;
@@ -27,192 +27,34 @@ export interface FunctionMeta {
 export const FUNCTION_REGISTRY: FunctionMeta[] = [
 
     // ============================================
-    // Schedule Functions
+    // Calendar Event Tools (canonical path via calendar-workspace → apps/api)
+    // Legacy schedule CRUD tools retired from active assistant surface in BLD-012.
     // ============================================
 
     {
-        name: 'createSchedule',
-        category: 'schedule',
-        priority: 7,
-        triggers: ['create schedule', 'new schedule', 'make schedule', 'start schedule'],
-        synonyms: ['set up', 'begin', 'initialize'],
-        excludeWhen: ['event', 'lesson', 'appointment'],
-        requiresIds: [],
-        providesIds: ['schedule_id'],
-        prerequisites: [],
-        prompt: 'Create a new schedule with label, start_date (YYYY-MM-DD), end_date (YYYY-MM-DD).',
-        example: `User: "Create a schedule for Spring 2026 from March to June"
-You: "Creating your Spring 2026 schedule!"
-FUNCTION_CALL: {"name":"createSchedule","arguments":{"label":"Spring 2026","start_date":"2026-03-01","end_date":"2026-06-30"}}`,
-    },
-
-    {
         name: 'listSchedules',
-        category: 'schedule',
-        priority: 10,
-        triggers: ['list schedules', 'show schedules', 'my schedules', 'what schedules'],
-        synonyms: ['view', 'see', 'get'],
-        excludeWhen: ['trash', 'deleted', 'removed'],
-        requiresIds: [],
-        providesIds: ['schedule_id'],
-        prerequisites: [],
-        prompt: 'Lists all active schedules. Returns schedule containers only — NOT events or participants. Call this FIRST when you need a schedule_id and no CURRENT_SCHEDULE_ID is provided. After getting schedules, ask the user which schedule to operate on if there are multiple.',
-    },
-
-    {
-        name: 'listTrashedSchedules',
-        category: 'schedule',
-        priority: 5,
-        triggers: ['trashed', 'deleted schedules', 'trash', 'removed schedules'],
-        synonyms: ['bin', 'recycle'],
-        excludeWhen: ['active', 'current'],
-        requiresIds: [],
-        providesIds: ['schedule_id'],
-        prerequisites: [],
-        prompt: 'Lists schedules in trash. Use when user asks about deleted or trashed schedules.',
-    },
-
-    {
-        name: 'updateSchedule',
-        category: 'schedule',
-        priority: 6,
-        triggers: ['update schedule', 'change schedule', 'edit schedule', 'rename schedule', 'modify schedule', 'change hours', 'operating hours'],
-        synonyms: ['alter', 'adjust'],
-        excludeWhen: ['event', 'lesson', 'delete', 'trash'],
-        requiresIds: ['schedule_id'],
-        providesIds: [],
-        prerequisites: ['listSchedules'],
-        prompt: 'Update schedule label, dates, working_hours_start (0-23), working_hours_end (0-23). Needs schedule_id.',
-    },
-
-    {
-        name: 'trashSchedule',
-        category: 'schedule',
-        priority: 6,
-        triggers: ['trash schedule', 'delete schedule', 'remove schedule'],
-        synonyms: ['discard', 'get rid of'],
-        excludeWhen: ['event', 'lesson', 'recover', 'restore'],
-        requiresIds: ['schedule_id'],
-        providesIds: [],
-        prerequisites: ['listSchedules'],
-        prompt: 'Move schedule to trash (soft delete, recoverable). Needs schedule_id.',
-    },
-
-    {
-        name: 'recoverSchedule',
-        category: 'schedule',
-        priority: 5,
-        triggers: ['recover', 'restore', 'undelete', 'bring back'],
-        synonyms: ['undo delete', 'retrieve'],
-        excludeWhen: ['create', 'new'],
-        requiresIds: ['schedule_id'],
-        providesIds: [],
-        prerequisites: ['listTrashedSchedules'],
-        prompt: 'Restore a schedule from trash. Call listTrashedSchedules first to get the ID.',
-    },
-
-    {
-        name: 'emptyTrash',
-        category: 'schedule',
-        priority: 3,
-        triggers: ['empty trash', 'clear trash', 'permanently delete', 'delete all trash'],
-        synonyms: ['purge', 'wipe'],
-        excludeWhen: ['recover', 'restore'],
-        requiresIds: [],
-        providesIds: [],
-        prerequisites: [],
-        prompt: 'PERMANENTLY deletes ALL trashed schedules. ASK FOR CONFIRMATION before calling this.',
-    },
-
-    {
-        name: 'updateFormConfig',
-        category: 'schedule',
-        priority: 5,
-        triggers: ['configure form', 'form instructions', 'form deadline', 'max choices', 'change form'],
-        synonyms: ['setup form', 'instructions', 'deadline'],
-        excludeWhen: ['event', 'lesson'],
-        requiresIds: ['schedule_id'],
-        providesIds: [],
-        prerequisites: ['listSchedules'],
-        prompt: 'Update form settings: max_choices (1-3), form_instructions, form_deadline (YYYY-MM-DD), working_hours_start, working_hours_end.',
-        example: `User: "Change the form deadline to March 1st"
-<thought>I need a schedule_id. Fetching schedules first.</thought>
-"Let me find your schedule..."
-FUNCTION_CALL: {"name":"listSchedules","arguments":{}}
-[After ID retrieved]
-"Updating the deadline now!"
-FUNCTION_CALL: {"name":"updateFormConfig","arguments":{"schedule_id":"...","form_deadline":"2026-03-01"}}`,
-    },
-
-    {
-        name: 'checkScheduleOverlaps',
-        category: 'schedule',
-        priority: 6,
-        triggers: ['check overlaps', 'clash', 'conflict', 'overlap', 'double booked'],
-        synonyms: ['audit', 'verify dates'],
-        excludeWhen: [],
-        requiresIds: [],
-        providesIds: [],
-        prerequisites: [],
-        prompt: 'Checks if a date range overlaps with existing schedules. Returns conflicting schedule names.',
-    },
-
-    {
-        name: 'autoScheduleParticipants',
-        category: 'schedule',
-        priority: 8,
-        triggers: ['schedule all', 'schedule them all', 'auto schedule', 'bulk schedule', 'assign everyone', 'assign them all', 'schedule everyone', 'fill schedule'],
-        synonyms: ['populate', 'arrange', 'optimize'],
-        excludeWhen: ['one', 'single'],
-        requiresIds: ['schedule_id'],
-        providesIds: [],
-        prerequisites: ['listSchedules'],
-        prompt: 'Automatically schedules ALL unassigned participants based on their preferences. You MUST call this tool when the user says "schedule all" or "assign everyone". DO NOT just say you did it without calling this.',
-        example: `User: "Schedule everyone"
-<thought>I need schedule_id.</thought>
-"Auto-scheduling your participants now..."
-FUNCTION_CALL: {"name":"listSchedules","arguments":{}}
-[After ID retrieved]
-FUNCTION_CALL: {"name":"autoScheduleParticipants","arguments":{"schedule_id":"..."}}`,
-    },
-
-    {
-        name: 'publishSchedule',
-        category: 'schedule',
+        category: 'event',
         priority: 9,
-        triggers: ['publish', 'notify participants', 'send emails', 'go live', 'finalize schedule'],
-        synonyms: ['blast', 'announce'],
-        excludeWhen: ['draft', 'unpublish'],
-        requiresIds: ['schedule_id'],
-        providesIds: [],
-        prerequisites: ['listSchedules'],
-        prompt: 'Publishes the schedule and sends confirmation emails to all assigned participants. Needs schedule_id.',
-    },
-
-    {
-        name: 'getExportLink',
-        category: 'schedule',
-        priority: 5,
-        triggers: ['export', 'ical', 'download', 'csv', 'google calendar'],
-        synonyms: ['link'],
+        triggers: ['list calendars', 'show calendars', 'which calendars', 'my calendars', 'list schedules'],
+        synonyms: ['calendar list', 'available calendars'],
         excludeWhen: [],
-        requiresIds: ['schedule_id'],
-        providesIds: [],
-        prerequisites: ['listSchedules'],
-        prompt: 'Provides the public schedule link for a schedule. Needs schedule_id.',
+        requiresIds: [],
+        providesIds: ['calendar_id'],
+        prerequisites: [],
+        prompt: 'List synced provider calendars available in the current workspace. Use this to resolve calendar_id for canonical calendar-event tools.',
     },
 
     {
         name: 'analyzeScheduleHealth',
-        category: 'schedule',
+        category: 'event',
         priority: 7,
         triggers: ['audit schedule', 'how is my schedule', 'analyze', 'spot issues', 'health check', 'gaps'],
         synonyms: ['review', 'inspect'],
         excludeWhen: [],
-        requiresIds: ['schedule_id'],
+        requiresIds: [],
         providesIds: [],
         prerequisites: ['getEventSummaryInSchedule'],
-        prompt: 'Analyzes the current schedule for gaps, overlaps, or low utilization. Call this to give the user advice.',
+        prompt: 'Analyzes the current calendar for gaps, overlaps, or low utilization. Call this to give the user advice.',
     },
 
     // ============================================
@@ -221,20 +63,20 @@ FUNCTION_CALL: {"name":"autoScheduleParticipants","arguments":{"schedule_id":"..
 
     {
         name: 'proposeScheduleChanges',
-        category: 'schedule',
+        category: 'event',
         priority: 10,
         triggers: ['plan', 'propose', 'preview', 'what if', 'dry run', 'show me first', 'before you do', 'draft changes'],
         synonyms: ['suggest', 'outline'],
         excludeWhen: ['commit', 'confirm', 'apply'],
-        requiresIds: ['schedule_id'],
+        requiresIds: [],
         providesIds: ['plan_id'],
-        prerequisites: ['listSchedules', 'getEventSummaryInSchedule'],
-        prompt: 'Propose multi-step changes as a dry-run preview without modifying the schedule. Required: schedule_id, changes[] ({action: "add"|"move"|"swap"|"delete", target, description, before?, after?}). Returns plan_id for commitSchedulePlan.',
+        prerequisites: [],
+        prompt: 'Propose multi-step calendar changes as a dry-run preview without modifying events. Required: changes[] ({action: "add"|"move"|"swap"|"delete", target, description, before?, after?}). Returns plan_id for commitSchedulePlan.',
     },
 
     {
         name: 'commitSchedulePlan',
-        category: 'schedule',
+        category: 'event',
         priority: 10,
         triggers: ['commit', 'confirm', 'apply', 'yes do it', 'go ahead', 'approve', 'looks good', 'execute plan'],
         synonyms: ['accept', 'proceed', 'finalize'],
@@ -256,10 +98,10 @@ FUNCTION_CALL: {"name":"autoScheduleParticipants","arguments":{"schedule_id":"..
         triggers: ['add', 'create event', 'schedule', 'book', 'put', 'new lesson', 'new event'],
         synonyms: ['insert', 'place', 'set'],
         excludeWhen: ['delete', 'remove', 'cancel', 'move', 'update', 'change'],
-        requiresIds: ['schedule_id'],
+        requiresIds: ['calendar_id'],
         providesIds: ['event_id'],
         prerequisites: ['listSchedules'],
-        prompt: 'Add an event. Required: schedule_id, student_name, day (full English: "Monday" etc.), hour (24h integer), recurrence_rule (see RECURRENCE FORMAT above).',
+        prompt: 'Add an event. Required: calendar_id, student_name, day (full English: "Monday" etc.), hour (24h integer), recurrence_rule (see RECURRENCE FORMAT above).',
     },
 
     {
@@ -283,13 +125,13 @@ RECURRENCE RULES — use EXACTLY these formats:
 - Weekly:   "FREQ=WEEKLY;BYDAY=XX"
 - Biweekly: "FREQ=WEEKLY;INTERVAL=2;BYDAY=XX"
 - Monthly:  "FREQ=MONTHLY;BYDAY=NXX"  e.g. "FREQ=MONTHLY;BYDAY=2TU" for 2nd Tuesday`,
-        example: `User: "Change Piano to biweekly"
-FUNCTION_CALL: {"name":"getEventSummaryInSchedule","arguments":{"schedule_id":"..."}}
+example: `User: "Change Piano to biweekly"
+FUNCTION_CALL: {"name":"getEventSummaryInSchedule","arguments":{"calendar_id":"..."}}
 [Piano found on Tuesday]
 FUNCTION_CALL: {"name":"updateEventInSchedule","arguments":{"event_id":"...","recurrence_rule":"FREQ=WEEKLY;INTERVAL=2;BYDAY=TU"}}
 
 User: "Move Singing to Thursdays at 4pm"
-FUNCTION_CALL: {"name":"getEventSummaryInSchedule","arguments":{"schedule_id":"..."}}
+FUNCTION_CALL: {"name":"getEventSummaryInSchedule","arguments":{"calendar_id":"..."}}
 [After getting event_id]
 FUNCTION_CALL: {"name":"updateEventInSchedule","arguments":{"event_id":"...","day":"Thursday","hour":16}}`,
     },
@@ -304,9 +146,9 @@ FUNCTION_CALL: {"name":"updateEventInSchedule","arguments":{"event_id":"...","da
         requiresIds: ['event_id'],
         providesIds: [],
         prerequisites: ['getEventSummaryInSchedule'],
-        prompt: 'Delete an event permanently. Needs event_id — call getEventSummaryInSchedule first. If no CURRENT_SCHEDULE_ID is in context, call listSchedules first and ask the user which schedule the event is in.',
+        prompt: 'Delete an event permanently. Needs event_id — call getEventSummaryInSchedule first. If no CURRENT_CALENDAR_ID is in context, call listSchedules first and ask the user which calendar the event is in.',
         example: `User: "Delete Singing on Friday"
-FUNCTION_CALL: {"name":"getEventSummaryInSchedule","arguments":{"schedule_id":"..."}}
+FUNCTION_CALL: {"name":"getEventSummaryInSchedule","arguments":{"calendar_id":"..."}}
 [After getting event_id]
 FUNCTION_CALL: {"name":"deleteEventFromSchedule","arguments":{"event_id":"..."}}`,
     },
@@ -318,7 +160,7 @@ FUNCTION_CALL: {"name":"deleteEventFromSchedule","arguments":{"event_id":"..."}}
         triggers: ['show events', 'list events', 'what events', "what's scheduled", 'view events'],
         synonyms: ['see events', 'get events', 'summary'],
         excludeWhen: [],
-        requiresIds: ['schedule_id'],
+        requiresIds: ['calendar_id'],
         providesIds: ['event_id'],
         prerequisites: ['listSchedules'],
         prompt: '**PREFERRED FOR FINDING SPECIFIC EVENTS.** Get full schedule grouped by day. Minified keys: i (id), n (name), t (time), r (rule).',
@@ -331,10 +173,10 @@ FUNCTION_CALL: {"name":"deleteEventFromSchedule","arguments":{"event_id":"..."}}
         triggers: ['find event', 'search event', 'locate', 'where is', 'look for'],
         synonyms: ['query', 'find'],
         excludeWhen: [],
-        requiresIds: ['schedule_id'],
+        requiresIds: ['calendar_id'],
         providesIds: ['event_id'],
         prerequisites: ['listSchedules'],
-        prompt: 'Search for specific events by student name. Required: schedule_id, query (string — the name to search for). If no CURRENT_SCHEDULE_ID is in context, call listSchedules first and ask the user which schedule to search in.',
+        prompt: 'Search for specific events by student name. Required: calendar_id, query (string — the name to search for). If no CURRENT_CALENDAR_ID is in context, call listSchedules first and ask the user which calendar to search in.',
     },
 
     {
@@ -349,7 +191,7 @@ FUNCTION_CALL: {"name":"deleteEventFromSchedule","arguments":{"event_id":"..."}}
         prerequisites: ['getEventSummaryInSchedule'],
         prompt: 'Atomically swaps two events including their recurrence rules. Requires event1_id and event2_id. Call getEventSummaryInSchedule first to find these specific IDs.',
         example: `User: "Swap Piano and Singing"
-FUNCTION_CALL: {"name":"getEventSummaryInSchedule","arguments":{"schedule_id":"..."}}
+FUNCTION_CALL: {"name":"getEventSummaryInSchedule","arguments":{"calendar_id":"..."}}
 [After getting both IDs]
 FUNCTION_CALL: {"name":"swapEvents","arguments":{"event1_id":"...","event2_id":"..."}}`,
     },
@@ -365,15 +207,13 @@ FUNCTION_CALL: {"name":"swapEvents","arguments":{"event1_id":"...","event2_id":"
         triggers: ['unassigned', 'unscheduled', 'without events', 'not scheduled', 'waiting', 'pending'],
         synonyms: ['available', 'free'],
         excludeWhen: ['assigned', 'scheduled'],
-        requiresIds: ['schedule_id'],
+        requiresIds: ['legacy_schedule_id'],
         providesIds: ['participant_id'],
-        prerequisites: ['listSchedules'],
-        prompt: 'List participants who submitted the form but have no event slot yet. Needs schedule_id.',
+        prerequisites: [],
+        prompt: 'List participants who submitted the form but have no event slot yet. Needs legacy_schedule_id (legacy schedule domain id).',
         example: `User: "Who hasn't been scheduled yet?"
-<thought>I need schedule_id.</thought>
-FUNCTION_CALL: {"name":"listSchedules","arguments":{}}
-[After ID retrieved]
-FUNCTION_CALL: {"name":"listUnassignedParticipants","arguments":{"schedule_id":"..."}}`,
+<thought>I need a legacy schedule id from context.</thought>
+FUNCTION_CALL: {"name":"listUnassignedParticipants","arguments":{"legacy_schedule_id":"..."}}`,
     },
 
     {

@@ -2,11 +2,11 @@
   "extends": "../../tsconfig.node.json",
   "compilerOptions": {
     "tsBuildInfoFile": "../../node_modules/.tmp/apps-api.tsbuildinfo",
-    "rootDir": "../../",
+    "rootDir": "./src",
     "outDir": "./dist",
     "allowImportingTsExtensions": false,
     "types": ["node", "vite/client"],
     "noEmit": false
   },
-  "include": ["src", "../../src/application", "../../src/domain", "../../src/infrastructure"]
+  "include": ["src"]
 }

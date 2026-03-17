@@ -1,0 +1,73 @@
+/* Simple CSS without Tailwind - temporary solution */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: system-ui, -apple-system, sans-serif;
+  background: linear-gradient(135deg, #fff7ed 0%, #ffffff 50%, #fff7ed 100%);
+  min-height: 100vh;
+}
+
+.dashboard-container {
+  min-height: 100vh;
+}
+
+.header {
+  border-bottom: 1px solid #e5e7eb;
+  background: rgba(255, 255, 255, 0.8);
+  backdrop-filter: blur(4px);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.header-content {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 1.5rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.header h1 {
+  font-size: 2rem;
+  font-weight: bold;
+  color: #111827;
+}
+
+.header p {
+  color: #6b7280;
+  margin-top: 0.25rem;
+}
+
+.btn-primary {
+  background-color: #f97316;
+  color: white;
+  font-weight: 500;
+  padding: 1rem 1.5rem;
+  border-radius: 0.5rem;
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  transition: background-color 0.2s;
+}
+
+.btn-primary:hover {
+  background-color: #ea580c;
+}
+
+.loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  color: #6b7280;
+  font-size: 1.125rem;
+}

@@ -1,7 +1,12 @@
 {
-  "extends": "../../tsconfig.app.json",
+  "extends": "../../tsconfig.node.json",
   "compilerOptions": {
-    "tsBuildInfoFile": "../../node_modules/.tmp/packages-domain.tsbuildinfo"
+    "tsBuildInfoFile": "../../node_modules/.tmp/packages-domain.tsbuildinfo",
+    "rootDir": "./src",
+    "outDir": "./dist",
+    "noEmit": false,
+    "declaration": true,
+    "allowImportingTsExtensions": false
   },
-  "include": ["src", "../../src/domain"]
+  "include": ["src"]
 }

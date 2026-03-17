@@ -87,7 +87,8 @@ aria/
 |  `- api/                    # Current server-managed execution shell
 |- packages/
 |  |- domain/                 # Shared domain contracts and entities
-|  `- application/            # Shared application handlers and orchestration contracts
+|  |- application/            # Shared application handlers and orchestration contracts
+|  `- infrastructure/         # Shared provider adapters and persistence integration
 |- src/                       # Legacy compatibility surface pending migration
 |- supabase/
 |  |- functions/              # Retained temporary edge-runtime boundaries
@@ -100,11 +101,7 @@ aria/
 
 ## Current Sprint
 
-The active sprint is `PHASE-1 - Monorepo And Runtime Reset`. Phase 1 is only considered closed once:
-- `.env.example` is published
-- local `.env` is populated from that contract
-- QA closeout completes
-- reviewer closeout completes
+The active sprint is `PHASE-3 - Provider Connection And Sync`. Phase 3 is focused on hardening one-flow provider connection, selected-calendar and primary-write behavior, and bidirectional sync reliability (including watch/webhook paths).
 
 ## License
 

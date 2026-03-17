@@ -1,0 +1,24 @@
+{
+  "name": "@aria/infrastructure",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "dependencies": {
+    "@aria/domain": "0.0.0",
+    "@supabase/supabase-js": "^2.75.0"
+  },
+  "scripts": {
+    "build:deps": "node ../../scripts/link-workspace-packages.mjs && npm run build -w @aria/domain",
+    "build": "npm run build:deps && tsc -p tsconfig.json",
+    "lint": "eslint src --ext .ts",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  }
+}

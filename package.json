@@ -11,6 +11,7 @@
     "dev": "npm run dev:web",
     "dev:web": "npm run dev -w @aria/web",
     "dev:api": "npm run dev -w @aria/api",
+    "link:workspace-packages": "node scripts/link-workspace-packages.mjs",
     "build": "npm run build:workspaces",
     "build:workspaces": "npm run build -ws --if-present",
     "lint": "npm run lint:workspaces",

@@ -1,0 +1,12 @@
+{
+  "extends": "../../tsconfig.node.json",
+  "compilerOptions": {
+    "tsBuildInfoFile": "../../node_modules/.tmp/packages-infrastructure.tsbuildinfo",
+    "rootDir": "./src",
+    "outDir": "./dist",
+    "noEmit": false,
+    "declaration": true,
+    "allowImportingTsExtensions": false
+  },
+  "include": ["src"]
+}

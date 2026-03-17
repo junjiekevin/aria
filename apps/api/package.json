@@ -3,9 +3,16 @@
   "private": true,
   "version": "0.0.0",
   "type": "module",
+  "dependencies": {
+    "@aria/application": "0.0.0",
+    "@aria/domain": "0.0.0",
+    "@aria/infrastructure": "0.0.0"
+  },
   "scripts": {
+    "clean": "node -e \"require('fs').rmSync('dist',{recursive:true,force:true})\"",
+    "build:deps": "node ../../scripts/link-workspace-packages.mjs && npm run build -w @aria/domain && npm run build -w @aria/application && npm run build -w @aria/infrastructure",
+    "build": "npm run clean && npm run build:deps && tsc -p tsconfig.json",
     "dev": "npm run build && node dist/server.js",
-    "build": "tsc -p tsconfig.json",
     "lint": "eslint src --ext .ts"
   }
 }
